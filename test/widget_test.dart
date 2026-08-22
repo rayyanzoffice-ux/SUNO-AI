@@ -26,14 +26,14 @@ void main() {
     await tester.pumpWidget(const SunoApp());
     await tester.tap(find.text('START MONITORING'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('SIMULATE DISTRESS DETECTION'));
+    await tester.tap(find.text('Demo: Simulate Distress'));
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
     expect(find.text('Emergency Alert Activated'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('VIEW TRUSTED CONTACT ALERT'));
+    await tester.ensureVisible(find.text('VIEW LOCATION'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('VIEW TRUSTED CONTACT ALERT'));
+    await tester.tap(find.text('VIEW LOCATION'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('I AM CHECKING ON THEM'));
     await tester.pumpAndSettle();

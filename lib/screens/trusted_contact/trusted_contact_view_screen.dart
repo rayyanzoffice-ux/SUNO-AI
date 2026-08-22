@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
 import '../../models/incident.dart';
 import '../../services/mock_incident_service.dart';
+import '../../widgets/map_preview_card.dart';
 import '../../widgets/primary_action_button.dart';
 import '../../widgets/risk_badge.dart';
 
@@ -30,83 +31,90 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
     final displayTime =
         '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
     return Scaffold(
-      appBar: AppBar(title: const Text('Trusted contact alert')),
+      appBar: AppBar(title: const Text('Safety alert')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.notification_important_rounded,
-                color: AppColors.emergency,
-                size: 52,
+              const Center(
+                child: CircleAvatar(
+                  radius: 29,
+                  backgroundColor: Color(0xFFFFE8E9),
+                  child: Icon(
+                    Icons.person_rounded,
+                    color: AppColors.emergency,
+                    size: 32,
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Rayyan may be in danger',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+              const SizedBox(height: 12),
+              const Center(
+                child: Text(
+                  'Rayyan',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
-              RiskBadge(
-                score: result?.riskScore ?? 96,
-                level: result?.riskLevel ?? RiskLevel.critical,
+              const SizedBox(height: 3),
+              const Center(
+                child: Text(
+                  'Rayyan may be in danger',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              Center(
+                child: RiskBadge(
+                  score: result?.riskScore ?? 96,
+                  level: result?.riskLevel ?? RiskLevel.critical,
+                ),
+              ),
+              const SizedBox(height: 18),
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 5,
+                  ),
                   child: Column(
                     children: [
                       _line(
-                        Icons.hearing,
+                        Icons.hearing_rounded,
                         'Event',
                         result?.eventType ?? 'Distress Sound + Impact',
                       ),
-                      _line(Icons.schedule, 'Time', '$displayTime · Today'),
+                      const Divider(height: 1),
                       _line(
-                        Icons.location_on_outlined,
-                        'Location',
-                        result == null
-                            ? MockIncidentService.locationText
-                            : MockIncidentService.instance.locationFor(result),
+                        Icons.schedule_rounded,
+                        'Detected',
+                        '$displayTime · Today',
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              Container(
-                height: 150,
-                decoration: BoxDecoration(
-                  color: AppColors.navyLight,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.map_outlined,
-                        size: 42,
-                        color: AppColors.purple,
-                      ),
-                      SizedBox(height: 8),
-                      Text('Map preview unavailable in demo'),
-                      Text(
-                        'Lahore, Pakistan',
-                        style: TextStyle(color: AppColors.textMuted),
-                      ),
-                    ],
-                  ),
-                ),
+              const SizedBox(height: 18),
+              const Text(
+                'Live Location',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 9),
+              const MapPreviewCard(),
+              const SizedBox(height: 12),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: .14),
+                  color: AppColors.warning.withValues(alpha: .1),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
@@ -114,22 +122,16 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: AppColors.warning,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              PrimaryActionButton(
-                label: 'THEY ARE SAFE',
-                color: AppColors.safe,
-                onPressed: () => update(
-                  IncidentStatus.resolved,
-                  'Resolved — contact confirmed they are safe',
-                ),
-              ),
-              const SizedBox(height: 9),
+              const SizedBox(height: 16),
               PrimaryActionButton(
                 label: 'I AM CHECKING ON THEM',
+                color: AppColors.warning,
+                icon: Icons.directions_run_rounded,
                 onPressed: () => update(
                   IncidentStatus.contactChecking,
                   'Contact checking — help is on the way',
@@ -137,19 +139,21 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
               ),
               const SizedBox(height: 9),
               PrimaryActionButton(
-                label: 'UNABLE TO CONTACT',
-                color: AppColors.emergency,
+                label: 'THEY ARE SAFE',
+                color: AppColors.safe,
+                icon: Icons.check_circle_outline_rounded,
                 onPressed: () => update(
-                  IncidentStatus.alertTriggered,
-                  'Escalation needed — unable to contact',
+                  IncidentStatus.resolved,
+                  'Resolved — contact confirmed they are safe',
                 ),
               ),
-              const SizedBox(height: 9),
-              PrimaryActionButton(
-                label: 'VIEW HISTORY',
-                outlined: true,
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.history),
+              const SizedBox(height: 4),
+              Center(
+                child: TextButton(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRoutes.history),
+                  child: const Text('VIEW HISTORY'),
+                ),
               ),
             ],
           ),
@@ -159,23 +163,26 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
   }
 
   static Widget _line(IconData icon, String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
+    padding: const EdgeInsets.symmetric(vertical: 12),
     child: Row(
       children: [
-        Icon(icon, color: AppColors.purple),
-        const SizedBox(width: 12),
+        Icon(icon, color: AppColors.purple, size: 21),
+        const SizedBox(width: 11),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: const TextStyle(color: Colors.black54, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
               ),
               Text(
                 value,
                 style: const TextStyle(
-                  color: AppColors.navy,
+                  color: AppColors.text,
                   fontWeight: FontWeight.w700,
                 ),
               ),
