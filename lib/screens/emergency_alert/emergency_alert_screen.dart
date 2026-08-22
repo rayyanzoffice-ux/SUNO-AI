@@ -2,132 +2,205 @@ import 'package:flutter/material.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
-import '../../models/detection_result.dart';
 import '../../models/incident.dart';
 import '../../services/mock_incident_service.dart';
 import '../../widgets/primary_action_button.dart';
-import '../../widgets/risk_badge.dart';
 
 class EmergencyAlertScreen extends StatelessWidget {
   const EmergencyAlertScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final incident = MockIncidentService.instance.currentIncident;
-    final result = incident?.detectionResult;
+    final result =
+        MockIncidentService.instance.currentIncident?.detectionResult;
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: AppColors.emergency.withValues(alpha: .16),
-                  shape: BoxShape.circle,
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(22, 4, 22, 20),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - 24,
+              ),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 112,
+                      height: 112,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.emergency.withValues(alpha: .1),
+                        border: Border.all(
+                          color: AppColors.emergency.withValues(alpha: .22),
+                          width: 7,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.emergency.withValues(alpha: .16),
+                            blurRadius: 30,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.notifications_active_rounded,
+                        color: AppColors.emergency,
+                        size: 53,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Emergency Alert Activated',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.emergency,
+                        fontSize: 30,
+                        height: 1.08,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Your trusted contacts are being notified.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 22),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 6,
+                        ),
+                        child: Column(
+                          children: [
+                            _Detail(
+                              icon: Icons.hearing_rounded,
+                              label: 'Event',
+                              value:
+                                  result?.eventType ??
+                                  'Distress Sound + Impact',
+                            ),
+                            const Divider(height: 1),
+                            _Detail(
+                              icon: Icons.speed_rounded,
+                              label: 'Risk Score',
+                              value: '${result?.riskScore ?? 96}% (Critical)',
+                              critical: true,
+                            ),
+                            const Divider(height: 1),
+                            const _Detail(
+                              icon: Icons.location_on_outlined,
+                              label: 'Location',
+                              value: 'Live location captured',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.verified_user_outlined,
+                            color: AppColors.safe,
+                            size: 18,
+                          ),
+                          SizedBox(width: 7),
+                          Text(
+                            'Safety network activated',
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PrimaryActionButton(
+                      label: 'VIEW LOCATION',
+                      color: AppColors.emergency,
+                      icon: Icons.location_on_rounded,
+                      onPressed: () {
+                        MockIncidentService.instance.updateStatus(
+                          IncidentStatus.contactNotified,
+                        );
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.trustedContactView,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () =>
+                          Navigator.pushNamed(context, AppRoutes.history),
+                      child: const Text('View incident history'),
+                    ),
+                  ],
                 ),
-                child: const Icon(
-                  Icons.emergency_rounded,
-                  color: AppColors.emergency,
-                  size: 58,
-                ),
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'Emergency Alert Activated',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 29, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Critical risk detected. Your safety network is being engaged.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textMuted, height: 1.4),
-              ),
-              const SizedBox(height: 24),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      _row(
-                        'Event',
-                        result?.eventType ?? 'Distress Sound + Impact',
-                      ),
-                      _row(
-                        'Confidence',
-                        '${((result?.confidence ?? .93) * 100).round()}%',
-                      ),
-                      _row(
-                        'Location',
-                        result == null
-                            ? MockIncidentService.locationText
-                            : MockIncidentService.instance.locationFor(result),
-                      ),
-                      const Divider(height: 28),
-                      RiskBadge(
-                        score: result?.riskScore ?? 96,
-                        level: result?.riskLevel ?? RiskLevel.critical,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.notifications_active_outlined,
-                    color: AppColors.warning,
-                  ),
-                  SizedBox(width: 8),
-                  Flexible(child: Text('Trusted contacts will be notified')),
-                ],
-              ),
-              const SizedBox(height: 28),
-              PrimaryActionButton(
-                label: 'VIEW TRUSTED CONTACT ALERT',
-                onPressed: () {
-                  MockIncidentService.instance.updateStatus(
-                    IncidentStatus.contactNotified,
-                  );
-                  Navigator.pushNamed(context, AppRoutes.trustedContactView);
-                },
-              ),
-              const SizedBox(height: 10),
-              PrimaryActionButton(
-                label: 'VIEW HISTORY',
-                outlined: true,
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.history),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  static Widget _row(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 7),
+class _Detail extends StatelessWidget {
+  const _Detail({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.critical = false,
+  });
+  final IconData icon;
+  final String label, value;
+  final bool critical;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 13),
     child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 92,
-          child: Text(label, style: const TextStyle(color: Colors.black54)),
+        Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: (critical ? AppColors.emergency : AppColors.purple)
+                .withValues(alpha: .09),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            size: 21,
+            color: critical ? AppColors.emergency : AppColors.purple,
+          ),
         ),
+        const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontWeight: FontWeight.w700,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  color: critical ? AppColors.emergency : AppColors.text,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
       ],

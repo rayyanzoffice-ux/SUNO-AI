@@ -72,6 +72,7 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.canvas,
     body: SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
@@ -82,21 +83,37 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
               child: Column(
                 children: [
                   const Spacer(),
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    size: 74,
-                    color: AppColors.warning,
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: .1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      size: 54,
+                      color: AppColors.warning,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    'Possible emergency detected',
+                    'Possible emergency\ndetected',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 24,
+                      height: 1.2,
+                      color: AppColors.emergency,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   const Text(
                     'Are you safe?',
-                    style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900),
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 34),
                   SizedBox(
@@ -108,15 +125,16 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                         SizedBox.expand(
                           child: CircularProgressIndicator(
                             value: seconds / 10,
-                            strokeWidth: 8,
+                            strokeWidth: 9,
                             color: AppColors.warning,
-                            backgroundColor: Colors.white12,
+                            backgroundColor: AppColors.border,
                           ),
                         ),
                         Text(
                           '$seconds',
                           style: const TextStyle(
                             fontSize: 44,
+                            color: AppColors.text,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -126,7 +144,8 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                   const SizedBox(height: 14),
                   const Text(
                     'Alert activates automatically when time runs out',
-                    style: TextStyle(color: AppColors.textMuted),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                   ),
                   const Spacer(),
                   PrimaryActionButton(
