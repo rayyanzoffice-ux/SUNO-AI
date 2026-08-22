@@ -32,3 +32,22 @@ Build a working demo in 3 days, not a production app.
 ## Important Rule
 
 Frontend must not wait for backend. Use mock data first, then replace mock data with backend result after integration.
+
+## Flutter Frontend
+
+The Android-first Flutter prototype is committed at the repository root. Its
+implementation is organized under `lib/` into models, mock services, screens,
+and reusable widgets; Android runner files live under `android/` and widget
+tests live under `test/`.
+
+Run the local mock demo with:
+
+```bash
+flutter pub get
+flutter run
+```
+
+The primary demo path is Home → Monitoring → Simulate Detection → Emergency
+Alert → Trusted Contact View → History. All detection, location, contact, and
+incident behavior is local mock data; the prototype does not contact external
+or emergency services.
