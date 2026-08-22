@@ -131,14 +131,24 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                         ),
                       ),
                     ),
-                  TextButton.icon(
+                  OutlinedButton.icon(
                     onPressed: detecting ? null : _simulate,
                     icon: const Icon(Icons.science_outlined, size: 18),
                     label: Text(
                       detecting ? 'Analyzing…' : 'Demo: Simulate Distress',
                     ),
-                    style: TextButton.styleFrom(
+                    style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textMuted,
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: AppColors.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 11,
+                      ),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 5),
