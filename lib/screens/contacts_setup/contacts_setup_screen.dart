@@ -1,0 +1,131 @@
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_theme.dart';
+import '../../models/trusted_contact.dart';
+import '../../services/mock_incident_service.dart';
+import '../../widgets/primary_action_button.dart';
+
+class ContactsSetupScreen extends StatefulWidget {
+  const ContactsSetupScreen({super.key});
+  @override
+  State<ContactsSetupScreen> createState() => _ContactsSetupScreenState();
+}
+
+class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
+  final name = TextEditingController();
+  final phone = TextEditingController();
+  final relationship = TextEditingController();
+  final contacts = <TrustedContact>[MockIncidentService.contact];
+
+  void save() {
+    if (name.text.trim().isEmpty ||
+        phone.text.trim().isEmpty ||
+        relationship.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Complete all contact fields.')),
+      );
+      return;
+    }
+    setState(
+      () => contacts.add(
+        TrustedContact(
+          id: DateTime.now().toString(),
+          name: name.text.trim(),
+          phone: phone.text.trim(),
+          relationship: relationship.text.trim(),
+        ),
+      ),
+    );
+    name.clear();
+    phone.clear();
+    relationship.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Trusted contact saved locally.')),
+    );
+  }
+
+  @override
+  void dispose() {
+    name.dispose();
+    phone.dispose();
+    relationship.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Trusted contacts')),
+    body: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your safety network',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Contacts shown here are stored only for this demo session.',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 20),
+            ...contacts.map(
+              (contact) => Card(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(14),
+                  leading: const CircleAvatar(
+                    backgroundColor: AppColors.purple,
+                    child: Icon(Icons.person),
+                  ),
+                  title: Text(
+                    contact.name,
+                    style: const TextStyle(
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${contact.relationship}\n${contact.phone}',
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                  isThreeLine: true,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Add a contact',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: name,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Phone'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: relationship,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Relationship'),
+            ),
+            const SizedBox(height: 18),
+            PrimaryActionButton(
+              label: 'SAVE CONTACT',
+              icon: Icons.person_add_alt_1,
+              onPressed: save,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
