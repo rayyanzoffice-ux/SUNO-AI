@@ -17,11 +17,19 @@ class TrustedContactViewScreen extends StatefulWidget {
 }
 
 class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
+  final ScrollController _scrollController = ScrollController();
   String status = 'Alert received — response needed';
+
   Future<void> update(IncidentStatus incidentStatus, String text) async {
     await SunoRuntimeService.instance.updateStatus(incidentStatus, text);
     if (!mounted) return;
     setState(() => status = text);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -34,8 +42,10 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
       appBar: AppBar(title: const Text('Safety alert')),
       body: SafeArea(
         child: Scrollbar(
+          controller: _scrollController,
           thumbVisibility: true,
           child: SingleChildScrollView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 48),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
