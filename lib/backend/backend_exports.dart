@@ -1,6 +1,6 @@
-/// Single import point for the whole backend/logic layer. Screens and state
-/// controllers can `import 'package:suno_ai/backend/backend_exports.dart';`
-/// instead of importing each file under lib/backend/ individually.
+// Single import point for the whole backend/logic layer. Screens and state
+// controllers can `import 'package:suno_ai/backend/backend_exports.dart';`
+// instead of importing each file under lib/backend/ individually.
 export 'contacts/in_memory_trusted_contact_repository.dart';
 export 'contacts/trusted_contact_repository.dart';
 export 'detection/detection_engine.dart';

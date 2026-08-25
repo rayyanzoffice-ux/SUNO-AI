@@ -16,28 +16,28 @@ void main() {
       expect(result.riskLevel, RiskLevel.critical);
     });
 
-    test(
-      'high-confidence distress alone (no motion corroboration) lands in medium',
-      () {
-        final result = engine.evaluateDetection(
-          confidence: 0.85,
-          impactDetected: false,
-          stillnessDetected: false,
-        );
-        expect(result.riskScore, 50);
-        expect(result.riskLevel, RiskLevel.medium);
-      },
-    );
-
-    test('moderate-confidence sound alone is too weak to clear the medium floor', () {
+    test('high-confidence distress alone (no motion corroboration) lands in medium', () {
       final result = engine.evaluateDetection(
-        confidence: 0.65,
+        confidence: 0.85,
         impactDetected: false,
         stillnessDetected: false,
       );
-      expect(result.riskScore, 35);
-      expect(result.riskLevel, RiskLevel.low);
+      expect(result.riskScore, 50);
+      expect(result.riskLevel, RiskLevel.medium);
     });
+
+    test(
+      'moderate-confidence sound alone is too weak to clear the medium floor',
+      () {
+        final result = engine.evaluateDetection(
+          confidence: 0.65,
+          impactDetected: false,
+          stillnessDetected: false,
+        );
+        expect(result.riskScore, 35);
+        expect(result.riskLevel, RiskLevel.low);
+      },
+    );
 
     test('low-confidence ambient sound scores zero and stays low risk', () {
       final result = engine.evaluateDetection(

@@ -83,6 +83,22 @@ class SafetyCheckEngine {
     _clearPending();
   }
 
+  /// Immediately completes the active check as no-response. This is used by
+  /// the explicit "can't respond" action and keeps escalation in this engine.
+  void escalateNow() {
+    final completer = _pendingCompleter;
+    final pending = _pendingDetection;
+    if (completer == null || pending == null || completer.isCompleted) return;
+    _timer?.cancel();
+    completer.complete(
+      SafetyCheckResult(
+        outcome: SafetyCheckOutcome.noResponse,
+        detectionResult: _escalate(pending),
+      ),
+    );
+    _clearPending();
+  }
+
   /// Cancels any in-flight countdown without resolving it — call this from
   /// a screen's dispose() if the Safety Check screen can be left mid-
   /// countdown, so no orphaned Timer keeps running in the background.

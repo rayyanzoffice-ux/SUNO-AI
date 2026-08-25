@@ -4,9 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
-import '../../models/incident.dart';
-import '../../services/mock_detection_service.dart';
-import '../../services/mock_incident_service.dart';
+import '../../backend/safety/safety_check_engine.dart';
+import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
 
 class SafetyCheckScreen extends StatefulWidget {
@@ -22,51 +21,44 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
   @override
   void initState() {
     super.initState();
-    if (MockIncidentService.instance.currentIncident == null) {
-      MockIncidentService.instance.createIncident(
-        MockDetectionService().createCriticalDemoResult(),
-      );
-    }
-    MockIncidentService.instance.updateStatus(IncidentStatus.safetyCheck);
+    _runBackendCheck();
     timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (seconds <= 1) {
-        timer?.cancel();
-        _emergency();
-      } else {
-        setState(() => seconds--);
-      }
+      if (!mounted || completed) return;
+      setState(() => seconds = seconds > 1 ? seconds - 1 : 0);
     });
+  }
+
+  Future<void> _runBackendCheck() async {
+    final result = await SunoRuntimeService.instance.startSafetyCheck();
+    if (completed || !mounted) return;
+    completed = true;
+    timer?.cancel();
+    await SunoRuntimeService.instance.applySafetyCheckResult(result);
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(
+      context,
+      result.outcome == SafetyCheckOutcome.userConfirmedSafe
+          ? AppRoutes.history
+          : AppRoutes.emergencyAlert,
+    );
   }
 
   void _emergency() {
     if (completed) return;
-    completed = true;
     timer?.cancel();
-    MockIncidentService.instance.updateStatus(
-      IncidentStatus.alertTriggered,
-      'No response received',
-    );
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.emergencyAlert);
-    }
+    SunoRuntimeService.instance.escalateSafetyCheck();
   }
 
   void _safe() {
     if (completed) return;
-    completed = true;
     timer?.cancel();
-    MockIncidentService.instance.updateStatus(
-      IncidentStatus.cancelled,
-      'User confirmed safe',
-    );
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.history);
-    }
+    SunoRuntimeService.instance.confirmSafe();
   }
 
   @override
   void dispose() {
     timer?.cancel();
+    if (!completed) SunoRuntimeService.instance.cancelSafetyCheck();
     super.dispose();
   }
 

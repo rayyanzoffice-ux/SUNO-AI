@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
-import '../../services/mock_detection_service.dart';
-import '../../services/mock_incident_service.dart';
+import '../../models/detection_result.dart';
+import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
 import '../../widgets/status_chip.dart';
 
 class MonitoringScreen extends StatefulWidget {
-  const MonitoringScreen({super.key});
+  const MonitoringScreen({
+    super.key,
+    this.scenario = DetectionScenario.critical,
+    this.runtime,
+  });
+  final DetectionScenario scenario;
+  final SunoRuntimeService? runtime;
   @override
   State<MonitoringScreen> createState() => _MonitoringScreenState();
 }
@@ -17,11 +23,19 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   bool detecting = false;
   Future<void> _simulate() async {
     setState(() => detecting = true);
-    final result = await MockDetectionService().simulateCriticalDetection();
-    MockIncidentService.instance.createIncident(result);
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.emergencyAlert);
+    final runtime = widget.runtime ?? SunoRuntimeService.instance;
+    final result = await runtime.runDetection(widget.scenario);
+    if (!mounted) return;
+    if (result.riskLevel == RiskLevel.low) {
+      setState(() => detecting = false);
+      return;
     }
+    await runtime.recordDetection(result);
+    if (!mounted) return;
+    final route = result.riskLevel == RiskLevel.medium
+        ? AppRoutes.safetyCheck
+        : AppRoutes.emergencyAlert;
+    Navigator.pushReplacementNamed(context, route);
   }
 
   @override

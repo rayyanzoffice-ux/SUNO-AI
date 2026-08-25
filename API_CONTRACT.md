@@ -7,10 +7,10 @@ This file defines the shared contract between frontend and backend.
 ```json
 {
   "eventType": "Distress Sound + Impact",
-  "confidence": 0.96,
+  "confidence": 0.93,
   "impactDetected": true,
   "stillnessDetected": true,
-  "riskScore": 96,
+  "riskScore": 95,
   "riskLevel": "critical",
   "locationText": "Lahore, Pakistan",
   "latitude": 31.5204,
