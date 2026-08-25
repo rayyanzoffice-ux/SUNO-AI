@@ -4,7 +4,7 @@ import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
 import '../../models/incident.dart';
-import '../../services/mock_incident_service.dart';
+import '../../services/suno_runtime_service.dart';
 import '../../widgets/map_preview_card.dart';
 import '../../widgets/primary_action_button.dart';
 import '../../widgets/risk_badge.dart';
@@ -17,16 +17,24 @@ class TrustedContactViewScreen extends StatefulWidget {
 }
 
 class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
+  final ScrollController _scrollController = ScrollController();
   String status = 'Alert received — response needed';
-  void update(IncidentStatus incidentStatus, String text) {
-    MockIncidentService.instance.updateStatus(incidentStatus, text);
+
+  Future<void> update(IncidentStatus incidentStatus, String text) async {
+    await SunoRuntimeService.instance.updateStatus(incidentStatus, text);
+    if (!mounted) return;
     setState(() => status = text);
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final result =
-        MockIncidentService.instance.currentIncident?.detectionResult;
+    final result = SunoRuntimeService.instance.currentIncident?.detectionResult;
     final time = result?.detectedAt ?? DateTime.now();
     final displayTime =
         '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
@@ -34,8 +42,10 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
       appBar: AppBar(title: const Text('Safety alert')),
       body: SafeArea(
         child: Scrollbar(
+          controller: _scrollController,
           thumbVisibility: true,
           child: SingleChildScrollView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 48),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,7 +86,7 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                 const SizedBox(height: 12),
                 Center(
                   child: RiskBadge(
-                    score: result?.riskScore ?? 96,
+                    score: result?.riskScore ?? 0,
                     level: result?.riskLevel ?? RiskLevel.critical,
                   ),
                 ),
@@ -150,6 +160,15 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
+                Center(
+                  child: TextButton(
+                    onPressed: () => update(
+                      IncidentStatus.alertTriggered,
+                      'Unable to contact — emergency remains active',
+                    ),
+                    child: const Text('UNABLE TO CONTACT'),
+                  ),
+                ),
                 Center(
                   child: TextButton(
                     onPressed: () =>

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/incident.dart';
-import '../../services/mock_incident_service.dart';
+import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
 
 class EmergencyAlertScreen extends StatelessWidget {
@@ -11,8 +11,7 @@ class EmergencyAlertScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final result =
-        MockIncidentService.instance.currentIncident?.detectionResult;
+    final result = SunoRuntimeService.instance.currentIncident?.detectionResult;
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
@@ -86,14 +85,24 @@ class EmergencyAlertScreen extends StatelessWidget {
                             _Detail(
                               icon: Icons.speed_rounded,
                               label: 'Risk Score',
-                              value: '${result?.riskScore ?? 96}% (Critical)',
+                              value:
+                                  '${result?.riskScore ?? 0}% (${_label(result?.riskLevel)})',
                               critical: true,
                             ),
                             const Divider(height: 1),
-                            const _Detail(
+                            _Detail(
+                              icon: Icons.analytics_outlined,
+                              label: 'Confidence',
+                              value:
+                                  '${((result?.confidence ?? 0) * 100).round()}%',
+                            ),
+                            const Divider(height: 1),
+                            _Detail(
                               icon: Icons.location_on_outlined,
                               label: 'Location',
-                              value: 'Live location captured',
+                              value:
+                                  result?.locationText ??
+                                  'Location unavailable',
                             ),
                           ],
                         ),
@@ -126,7 +135,7 @@ class EmergencyAlertScreen extends StatelessWidget {
                       color: AppColors.emergency,
                       icon: Icons.location_on_rounded,
                       onPressed: () {
-                        MockIncidentService.instance.updateStatus(
+                        SunoRuntimeService.instance.updateStatus(
                           IncidentStatus.contactNotified,
                         );
                         Navigator.pushNamed(
@@ -149,6 +158,11 @@ class EmergencyAlertScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _label(Object? level) {
+    final name = level?.toString().split('.').last ?? 'unknown';
+    return '${name[0].toUpperCase()}${name.substring(1)}';
   }
 }
 

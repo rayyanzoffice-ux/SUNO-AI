@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/trusted_contact.dart';
-import '../../services/mock_incident_service.dart';
+import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
 
 class ContactsSetupScreen extends StatefulWidget {
@@ -15,9 +15,20 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
   final name = TextEditingController();
   final phone = TextEditingController();
   final relationship = TextEditingController();
-  final contacts = <TrustedContact>[MockIncidentService.contact];
+  final contacts = <TrustedContact>[];
 
-  void save() {
+  @override
+  void initState() {
+    super.initState();
+    _loadContacts();
+  }
+
+  Future<void> _loadContacts() async {
+    final saved = await SunoRuntimeService.instance.getTrustedContacts();
+    if (mounted) setState(() => contacts.addAll(saved));
+  }
+
+  Future<void> save() async {
     if (name.text.trim().isEmpty ||
         phone.text.trim().isEmpty ||
         relationship.text.trim().isEmpty) {
@@ -26,16 +37,16 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
       );
       return;
     }
-    setState(
-      () => contacts.add(
-        TrustedContact(
-          id: DateTime.now().toString(),
-          name: name.text.trim(),
-          phone: phone.text.trim(),
-          relationship: relationship.text.trim(),
-        ),
+    final contact = await SunoRuntimeService.instance.addTrustedContact(
+      TrustedContact(
+        id: DateTime.now().toString(),
+        name: name.text.trim(),
+        phone: phone.text.trim(),
+        relationship: relationship.text.trim(),
       ),
     );
+    if (!mounted) return;
+    setState(() => contacts.add(contact));
     name.clear();
     phone.clear();
     relationship.clear();

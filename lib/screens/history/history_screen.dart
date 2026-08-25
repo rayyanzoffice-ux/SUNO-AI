@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/incident.dart';
-import '../../services/mock_incident_service.dart';
+import '../../services/suno_runtime_service.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -13,25 +13,35 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   int filter = 0;
   @override
-  Widget build(BuildContext context) {
-    final incident = MockIncidentService.instance.currentIncident;
-    final currentStatus = switch (incident?.status) {
+  Widget build(BuildContext context) => FutureBuilder<List<Incident>>(
+    future: SunoRuntimeService.instance.getIncidentHistory(),
+    builder: (context, snapshot) =>
+        _buildContent(context, snapshot.data ?? const <Incident>[]),
+  );
+
+  Widget _buildContent(BuildContext context, List<Incident> incidents) {
+    String statusFor(IncidentStatus status) => switch (status) {
       IncidentStatus.contactChecking => 'Contact checking',
       IncidentStatus.resolved => 'Resolved — confirmed safe',
       IncidentStatus.cancelled => 'User confirmed safe',
       IncidentStatus.alertTriggered => 'Escalation needed',
       IncidentStatus.contactNotified => 'Contact notified',
-      _ => 'Contact checking',
+      IncidentStatus.safetyCheck => 'Safety check shown',
+      IncidentStatus.monitoring => 'Monitoring',
     };
-    final alerts = [
-      _HistoryCard(
-        title: 'Critical alert',
-        event: incident?.detectionResult.eventType ?? 'Distress Sound + Impact',
-        score: '${incident?.detectionResult.riskScore ?? 96}%',
-        status: currentStatus,
-        time: 'Today · 10:42',
-        color: AppColors.emergency,
-      ),
+    final generated = incidents.map((incident) {
+      final cancelled = incident.status == IncidentStatus.cancelled;
+      return _HistoryCard(
+        title: cancelled ? 'Canceled alert' : 'Critical alert',
+        event: incident.detectionResult.eventType,
+        score: '${incident.detectionResult.riskScore}%',
+        status: statusFor(incident.status),
+        time: _time(incident.createdAt),
+        color: cancelled ? AppColors.safe : AppColors.emergency,
+      );
+    }).toList();
+    final alerts = <_HistoryCard>[
+      ...generated.where((card) => card.color != AppColors.safe),
       const _HistoryCard(
         title: 'Safety check',
         event: 'Possible distress sound',
@@ -41,7 +51,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         color: AppColors.warning,
       ),
     ];
-    const canceled = [
+    final canceled = <_HistoryCard>[
+      ...generated.where((card) => card.color == AppColors.safe),
       _HistoryCard(
         title: 'Canceled alert',
         event: 'Medium safety check',
@@ -139,6 +150,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
     );
   }
+
+  static String _time(DateTime time) =>
+      'Today · ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 }
 
 class _HistoryCard extends StatelessWidget {
