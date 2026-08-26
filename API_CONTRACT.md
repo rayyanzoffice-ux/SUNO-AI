@@ -31,7 +31,6 @@ This file defines the shared contract between frontend and backend.
 
 ```text
 detected
-evaluating
 safety_check
 cancelled_by_user
 alert_triggered
