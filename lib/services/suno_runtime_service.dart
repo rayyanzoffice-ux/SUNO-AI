@@ -88,7 +88,9 @@ class SunoRuntimeService {
 
   Future<Incident?> applySafetyCheckResult(SafetyCheckResult result) async {
     final existing = currentIncident;
-    if (existing == null) return null;
+    if (existing == null || result.outcome == SafetyCheckOutcome.cancelled) {
+      return existing;
+    }
     final now = DateTime.now();
     final updated = Incident(
       id: existing.id,

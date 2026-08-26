@@ -4,7 +4,7 @@ import '../../models/detection_result.dart';
 import '../risk/risk_engine.dart';
 
 /// Outcome of a completed Safety Check countdown.
-enum SafetyCheckOutcome { userConfirmedSafe, noResponse }
+enum SafetyCheckOutcome { userConfirmedSafe, noResponse, cancelled }
 
 /// Bundles the outcome with the (possibly escalated) [DetectionResult] so
 /// the caller has everything needed to update the Incident in one step.
@@ -23,10 +23,7 @@ class SafetyCheckResult {
 ///
 /// Framework-free — screens/state controllers own the actual UI countdown
 /// display (the visible "10" ring) and call into this class only for the
-/// timing + scoring logic. Only one countdown can be active at a time;
-/// starting a new one silently cancels any previous pending countdown
-/// without resolving it, since overlapping incidents aren't supported by
-/// the single-current-incident design in incident.dart.
+/// timing + scoring logic. Only one countdown can be active at a time.
 class SafetyCheckEngine {
   SafetyCheckEngine({RiskEngine? riskEngine, Duration? countdownDuration})
     : _riskEngine = riskEngine ?? const RiskEngine(),
@@ -45,7 +42,7 @@ class SafetyCheckEngine {
   /// [SafetyCheckOutcome.userConfirmedSafe] and the original (unescalated)
   /// result if it is.
   Future<SafetyCheckResult> startCountdown(DetectionResult detection) {
-    _timer?.cancel();
+    _cancelActiveCountdown();
     final completer = Completer<SafetyCheckResult>();
     _pendingCompleter = completer;
     _pendingDetection = detection;
@@ -99,12 +96,23 @@ class SafetyCheckEngine {
     _clearPending();
   }
 
-  /// Cancels any in-flight countdown without resolving it — call this from
-  /// a screen's dispose() if the Safety Check screen can be left mid-
-  /// countdown, so no orphaned Timer keeps running in the background.
+  /// Cancels any in-flight countdown and resolves its future as cancelled.
+  /// This prevents callers awaiting [startCountdown] from being left hanging
+  /// when the owning screen is disposed. Cancellation is deliberately not
+  /// treated as no-response, so it cannot trigger an emergency escalation.
   void dispose() {
+    final completer = _pendingCompleter;
+    final pending = _pendingDetection;
     _timer?.cancel();
     _timer = null;
+    if (completer != null && pending != null && !completer.isCompleted) {
+      completer.complete(
+        SafetyCheckResult(
+          outcome: SafetyCheckOutcome.cancelled,
+          detectionResult: pending,
+        ),
+      );
+    }
     _pendingCompleter = null;
     _pendingDetection = null;
   }
@@ -133,5 +141,20 @@ class SafetyCheckEngine {
     _pendingCompleter = null;
     _pendingDetection = null;
     _timer = null;
+  }
+
+  void _cancelActiveCountdown() {
+    final completer = _pendingCompleter;
+    final pending = _pendingDetection;
+    _timer?.cancel();
+    if (completer != null && pending != null && !completer.isCompleted) {
+      completer.complete(
+        SafetyCheckResult(
+          outcome: SafetyCheckOutcome.cancelled,
+          detectionResult: pending,
+        ),
+      );
+    }
+    _clearPending();
   }
 }
