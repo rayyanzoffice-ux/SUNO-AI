@@ -96,7 +96,9 @@ void main() {
     expect(find.text('58%'), findsNothing);
   });
 
-  testWidgets('history uses repository data and status filters', (tester) async {
+  testWidgets('history uses repository data and status filters', (
+    tester,
+  ) async {
     final repository = InMemoryIncidentRepository();
     final runtime = SunoRuntimeService(incidentRepository: repository);
     final cancelled = _historyIncident(

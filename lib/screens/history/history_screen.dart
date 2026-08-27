@@ -28,12 +28,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildContent(BuildContext context, List<Incident> incidents) {
     final filteredIncidents = switch (filter) {
-      1 => incidents
-          .where((incident) => incident.status != IncidentStatus.cancelled)
-          .toList(),
-      2 => incidents
-          .where((incident) => incident.status == IncidentStatus.cancelled)
-          .toList(),
+      1 =>
+        incidents
+            .where((incident) => incident.status != IncidentStatus.cancelled)
+            .toList(),
+      2 =>
+        incidents
+            .where((incident) => incident.status == IncidentStatus.cancelled)
+            .toList(),
       _ => incidents,
     };
     final cards = filteredIncidents.map(_cardFor).toList();
@@ -121,8 +123,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       )
                     : ListView.separated(
                         itemCount: cards.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: 11),
+                        separatorBuilder: (_, _) => const SizedBox(height: 11),
                         itemBuilder: (_, i) => cards[i],
                       ),
               ),
