@@ -1,4 +1,4 @@
-enum RiskLevel { low, medium, high, critical }
+enum RiskLevel { low, medium, critical }
 
 extension RiskLevelContract on RiskLevel {
   String get wireValue => name;
