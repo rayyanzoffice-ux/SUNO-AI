@@ -13,9 +13,11 @@ import 'mock_detection_repository.dart';
 /// [DetectionResult.riskLevel].
 class DetectionEngine {
   DetectionEngine({DetectionRepository? repository})
-    : _repository = repository ?? MockDetectionRepository();
+    : _repository = repository ?? MockDetectionRepository(),
+      _demoRepository = MockDetectionRepository();
 
   final DetectionRepository _repository;
+  final MockDetectionRepository _demoRepository;
 
   /// Convenience singleton for call sites that don't need dependency
   /// injection (e.g. quick wiring from a screen's button handler). Supports
@@ -24,34 +26,19 @@ class DetectionEngine {
   static final DetectionEngine instance = DetectionEngine();
 
   /// Runs the primary demo path and returns a critical-risk
-  /// [DetectionResult]. Falls back to [detect] if a non-mock repository has
-  /// been wired in, since a real implementation doesn't take a named
-  /// scenario argument.
-  Future<DetectionResult> simulateCriticalDetection() {
-    final repo = _repository;
-    if (repo is MockDetectionRepository) {
-      return repo.simulateCriticalDetection();
-    }
-    return repo.detect();
-  }
+  /// [DetectionResult]. Kept on the mock fixture repository even when a live
+  /// [DetectionRepository] is injected so demo buttons stay deterministic
+  /// during the TFLite wiring sprint.
+  Future<DetectionResult> simulateCriticalDetection() =>
+      _demoRepository.simulateCriticalDetection();
 
   /// Same as [simulateCriticalDetection] but for the medium-risk demo path.
-  Future<DetectionResult> simulateMediumDetection() {
-    final repo = _repository;
-    if (repo is MockDetectionRepository) {
-      return repo.simulateMediumDetection();
-    }
-    return repo.detect();
-  }
+  Future<DetectionResult> simulateMediumDetection() =>
+      _demoRepository.simulateMediumDetection();
 
   /// Same as above but for the low-risk / ambient demo path.
-  Future<DetectionResult> simulateLowRiskDetection() {
-    final repo = _repository;
-    if (repo is MockDetectionRepository) {
-      return repo.simulateLowRiskDetection();
-    }
-    return repo.detect();
-  }
+  Future<DetectionResult> simulateLowRiskDetection() =>
+      _demoRepository.simulateLowRiskDetection();
 
   /// The real entry point once a live detection pipeline exists — runs
   /// whatever [DetectionRepository] is currently wired in, mock or real.
