@@ -7,6 +7,65 @@ import 'package:suno_ai/services/suno_runtime_service.dart';
 
 void main() {
   test(
+    'runtime demo scenarios preserve LOW MEDIUM CRITICAL outcomes',
+    () async {
+      final runtime = SunoRuntimeService();
+
+      final low = await runtime.runDetection(DetectionScenario.low);
+      expect(low.eventType, 'Ambient Sound');
+      expect(low.riskScore, 0);
+      expect(low.riskLevel, RiskLevel.low);
+      expect(await runtime.recordDetection(low), isNull);
+      expect(runtime.currentIncident, isNull);
+
+      final medium = await runtime.runDetection(DetectionScenario.medium);
+      final mediumIncident = await runtime.recordDetection(medium);
+      expect(medium.eventType, 'Possible Distress Sound');
+      expect(medium.riskScore, 50);
+      expect(medium.riskLevel, RiskLevel.medium);
+      expect(mediumIncident?.status, IncidentStatus.safetyCheck);
+
+      final critical = await runtime.runDetection(DetectionScenario.critical);
+      final criticalIncident = await runtime.recordDetection(critical);
+      expect(critical.eventType, 'Distress Sound + Impact');
+      expect(critical.riskScore, 95);
+      expect(critical.riskLevel, RiskLevel.critical);
+      expect(criticalIncident?.status, IncidentStatus.alertTriggered);
+    },
+  );
+
+  test(
+    'named demo scenarios stay frozen when a live repository is injected',
+    () async {
+      final engine = DetectionEngine(repository: _LiveCriticalRepository());
+      final runtime = SunoRuntimeService(detectionEngine: engine);
+
+      final low = await runtime.runDetection(DetectionScenario.low);
+      final medium = await runtime.runDetection(DetectionScenario.medium);
+      final critical = await runtime.runDetection(DetectionScenario.critical);
+      final live = await engine.detect();
+
+      expect(low.riskLevel, RiskLevel.low);
+      expect(low.riskScore, 0);
+      expect(medium.riskLevel, RiskLevel.medium);
+      expect(medium.riskScore, 50);
+      expect(critical.riskLevel, RiskLevel.critical);
+      expect(critical.riskScore, 95);
+      expect(live.eventType, 'Live Detector Event');
+      expect(live.riskScore, 100);
+    },
+  );
+
+  test('RiskLevel contract exposes only current demo readiness levels', () {
+    expect(RiskLevel.values.map((level) => level.wireValue), [
+      'low',
+      'medium',
+      'critical',
+    ]);
+    expect(RiskLevelContract.fromWireValue('high'), RiskLevel.low);
+  });
+
+  test(
     'SafetyCheckEngine timeout escalates medium detection to critical',
     () async {
       final runtime = SunoRuntimeService(
@@ -135,6 +194,40 @@ void main() {
     expect(secondOutcome.detectionResult, same(secondDetection));
   });
 
+  test(
+    'completed safety checks ignore late lifecycle actions and can restart',
+    () async {
+      final detection = DetectionResult(
+        eventType: 'Possible Distress Sound',
+        confidence: 0.85,
+        impactDetected: false,
+        stillnessDetected: false,
+        riskScore: 50,
+        riskLevel: RiskLevel.medium,
+        detectedAt: DateTime(2026, 1, 1, 12),
+      );
+      final engine = SafetyCheckEngine(
+        countdownDuration: const Duration(milliseconds: 5),
+      );
+
+      final timedOut = await engine.startCountdown(detection);
+      engine.confirmSafe();
+      engine.escalateNow();
+      engine.dispose();
+
+      expect(timedOut.outcome, SafetyCheckOutcome.noResponse);
+      expect(timedOut.detectionResult.riskScore, 70);
+      expect(timedOut.detectionResult.riskLevel, RiskLevel.critical);
+
+      final restartedFuture = engine.startCountdown(detection);
+      engine.confirmSafe();
+      final restarted = await restartedFuture;
+
+      expect(restarted.outcome, SafetyCheckOutcome.userConfirmedSafe);
+      expect(restarted.detectionResult, same(detection));
+    },
+  );
+
   test('a cancelled safety check leaves the incident unchanged', () async {
     final runtime = SunoRuntimeService(
       safetyCheckEngine: SafetyCheckEngine(
@@ -258,4 +351,17 @@ void main() {
     expect(contacts, hasLength(2));
     expect(contacts.last.id, contact.id);
   });
+}
+
+class _LiveCriticalRepository implements DetectionRepository {
+  @override
+  Future<DetectionResult> detect() async => DetectionResult(
+    eventType: 'Live Detector Event',
+    confidence: 0.99,
+    impactDetected: true,
+    stillnessDetected: true,
+    riskScore: 100,
+    riskLevel: RiskLevel.critical,
+    detectedAt: DateTime(2026, 1, 1, 12),
+  );
 }
