@@ -58,3 +58,7 @@ app.*.map.json
 *.webp
 *.ico
 *.zip
+ml/raw_audio/
+ml/extracted_features/
+*.wav
+*.mp3
