@@ -5,68 +5,41 @@ import '../../models/incident.dart';
 import '../../services/suno_runtime_service.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({super.key, this.runtimeService});
+
+  final SunoRuntimeService? runtimeService;
+
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
   int filter = 0;
+
+  SunoRuntimeService get _runtimeService =>
+      widget.runtimeService ?? SunoRuntimeService.instance;
+
   @override
   Widget build(BuildContext context) => FutureBuilder<List<Incident>>(
-    future: SunoRuntimeService.instance.getIncidentHistory(),
+    future: _runtimeService.getIncidentHistory(),
     builder: (context, snapshot) =>
         _buildContent(context, snapshot.data ?? const <Incident>[]),
   );
 
   Widget _buildContent(BuildContext context, List<Incident> incidents) {
-    String statusFor(IncidentStatus status) => switch (status) {
-      IncidentStatus.contactChecking => 'Contact checking',
-      IncidentStatus.resolved => 'Resolved — confirmed safe',
-      IncidentStatus.cancelled => 'User confirmed safe',
-      IncidentStatus.alertTriggered => 'Escalation needed',
-      IncidentStatus.contactNotified => 'Contact notified',
-      IncidentStatus.safetyCheck => 'Safety check shown',
-      IncidentStatus.monitoring => 'Monitoring',
+    final filteredIncidents = switch (filter) {
+      1 =>
+        incidents
+            .where((incident) => incident.status != IncidentStatus.cancelled)
+            .toList(),
+      2 =>
+        incidents
+            .where((incident) => incident.status == IncidentStatus.cancelled)
+            .toList(),
+      _ => incidents,
     };
-    final generated = incidents.map((incident) {
-      final cancelled = incident.status == IncidentStatus.cancelled;
-      return _HistoryCard(
-        title: cancelled ? 'Canceled alert' : 'Critical alert',
-        event: incident.detectionResult.eventType,
-        score: '${incident.detectionResult.riskScore}%',
-        status: statusFor(incident.status),
-        time: _time(incident.createdAt),
-        color: cancelled ? AppColors.safe : AppColors.emergency,
-      );
-    }).toList();
-    final alerts = <_HistoryCard>[
-      ...generated.where((card) => card.color != AppColors.safe),
-      const _HistoryCard(
-        title: 'Safety check',
-        event: 'Possible distress sound',
-        score: '61%',
-        status: 'Safety check shown',
-        time: 'Yesterday · 18:20',
-        color: AppColors.warning,
-      ),
-    ];
-    final canceled = <_HistoryCard>[
-      ...generated.where((card) => card.color == AppColors.safe),
-      _HistoryCard(
-        title: 'Canceled alert',
-        event: 'Medium safety check',
-        score: '58%',
-        status: 'User confirmed safe',
-        time: 'Aug 18 · 21:04',
-        color: AppColors.safe,
-      ),
-    ];
-    final cards = filter == 1
-        ? alerts
-        : filter == 2
-        ? canceled
-        : [...alerts, ...canceled];
+    final cards = filteredIncidents.map(_cardFor).toList();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Incident History')),
       body: SafeArea(
@@ -138,11 +111,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: ListView.separated(
-                  itemCount: cards.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 11),
-                  itemBuilder: (_, i) => cards[i],
-                ),
+                child: cards.isEmpty
+                    ? Center(
+                        child: Text(
+                          _emptyStateText(),
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: cards.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 11),
+                        itemBuilder: (_, i) => cards[i],
+                      ),
               ),
             ],
           ),
@@ -151,8 +134,91 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  static String _time(DateTime time) =>
-      'Today · ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  _HistoryCard _cardFor(Incident incident) {
+    final status = incident.status;
+    return _HistoryCard(
+      title: _titleFor(status),
+      event: incident.detectionResult.eventType,
+      score: '${incident.detectionResult.riskScore}%',
+      status: _statusFor(status),
+      time: _time(incident.createdAt),
+      color: _colorFor(status),
+      icon: _iconFor(status),
+    );
+  }
+
+  String _emptyStateText() => switch (filter) {
+    1 => 'No alert incidents',
+    2 => 'No canceled incidents',
+    _ => 'No incidents yet',
+  };
+
+  static String _titleFor(IncidentStatus status) => switch (status) {
+    IncidentStatus.cancelled => 'Canceled alert',
+    IncidentStatus.safetyCheck => 'Safety check',
+    IncidentStatus.resolved => 'Resolved alert',
+    IncidentStatus.monitoring => 'Monitoring',
+    IncidentStatus.alertTriggered ||
+    IncidentStatus.contactNotified ||
+    IncidentStatus.contactChecking => 'Critical alert',
+  };
+
+  static String _statusFor(IncidentStatus status) => switch (status) {
+    IncidentStatus.contactChecking => 'Contact checking',
+    IncidentStatus.resolved => 'Resolved — confirmed safe',
+    IncidentStatus.cancelled => 'User confirmed safe',
+    IncidentStatus.alertTriggered => 'Escalation needed',
+    IncidentStatus.contactNotified => 'Contact notified',
+    IncidentStatus.safetyCheck => 'Safety check shown',
+    IncidentStatus.monitoring => 'Monitoring',
+  };
+
+  static Color _colorFor(IncidentStatus status) => switch (status) {
+    IncidentStatus.cancelled || IncidentStatus.resolved => AppColors.safe,
+    IncidentStatus.safetyCheck => AppColors.warning,
+    IncidentStatus.monitoring => AppColors.indigo,
+    IncidentStatus.alertTriggered ||
+    IncidentStatus.contactNotified ||
+    IncidentStatus.contactChecking => AppColors.emergency,
+  };
+
+  static IconData _iconFor(IncidentStatus status) => switch (status) {
+    IncidentStatus.cancelled || IncidentStatus.resolved => Icons.check_rounded,
+    IncidentStatus.safetyCheck => Icons.shield_outlined,
+    IncidentStatus.monitoring => Icons.hearing_outlined,
+    IncidentStatus.alertTriggered ||
+    IncidentStatus.contactNotified ||
+    IncidentStatus.contactChecking => Icons.notifications_active_outlined,
+  };
+
+  static String _time(DateTime time) {
+    final now = DateTime.now();
+    final eventDate = DateTime(time.year, time.month, time.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final clock =
+        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+    if (eventDate == today) return 'Today · $clock';
+    if (eventDate == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday · $clock';
+    }
+
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[time.month - 1]} ${time.day} · $clock';
+  }
 }
 
 class _HistoryCard extends StatelessWidget {
@@ -163,9 +229,13 @@ class _HistoryCard extends StatelessWidget {
     required this.status,
     required this.time,
     required this.color,
+    required this.icon,
   });
+
   final String title, event, score, status, time;
   final Color color;
+  final IconData icon;
+
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
@@ -179,12 +249,7 @@ class _HistoryCard extends StatelessWidget {
               color: color.withValues(alpha: .1),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              color == AppColors.safe
-                  ? Icons.check_rounded
-                  : Icons.notifications_active_outlined,
-              color: color,
-            ),
+            child: Icon(icon, color: color),
           ),
           const SizedBox(width: 12),
           Expanded(
