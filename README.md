@@ -4,7 +4,7 @@ SUNO is a cost-free hackathon prototype for an AI Safety Companion.
 
 The prototype flow is:
 
-1. Home
+1. Home.
 2. Monitoring
 3. Detection Result
 4. Safety Check
