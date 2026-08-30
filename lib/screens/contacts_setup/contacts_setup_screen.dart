@@ -15,6 +15,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
   final name = TextEditingController();
   final phone = TextEditingController();
   final relationship = TextEditingController();
+  final fcmToken = TextEditingController();
   final contacts = <TrustedContact>[];
 
   @override
@@ -43,6 +44,9 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
         name: name.text.trim(),
         phone: phone.text.trim(),
         relationship: relationship.text.trim(),
+        fcmToken: fcmToken.text.trim().isEmpty
+            ? null
+            : fcmToken.text.trim(),
       ),
     );
     if (!mounted) return;
@@ -50,6 +54,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     name.clear();
     phone.clear();
     relationship.clear();
+    fcmToken.clear();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Trusted contact saved locally.')),
     );
@@ -60,6 +65,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     name.dispose();
     phone.dispose();
     relationship.dispose();
+    fcmToken.dispose();
     super.dispose();
   }
 
@@ -78,7 +84,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Contacts shown here are stored only for this demo session.',
+              'Contacts are stored locally on this device. Add an FCM token when the contact also has SUNO installed and should receive push alerts.',
               style: TextStyle(color: AppColors.textMuted),
             ),
             const SizedBox(height: 20),
@@ -98,7 +104,8 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                     ),
                   ),
                   subtitle: Text(
-                    '${contact.relationship}\n${contact.phone}',
+                    '${contact.relationship}\n${contact.phone}\n'
+                    '${contact.fcmToken == null ? 'Push: not configured' : 'Push: configured'}',
                     style: const TextStyle(color: Colors.black54),
                   ),
                   isThreeLine: true,
@@ -127,6 +134,16 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
               controller: relationship,
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(labelText: 'Relationship'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: fcmToken,
+              minLines: 1,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'FCM token (optional)',
+                helperText: 'Needed only for real push alerts to this contact.',
+              ),
             ),
             const SizedBox(height: 18),
             PrimaryActionButton(

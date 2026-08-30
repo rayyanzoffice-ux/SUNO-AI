@@ -12,6 +12,7 @@ class HiveTrustedContactRepository implements TrustedContactRepository {
       'name': contact.name,
       'phone': contact.phone,
       'relationship': contact.relationship,
+      'fcmToken': contact.fcmToken,
     });
     return contact;
   }

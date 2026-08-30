@@ -15,8 +15,8 @@ class YamNetEmbedding {
 
 /// Wraps yamnet.tflite and converts a [AudioWaveform] into YAMNet embeddings.
 ///
-/// Model contract:
-///   Input  [0]: [1, 15360] float32 waveform (16 kHz, 0.96 s)
+/// Model contract for the TF Hub lite model used by SUNO:
+///   Input  [0]: [15360] float32 waveform (16 kHz, 0.96 s)
 ///   Output [0]: [N_frames, 521] class probabilities (not used here)
 ///   Output [1]: [N_frames, 1024] embeddings  ← fed to SUNO classifier
 class YamNetStage {
@@ -34,14 +34,13 @@ class YamNetStage {
     final interpreter = await Interpreter.fromAsset(_modelAsset);
     var success = false;
     try {
+      interpreter.resizeInputTensor(0, [_expectedInputLength]);
       interpreter.allocateTensors();
       final inputShape = interpreter.getInputTensor(0).shape;
-      if (inputShape.length != 2 ||
-          inputShape[0] != 1 ||
-          inputShape[1] != _expectedInputLength) {
+      if (inputShape.length != 1 || inputShape[0] != _expectedInputLength) {
         throw FormatException(
           'YAMNet input shape mismatch: $inputShape; '
-          'expected [1, $_expectedInputLength].',
+          'expected [$_expectedInputLength].',
         );
       }
       success = true;
@@ -62,7 +61,7 @@ class YamNetStage {
       );
     }
 
-    final input = [List<double>.from(waveform.samples)];
+    final input = List<double>.from(waveform.samples);
     final numOutputs = _interpreter.getOutputTensors().length;
     final outputs = <int, Object>{};
     for (var i = 0; i < numOutputs; i++) {
@@ -75,11 +74,21 @@ class YamNetStage {
       throw StateError('Unexpected YAMNet embedding tensor type.');
     }
 
+    if (embeddingTensor.length == _embeddingSize &&
+        embeddingTensor.every((value) => value is num)) {
+      return [
+        YamNetEmbedding(
+          embedding: List<double>.from(embeddingTensor),
+          frameIndex: 0,
+        ),
+      ];
+    }
+
     final frames = <YamNetEmbedding>[];
     for (var fi = 0; fi < embeddingTensor.length; fi++) {
-      final row = embeddingTensor[fi] as List;
-      if (row.length != _embeddingSize) {
-        throw StateError('Unexpected embedding row length: ${row.length}');
+      final row = embeddingTensor[fi];
+      if (row is! List || row.length != _embeddingSize) {
+        throw StateError('Unexpected embedding row shape at frame $fi.');
       }
       frames.add(YamNetEmbedding(
         embedding: List<double>.from(row),
@@ -96,11 +105,14 @@ class YamNetStage {
   }
 
   static Object _buildBuffer(List<int> shape) {
-    if (shape.length == 1) return List<double>.filled(shape[0], 0.0);
-    if (shape.length == 2) {
-      return List<List<double>>.generate(
-        shape[0], (_) => List<double>.filled(shape[1], 0.0));
+    final safeShape = shape.map((dimension) => dimension < 0 ? 1 : dimension).toList();
+    if (safeShape.length == 1) {
+      return List<double>.filled(safeShape[0], 0.0);
     }
-    return List<double>.filled(shape.reduce((a, b) => a * b), 0.0);
+    if (safeShape.length == 2) {
+      return List<List<double>>.generate(
+        safeShape[0], (_) => List<double>.filled(safeShape[1], 0.0));
+    }
+    return List<double>.filled(safeShape.reduce((a, b) => a * b), 0.0);
   }
 }

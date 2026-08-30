@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -6,16 +7,20 @@ import 'alert_service.dart';
 
 /// Firebase Cloud Messaging implementation of [AlertService].
 ///
-/// This device registers for push notifications and stores its FCM token.
-/// Actual delivery to trusted contacts requires a server-side component
-/// (Supabase Edge Function or Firebase Cloud Function) that accepts the
-/// payload and sends FCM messages to the contact tokens.
-/// See SETUP_INSTRUCTIONS.md for the backend wiring.
+/// The client cannot send FCM directly to another phone. It sends the
+/// metadata-only alert payload to a trusted relay endpoint, and that server
+/// function calls the FCM HTTP API with server credentials.
 class FcmAlertService implements AlertService {
-  FcmAlertService({required FirebaseMessaging messaging})
-    : _messaging = messaging;
+  FcmAlertService({
+    required FirebaseMessaging messaging,
+    String relayEndpoint = const String.fromEnvironment(
+      'SUNO_ALERT_RELAY_URL',
+    ),
+  }) : _messaging = messaging,
+       _relayEndpoint = relayEndpoint;
 
   final FirebaseMessaging _messaging;
+  final String _relayEndpoint;
   String? _deviceToken;
 
   Future<String?> registerDevice() async {
@@ -25,6 +30,8 @@ class FcmAlertService implements AlertService {
       sound: true,
     );
     _deviceToken = await _messaging.getToken();
+    // ignore: avoid_print
+    print('[SUNO FCM] This device token: $_deviceToken');
     return _deviceToken;
   }
 
@@ -35,16 +42,51 @@ class FcmAlertService implements AlertService {
     required List<String> contactTokens,
     required Map<String, String> payload,
   }) async {
-    // In demo mode: print payload. Replace with HTTP POST to your
-    // Supabase Edge Function or Firebase Cloud Functions endpoint.
-    // ignore: avoid_print
-    print('[SUNO FCM] Would notify ${contactTokens.length} contact(s): '
-          '${jsonEncode(payload)}');
+    if (contactTokens.isEmpty) return;
+
+    if (_relayEndpoint.trim().isEmpty) {
+      // ignore: avoid_print
+      print('[SUNO FCM] Relay not configured. Would notify '
+          '${contactTokens.length} contact(s): ${jsonEncode(payload)}');
+      return;
+    }
+
+    final uri = Uri.parse(_relayEndpoint);
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'contactTokens': contactTokens,
+        'payload': payload,
+      }));
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = await utf8.decodeStream(response);
+        throw StateError(
+          'Alert relay failed (${response.statusCode}): $body',
+        );
+      }
+    } finally {
+      client.close(force: true);
+    }
   }
 
   @override
   Future<void> cancelAlert(String incidentId) async {
-    // ignore: avoid_print
-    print('[SUNO FCM] Cancel alert for incident $incidentId');
+    if (_relayEndpoint.trim().isEmpty) return;
+    final uri = Uri.parse(_relayEndpoint);
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'cancelIncidentId': incidentId,
+      }));
+      await request.close();
+    } finally {
+      client.close(force: true);
+    }
   }
 }
+

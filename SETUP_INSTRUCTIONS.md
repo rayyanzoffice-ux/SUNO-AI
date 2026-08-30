@@ -17,11 +17,14 @@ SUNO classifier head consumes. Without it, only the demo/mock path works.
 ```bash
 cd ~/SUNO-AI
 curl -L -o assets/ml/yamnet.tflite \
-  "https://storage.googleapis.com/tfhub-lite-models/google/lite-model/yamnet/tflite/1.tflite"
+  "https://tfhub.dev/google/lite-model/yamnet/tflite/1?lite-format=tflite"
 
-# Verify size (~3.7 MB expected):
+# Verify size (~16 MB expected for the float32 TF Hub Lite model):
 ls -lh assets/ml/yamnet.tflite
+file assets/ml/yamnet.tflite
 ```
+
+If the file is around 411 bytes or `file` says XML/text, the download failed and saved an AccessDenied response instead of the model.
 
 ---
 
@@ -58,20 +61,53 @@ server. Requires the `INTERNET` permission already added to AndroidManifest.
 
 ---
 
-## 5. Supabase Edge Function for alert delivery (optional)
+## 5. Supabase Edge Function for alert delivery
 
-If you want real push notifications to trusted contacts:
+The app cannot send FCM directly to another phone. It sends alert metadata to
+`supabase/functions/send-alert`, and that function calls Firebase Cloud Messaging
+with server credentials.
 
 ```bash
 npm install -g supabase
 supabase login
 supabase init
-supabase functions new send-alert
+supabase functions deploy send-alert
 ```
 
-The `send-alert` function receives `{ contactTokens: string[], payload: object }`
-and calls the FCM HTTP v1 API using a service account. See Firebase docs:
-https://firebase.google.com/docs/cloud-messaging/send-message
+Set these Supabase secrets from your Firebase service account JSON:
+
+```bash
+supabase secrets set FIREBASE_PROJECT_ID="suno-ai-c5463"
+supabase secrets set FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@suno-ai-c5463.iam.gserviceaccount.com"
+supabase secrets set FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+After deploy, copy the function URL and run the app with:
+
+```bash
+flutter run --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"
+```
+
+For a release APK:
+
+```bash
+flutter build apk --release \
+  --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"
+```
+
+Trusted contacts only receive push alerts if their saved contact record includes
+that phone's FCM token. The contact setup screen now has an optional FCM token
+field for hackathon testing.
+
+Two-phone test flow:
+1. Install/run SUNO on the contact phone.
+2. Read the console line: `[SUNO FCM] This device token: ...`.
+3. Copy that token into the sender phone's Trusted Contact → FCM token field.
+4. Run the sender phone with `SUNO_ALERT_RELAY_URL` configured.
+5. Trigger a critical alert; the sender posts event/risk/location metadata to
+   Supabase, and Supabase sends FCM to the contact phone.
+
+No raw audio is sent — only incident metadata and location coordinates.
 
 ---
 

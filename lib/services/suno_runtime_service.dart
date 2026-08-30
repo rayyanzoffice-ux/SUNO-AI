@@ -12,18 +12,21 @@ class SunoRuntimeService {
     SafetyCheckEngine? safetyCheckEngine,
     IncidentRepository? incidentRepository,
     TrustedContactRepository? trustedContactRepository,
+    AlertService? alertService,
   }) : _detectionEngine = detectionEngine ?? DetectionEngine.instance,
        _safetyCheckEngine = safetyCheckEngine ?? SafetyCheckEngine(),
        _incidents = incidentRepository ?? InMemoryIncidentRepository(),
        _contacts =
-           trustedContactRepository ?? InMemoryTrustedContactRepository();
+           trustedContactRepository ?? InMemoryTrustedContactRepository(),
+       _alertService = alertService;
 
-  static final SunoRuntimeService instance = SunoRuntimeService();
+  static SunoRuntimeService instance = SunoRuntimeService();
 
   final DetectionEngine _detectionEngine;
   final SafetyCheckEngine _safetyCheckEngine;
   final IncidentRepository _incidents;
   final TrustedContactRepository _contacts;
+  final AlertService? _alertService;
 
   Incident? currentIncident;
 
@@ -49,6 +52,9 @@ class SunoRuntimeService {
       updatedAt: now,
     );
     currentIncident = await _incidents.save(incident);
+    if (status == IncidentStatus.alertTriggered) {
+      await notifyTrustedContactsForCurrentIncident();
+    }
     return currentIncident;
   }
 
@@ -79,6 +85,36 @@ class SunoRuntimeService {
 
   Future<TrustedContact> addTrustedContact(TrustedContact contact) =>
       _contacts.add(contact);
+
+  Future<void> notifyTrustedContactsForCurrentIncident() async {
+    final alertService = _alertService;
+    final incident = currentIncident;
+    if (alertService == null || incident == null) return;
+
+    final contacts = await _contacts.getAll();
+    final tokens = contacts
+        .map((contact) => contact.fcmToken)
+        .whereType<String>()
+        .where((token) => token.trim().isNotEmpty)
+        .toList(growable: false);
+    if (tokens.isEmpty) return;
+
+    final detection = incident.detectionResult;
+    final payload = <String, String>{
+      'incidentId': incident.id,
+      'eventType': detection.eventType,
+      'riskScore': detection.riskScore.toString(),
+      'riskLevel': detection.riskLevel.wireValue,
+      'detectedAt': detection.detectedAt.toIso8601String(),
+      if (detection.latitude != null) 'latitude': detection.latitude.toString(),
+      if (detection.longitude != null)
+        'longitude': detection.longitude.toString(),
+      if (detection.locationText != null)
+        'locationText': detection.locationText!,
+    };
+
+    await alertService.sendAlert(contactTokens: tokens, payload: payload);
+  }
 
   Future<SafetyCheckResult> startSafetyCheck() {
     final incident = currentIncident;
@@ -114,6 +150,9 @@ class SunoRuntimeService {
           : 'No response received',
     );
     currentIncident = await _incidents.update(updated);
+    if (updated.status == IncidentStatus.alertTriggered) {
+      await notifyTrustedContactsForCurrentIncident();
+    }
     return currentIncident;
   }
 }

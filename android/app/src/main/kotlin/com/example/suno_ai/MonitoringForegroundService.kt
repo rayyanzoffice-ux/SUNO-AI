@@ -3,20 +3,13 @@ package com.example.suno_ai
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import androidx.core.app.NotificationCompat
 
-/**
- * Minimal foreground service that keeps the process alive with a
- * persistent notification while SUNO's Live Mode monitoring pipeline
- * (microphone capture + on-device inference, driven from Dart) is
- * running. This service does not touch audio itself — it only prevents
- * Android from killing the app process while monitoring is active.
- */
 class MonitoringForegroundService : Service() {
 
     companion object {
@@ -51,14 +44,30 @@ class MonitoringForegroundService : Service() {
         }
     }
 
-    private fun buildNotification(): Notification =
-        NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun buildNotification(): Notification {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            launchIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+
+        return builder
             .setContentTitle("SUNO is listening")
             .setContentText("Monitoring for emergency sounds in the background.")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

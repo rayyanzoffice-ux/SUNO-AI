@@ -1,7 +1,7 @@
 package com.example.suno_ai
 
 import android.content.Intent
-import androidx.core.content.ContextCompat
+import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -17,7 +17,11 @@ class MainActivity : FlutterActivity() {
                     "start" -> {
                         val intent = Intent(this, MonitoringForegroundService::class.java)
                         intent.action = MonitoringForegroundService.ACTION_START
-                        ContextCompat.startForegroundService(this, intent)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(intent)
+                        } else {
+                            startService(intent)
+                        }
                         result.success(null)
                     }
                     "stop" -> {
