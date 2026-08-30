@@ -21,10 +21,18 @@ class MonitoringScreen extends StatefulWidget {
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
   bool detecting = false;
+  late DetectionScenario selectedScenario;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedScenario = widget.scenario;
+  }
+
   Future<void> _simulate() async {
     setState(() => detecting = true);
     final runtime = widget.runtime ?? SunoRuntimeService.instance;
-    final result = await runtime.runDetection(widget.scenario);
+    final result = await runtime.runDetection(selectedScenario);
     if (!mounted) return;
     if (result.riskLevel == RiskLevel.low) {
       setState(() => detecting = false);
@@ -103,6 +111,32 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                   const SizedBox(height: 22),
                   const _Waveform(),
                   const SizedBox(height: 24),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: DetectionScenario.values.map((scenario) {
+                      final selected = selectedScenario == scenario;
+                      return ChoiceChip(
+                        label: Text(_scenarioLabel(scenario)),
+                        selected: selected,
+                        onSelected: detecting
+                            ? null
+                            : (_) =>
+                                  setState(() => selectedScenario = scenario),
+                        selectedColor: AppColors.purple.withValues(alpha: .14),
+                        checkmarkColor: AppColors.purple,
+                        labelStyle: TextStyle(
+                          color: selected ? AppColors.purple : AppColors.text,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        side: BorderSide(
+                          color: selected ? AppColors.purple : AppColors.border,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 18),
                   const Row(
                     children: [
                       Expanded(
@@ -135,10 +169,10 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                   ),
                   const Spacer(),
                   if (detecting)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
-                        'Analyzing critical risk…',
+                        'Analyzing ${_scenarioLabel(selectedScenario).toLowerCase()} risk…',
                         style: TextStyle(
                           color: AppColors.emergency,
                           fontWeight: FontWeight.w700,
@@ -186,6 +220,13 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       ),
     ),
   );
+
+  static String _scenarioLabel(DetectionScenario scenario) =>
+      switch (scenario) {
+        DetectionScenario.low => 'LOW',
+        DetectionScenario.medium => 'MEDIUM',
+        DetectionScenario.critical => 'CRITICAL',
+      };
 }
 
 class _Waveform extends StatelessWidget {

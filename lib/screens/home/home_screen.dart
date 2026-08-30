@@ -55,17 +55,20 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  const Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
                       Icon(
                         Icons.lock_outline_rounded,
                         color: AppColors.safe,
                         size: 15,
                       ),
-                      SizedBox(width: 6),
                       Text(
                         'Private. On-device. Always ready.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                     ],
