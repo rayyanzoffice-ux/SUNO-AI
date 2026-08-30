@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/time_format.dart';
 import '../../models/detection_result.dart';
 import '../../models/incident.dart';
 import '../../services/suno_runtime_service.dart';
@@ -53,9 +54,7 @@ class _TrustedContactViewScreenState
     final result =
         SunoRuntimeService.instance.currentIncident?.detectionResult;
     final time = result?.detectedAt ?? DateTime.now();
-    final displayTime =
-        '${time.hour.toString().padLeft(2, '0')}:'
-        '${time.minute.toString().padLeft(2, '0')}';
+    final displayTime = formatClock12Hour(time);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Safety alert')),

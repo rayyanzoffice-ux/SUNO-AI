@@ -55,7 +55,13 @@ void main() {
   test('RiskLevel contract exposes only current demo readiness levels', () {
     expect(RiskLevel.values.map((level) => level.wireValue),
         ['low', 'medium', 'critical']);
-    expect(RiskLevelContract.fromWireValue('high'), RiskLevel.low);
+  });
+
+  test('fromWireValue throws instead of silently downgrading to low', () {
+    expect(
+      () => RiskLevelContract.fromWireValue('high'),
+      throwsFormatException,
+    );
   });
 
   test('SafetyCheckEngine timeout escalates medium detection to critical',

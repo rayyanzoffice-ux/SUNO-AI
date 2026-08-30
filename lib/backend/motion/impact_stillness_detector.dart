@@ -18,16 +18,21 @@ class MotionResult {
   final DateTime capturedAt;
 }
 
-/// Monitors the accelerometer for sudden impacts and post-impact stillness.
+/// Monitors linear (gravity-compensated) acceleration for sudden impacts
+/// and post-impact stillness.
 ///
-/// An impact candidate is detected when acceleration magnitude exceeds
-/// [impactThreshold]. After a candidate, a [postImpactWindowMs]-ms
-/// observation window begins; if average magnitude drops below
-/// [stillnessThreshold], stillness is confirmed.
+/// Uses [userAccelerometerEventStream] rather than the raw accelerometer.
+/// The raw sensor always reports ~9.8 m/s² of Earth's gravity baked into
+/// every reading even when the phone is perfectly still, so thresholds
+/// tuned against it would need an orientation-dependent gravity offset
+/// subtracted first. [userAccelerometerEventStream] already removes that
+/// component, so a resting phone reads close to 0 m/s² on all three axes
+/// and [impactThreshold] / [stillnessThreshold] can be compared directly
+/// against magnitude with no gravity bias.
 class ImpactStillnessDetector {
   ImpactStillnessDetector({
-    this.impactThreshold = 25.0,
-    this.stillnessThreshold = 3.0,
+    this.impactThreshold = 15.0,
+    this.stillnessThreshold = 1.5,
     this.postImpactWindowMs = 2000,
     void Function(MotionResult)? onResult,
   }) : _onResult = onResult;
@@ -37,7 +42,7 @@ class ImpactStillnessDetector {
   final int postImpactWindowMs;
   final void Function(MotionResult)? _onResult;
 
-  StreamSubscription<AccelerometerEvent>? _sub;
+  StreamSubscription<UserAccelerometerEvent>? _sub;
   bool _observingPostImpact = false;
   Timer? _postImpactTimer;
   double _peakMagnitude = 0;
@@ -46,7 +51,7 @@ class ImpactStillnessDetector {
   bool get isListening => _sub != null;
 
   void start() {
-    _sub ??= accelerometerEventStream(
+    _sub ??= userAccelerometerEventStream(
       samplingPeriod: SensorInterval.normalInterval,
     ).listen(_onAccelerometer);
   }
@@ -60,7 +65,7 @@ class ImpactStillnessDetector {
     _peakMagnitude = 0;
   }
 
-  void _onAccelerometer(AccelerometerEvent event) {
+  void _onAccelerometer(UserAccelerometerEvent event) {
     final mag =
         sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/time_format.dart';
 import '../../models/incident.dart';
 import '../../services/suno_runtime_service.dart';
 
@@ -220,8 +221,7 @@ class _HistoryCard extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final d = DateTime(t.year, t.month, t.day);
-    final clock =
-        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final clock = formatClock12Hour(t);
     if (d == today) return 'Today · $clock';
     if (d == today.subtract(const Duration(days: 1))) {
       return 'Yesterday · $clock';

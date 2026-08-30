@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../backend/audio/microphone_capture.dart';
+import '../../backend/detection/live_detection_repository.dart';
+import '../../backend/detection/suno_audio_classifier.dart';
+import '../../backend/location/location_service.dart';
+import '../../backend/ml/yamnet_stage.dart';
+import '../../backend/services/foreground_service_bridge.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
@@ -21,21 +27,143 @@ class MonitoringScreen extends StatefulWidget {
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
   bool detecting = false;
+
+  bool _liveMode = false;
+  bool _liveStarting = false;
+  bool _liveActive = false;
+  String? _liveError;
+
+  LiveDetectionRepository? _liveRepo;
+  YamNetStage? _yamnet;
+  MicrophoneCapture? _microphone;
+
+  SunoRuntimeService get _runtime =>
+      widget.runtime ?? SunoRuntimeService.instance;
+
   Future<void> _simulate() async {
     setState(() => detecting = true);
-    final runtime = widget.runtime ?? SunoRuntimeService.instance;
-    final result = await runtime.runDetection(widget.scenario);
+    final result = await _runtime.runDetection(widget.scenario);
     if (!mounted) return;
     if (result.riskLevel == RiskLevel.low) {
       setState(() => detecting = false);
       return;
     }
-    await runtime.recordDetection(result);
+    await _runtime.recordDetection(result);
     if (!mounted) return;
     final route = result.riskLevel == RiskLevel.medium
         ? AppRoutes.safetyCheck
         : AppRoutes.emergencyAlert;
     Navigator.pushReplacementNamed(context, route);
+  }
+
+  Future<void> _enableLiveMode() async {
+    setState(() {
+      _liveMode = true;
+      _liveStarting = true;
+      _liveError = null;
+    });
+
+    MicrophoneCapture? microphone;
+    YamNetStage? yamnet;
+    try {
+      microphone = MicrophoneCapture();
+      yamnet = await YamNetStage.load();
+      final classifier = await SunoAudioClassifier.load();
+      final repo = LiveDetectionRepository(
+        yamnet: yamnet,
+        classifier: classifier,
+        microphone: microphone,
+        locationService: LocationService(),
+        onDetection: _onLiveDetection,
+      );
+
+      await repo.startMonitoring();
+      await ForegroundServiceBridge.start();
+
+      if (!mounted) {
+        await repo.stopMonitoring();
+        yamnet.close();
+        await microphone.dispose();
+        return;
+      }
+
+      setState(() {
+        _yamnet = yamnet;
+        _microphone = microphone;
+        _liveRepo = repo;
+        _liveStarting = false;
+        _liveActive = true;
+      });
+    } on MicrophonePermissionException catch (e) {
+      yamnet?.close();
+      await microphone?.dispose();
+      if (!mounted) return;
+      setState(() {
+        _liveStarting = false;
+        _liveActive = false;
+        _liveMode = false;
+        _liveError = e.message;
+      });
+    } catch (e) {
+      yamnet?.close();
+      await microphone?.dispose();
+      if (!mounted) return;
+      setState(() {
+        _liveStarting = false;
+        _liveActive = false;
+        _liveMode = false;
+        _liveError = 'Live Mode failed to start: $e';
+      });
+    }
+  }
+
+  Future<void> _disableLiveMode() async {
+    final repo = _liveRepo;
+    final microphone = _microphone;
+    final yamnet = _yamnet;
+    _liveRepo = null;
+    _microphone = null;
+    _yamnet = null;
+
+    await repo?.stopMonitoring();
+    yamnet?.close();
+    await microphone?.dispose();
+    await ForegroundServiceBridge.stop();
+
+    if (!mounted) return;
+    setState(() {
+      _liveActive = false;
+      _liveMode = false;
+    });
+  }
+
+  void _onLiveDetection(DetectionResult result) {
+    if (!mounted) return;
+    // Low risk stays silent — keep listening, no incident, no interruption.
+    if (result.riskLevel == RiskLevel.low) return;
+
+    _runtime.recordDetection(result).then((_) async {
+      if (!mounted) return;
+      final route = result.riskLevel == RiskLevel.medium
+          ? AppRoutes.safetyCheck
+          : AppRoutes.emergencyAlert;
+      // Release the microphone before navigating away — Safety Check and
+      // Emergency Alert don't need the live pipeline running behind them.
+      await _disableLiveMode();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, route);
+    });
+  }
+
+  @override
+  void dispose() {
+    if (_liveActive) {
+      _liveRepo?.stopMonitoring();
+      _yamnet?.close();
+      _microphone?.dispose();
+      ForegroundServiceBridge.stop();
+    }
+    super.dispose();
   }
 
   @override
@@ -62,6 +190,33 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
             child: IntrinsicHeight(
               child: Column(
                 children: [
+                  const SizedBox(height: 4),
+                  _ModeToggle(
+                    liveMode: _liveMode,
+                    liveStarting: _liveStarting,
+                    onDemoSelected: _liveMode ? _disableLiveMode : null,
+                    onLiveSelected: _liveMode ? null : _enableLiveMode,
+                  ),
+                  if (_liveError != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.emergency.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        _liveError!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.emergency,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Container(
                     width: 132,
@@ -87,46 +242,51 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     ),
                   ),
                   const SizedBox(height: 22),
-                  const Text(
-                    'SUNO is Active',
-                    style: TextStyle(
+                  Text(
+                    _liveMode ? 'SUNO is Listening Live' : 'SUNO is Active',
+                    style: const TextStyle(
                       color: AppColors.safe,
                       fontSize: 29,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Listening privately on this device',
-                    style: TextStyle(color: AppColors.textMuted),
+                  Text(
+                    _liveMode
+                        ? 'Real microphone, motion, and location — processed on this device'
+                        : 'Listening privately on this device',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textMuted),
                   ),
                   const SizedBox(height: 22),
                   const _Waveform(),
                   const SizedBox(height: 24),
-                  const Row(
+                  Row(
                     children: [
                       Expanded(
                         child: StatusChip(
                           label: 'Sound',
-                          value: 'Normal',
+                          value: _liveMode
+                              ? (_liveActive ? 'Listening' : 'Starting…')
+                              : 'Normal',
                           color: AppColors.safe,
                           icon: Icons.graphic_eq_rounded,
                         ),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: StatusChip(
                           label: 'Motion',
-                          value: 'Stable',
+                          value: _liveMode ? 'Sensing' : 'Stable',
                           color: AppColors.safe,
                           icon: Icons.screen_rotation_alt_rounded,
                         ),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: StatusChip(
-                          label: 'Connection',
-                          value: 'Active',
+                          label: 'Location',
+                          value: _liveMode ? 'GPS' : 'Demo',
                           color: AppColors.safe,
                           icon: Icons.wifi_rounded,
                         ),
@@ -145,26 +305,27 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                         ),
                       ),
                     ),
-                  OutlinedButton.icon(
-                    onPressed: detecting ? null : _simulate,
-                    icon: const Icon(Icons.science_outlined, size: 18),
-                    label: Text(
-                      detecting ? 'Analyzing…' : 'Demo: Simulate Distress',
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textMuted,
-                      backgroundColor: Colors.white,
-                      side: const BorderSide(color: AppColors.border),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22),
+                  if (!_liveMode)
+                    OutlinedButton.icon(
+                      onPressed: detecting ? null : _simulate,
+                      icon: const Icon(Icons.science_outlined, size: 18),
+                      label: Text(
+                        detecting ? 'Analyzing…' : 'Demo: Simulate Distress',
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 11,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textMuted,
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 11,
+                        ),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      textStyle: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                  ),
                   const SizedBox(height: 5),
                   PrimaryActionButton(
                     label: 'STOP MONITORING',
@@ -173,15 +334,98 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     icon: Icons.stop_circle_outlined,
                     onPressed: detecting
                         ? null
-                        : () => Navigator.popUntil(
-                            context,
-                            ModalRoute.withName(AppRoutes.home),
-                          ),
+                        : () async {
+                            if (_liveMode) await _disableLiveMode();
+                            if (!context.mounted) return;
+                            Navigator.popUntil(
+                              context,
+                              ModalRoute.withName(AppRoutes.home),
+                            );
+                          },
                   ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ModeToggle extends StatelessWidget {
+  const _ModeToggle({
+    required this.liveMode,
+    required this.liveStarting,
+    required this.onDemoSelected,
+    required this.onLiveSelected,
+  });
+
+  final bool liveMode;
+  final bool liveStarting;
+  final VoidCallback? onDemoSelected;
+  final VoidCallback? onLiveSelected;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFEDEFF5),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: _ToggleSegment(
+            label: 'Demo Mode',
+            selected: !liveMode,
+            onTap: onDemoSelected,
+          ),
+        ),
+        Expanded(
+          child: _ToggleSegment(
+            label: liveStarting ? 'Starting…' : 'Live Mode',
+            selected: liveMode,
+            onTap: onLiveSelected,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ToggleSegment extends StatelessWidget {
+  const _ToggleSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    borderRadius: BorderRadius.circular(12),
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: selected ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: selected
+            ? const [BoxShadow(color: Colors.black12, blurRadius: 5)]
+            : null,
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: selected ? AppColors.text : AppColors.textMuted,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
         ),
       ),
     ),
@@ -210,3 +454,4 @@ class _Waveform extends StatelessWidget {
     ),
   );
 }
+

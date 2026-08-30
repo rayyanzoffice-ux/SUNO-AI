@@ -7,8 +7,9 @@ extension RiskLevelContract on RiskLevel {
     for (final level in RiskLevel.values) {
       if (level.wireValue == value) return level;
     }
-    assert(false, 'Unknown RiskLevel wire value: $value');
-    return RiskLevel.low;
+    // Never downgrade an unrecognized risk level to "low" — that would
+    // mask a real emergency as safe. Fail loudly in every build mode.
+    throw FormatException('Unknown RiskLevel wire value: $value');
   }
 }
 
