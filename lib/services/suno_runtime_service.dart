@@ -86,12 +86,17 @@ class SunoRuntimeService {
   Future<TrustedContact> addTrustedContact(TrustedContact contact) =>
       _contacts.add(contact);
 
-  Future<void> notifyTrustedContactsForCurrentIncident() async {
+  Future<void> notifyTrustedContactsForCurrentIncident({
+    String? onlyContactId,
+  }) async {
     final alertService = _alertService;
     final incident = currentIncident;
     if (alertService == null || incident == null) return;
 
-    final contacts = await _contacts.getAll();
+    var contacts = await _contacts.getAll();
+    if (onlyContactId != null) {
+      contacts = contacts.where((c) => c.id == onlyContactId).toList();
+    }
     final tokens = contacts
         .map((contact) => contact.fcmToken)
         .whereType<String>()
@@ -114,6 +119,45 @@ class SunoRuntimeService {
     };
 
     await alertService.sendAlert(contactTokens: tokens, payload: payload);
+  }
+
+  /// Deliberate manual/silent trigger — the "Silent SOS" action.
+  ///
+  /// Skips audio classification and motion scoring entirely. This exists
+  /// because audio/motion detection cannot cover emergencies that are
+  /// silent or purely visual/physical — the user needs a way to reach the
+  /// same Emergency Alert path without making a sound. Routes through the
+  /// exact same incident + notification path as any other critical
+  /// detection so downstream behavior stays consistent.
+  Future<Incident?> triggerManualAlert({String? onlyContactId}) async {
+    final location = await LocationService().currentLocation();
+    final now = DateTime.now();
+    final result = DetectionResult(
+      eventType: 'Manual Silent Alert',
+      confidence: 1.0,
+      impactDetected: false,
+      stillnessDetected: false,
+      riskScore: 100,
+      riskLevel: RiskLevel.critical,
+      latitude: location?.latitude,
+      longitude: location?.longitude,
+      locationText: location != null
+          ? '${location.latitude.toStringAsFixed(4)}, '
+            '${location.longitude.toStringAsFixed(4)}'
+          : null,
+      detectedAt: now,
+    );
+
+    final incident = Incident(
+      id: 'SUNO-${now.microsecondsSinceEpoch}',
+      detectionResult: result,
+      status: IncidentStatus.alertTriggered,
+      createdAt: now,
+      updatedAt: now,
+    );
+    currentIncident = await _incidents.save(incident);
+    await notifyTrustedContactsForCurrentIncident(onlyContactId: onlyContactId);
+    return currentIncident;
   }
 
   Future<SafetyCheckResult> startSafetyCheck() {

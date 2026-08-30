@@ -270,6 +270,24 @@ void main() {
     expect(unchanged, same(incident));
     expect(unchanged?.status, IncidentStatus.safetyCheck);
   });
+
+  test(
+    'triggerManualAlert bypasses audio/motion and creates a critical incident',
+    () async {
+      final runtime = SunoRuntimeService();
+      final incident = await runtime.triggerManualAlert();
+
+      expect(incident, isNotNull);
+      expect(incident!.status, IncidentStatus.alertTriggered);
+      expect(incident.detectionResult.eventType, 'Manual Silent Alert');
+      expect(incident.detectionResult.confidence, 1.0);
+      expect(incident.detectionResult.impactDetected, isFalse);
+      expect(incident.detectionResult.stillnessDetected, isFalse);
+      expect(incident.detectionResult.riskScore, 100);
+      expect(incident.detectionResult.riskLevel, RiskLevel.critical);
+      expect(runtime.currentIncident?.id, incident.id);
+    },
+  );
 }
 
 class _LiveCriticalRepository implements DetectionRepository {

@@ -56,3 +56,6 @@ app.*.map.json
 ml/raw_audio/
 ml/extracted_features/
 ml/datasets/
+
+# Supabase CLI local link cache
+supabase/.temp/

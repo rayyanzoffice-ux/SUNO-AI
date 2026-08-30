@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../backend/audio/microphone_capture.dart';
@@ -11,6 +13,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
 import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
+import '../../widgets/silent_sos_sheet.dart';
 import '../../widgets/status_chip.dart';
 
 class MonitoringScreen extends StatefulWidget {
@@ -27,6 +30,7 @@ class MonitoringScreen extends StatefulWidget {
 
 class _MonitoringScreenState extends State<MonitoringScreen> {
   bool detecting = false;
+  late DetectionScenario selectedScenario;
 
   bool _liveMode = false;
   bool _liveStarting = false;
@@ -36,13 +40,21 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   LiveDetectionRepository? _liveRepo;
   YamNetStage? _yamnet;
   MicrophoneCapture? _microphone;
+  StreamSubscription<dynamic>? _levelSub;
+  final List<double> _liveLevels = [];
 
   SunoRuntimeService get _runtime =>
       widget.runtime ?? SunoRuntimeService.instance;
 
+  @override
+  void initState() {
+    super.initState();
+    selectedScenario = widget.scenario;
+  }
+
   Future<void> _simulate() async {
     setState(() => detecting = true);
-    final result = await _runtime.runDetection(widget.scenario);
+    final result = await _runtime.runDetection(selectedScenario);
     if (!mounted) return;
     if (result.riskLevel == RiskLevel.low) {
       setState(() => detecting = false);
@@ -87,6 +99,17 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
         return;
       }
 
+      // Separate subscription purely for the waveform visualization — the
+      // ML pipeline consumes the same broadcast stream independently inside
+      // LiveDetectionRepository, so this never interferes with detection.
+      _levelSub = microphone.waveforms.listen((frame) {
+        if (!mounted) return;
+        setState(() {
+          _liveLevels.add(frame.rmsAmplitude);
+          if (_liveLevels.length > 23) _liveLevels.removeAt(0);
+        });
+      });
+
       setState(() {
         _yamnet = yamnet;
         _microphone = microphone;
@@ -125,6 +148,8 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     _microphone = null;
     _yamnet = null;
 
+    await _levelSub?.cancel();
+    _levelSub = null;
     await repo?.stopMonitoring();
     yamnet?.close();
     await microphone?.dispose();
@@ -134,6 +159,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     setState(() {
       _liveActive = false;
       _liveMode = false;
+      _liveLevels.clear();
     });
   }
 
@@ -158,6 +184,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   @override
   void dispose() {
     if (_liveActive) {
+      _levelSub?.cancel();
       _liveRepo?.stopMonitoring();
       _yamnet?.close();
       _microphone?.dispose();
@@ -218,27 +245,30 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  Container(
-                    width: 132,
-                    height: 132,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.safe.withValues(alpha: .09),
-                      border: Border.all(
-                        color: AppColors.safe.withValues(alpha: .25),
-                        width: 8,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.safe.withValues(alpha: .18),
-                          blurRadius: 30,
+                  GestureDetector(
+                    onLongPress: () => showSilentSosSheet(context),
+                    child: Container(
+                      width: 132,
+                      height: 132,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.safe.withValues(alpha: .09),
+                        border: Border.all(
+                          color: AppColors.safe.withValues(alpha: .25),
+                          width: 8,
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.mic_rounded,
-                      color: AppColors.safe,
-                      size: 58,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.safe.withValues(alpha: .18),
+                            blurRadius: 30,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.mic_rounded,
+                        color: AppColors.safe,
+                        size: 58,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 22),
@@ -258,9 +288,49 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: AppColors.textMuted),
                   ),
-                  const SizedBox(height: 22),
-                  const _Waveform(),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Long-press the mic for Silent SOS',
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  ),
+                  const SizedBox(height: 18),
+                  _Waveform(levels: _liveMode ? _liveLevels : null),
                   const SizedBox(height: 24),
+                  if (!_liveMode) ...[
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: DetectionScenario.values.map((scenario) {
+                        final selected = selectedScenario == scenario;
+                        return ChoiceChip(
+                          label: Text(_scenarioLabel(scenario)),
+                          selected: selected,
+                          onSelected: detecting
+                              ? null
+                              : (_) => setState(
+                                  () => selectedScenario = scenario,
+                                ),
+                          selectedColor: AppColors.purple.withValues(
+                            alpha: .14,
+                          ),
+                          checkmarkColor: AppColors.purple,
+                          labelStyle: TextStyle(
+                            color: selected
+                                ? AppColors.purple
+                                : AppColors.text,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          side: BorderSide(
+                            color: selected
+                                ? AppColors.purple
+                                : AppColors.border,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -295,11 +365,11 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                   ),
                   const Spacer(),
                   if (detecting)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
-                        'Analyzing critical risk…',
-                        style: TextStyle(
+                        'Analyzing ${_scenarioLabel(selectedScenario).toLowerCase()} risk…',
+                        style: const TextStyle(
                           color: AppColors.emergency,
                           fontWeight: FontWeight.w700,
                         ),
@@ -351,6 +421,13 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       ),
     ),
   );
+
+  static String _scenarioLabel(DetectionScenario scenario) =>
+      switch (scenario) {
+        DetectionScenario.low => 'LOW',
+        DetectionScenario.medium => 'MEDIUM',
+        DetectionScenario.critical => 'CRITICAL',
+      };
 }
 
 class _ModeToggle extends StatelessWidget {
@@ -433,25 +510,53 @@ class _ToggleSegment extends StatelessWidget {
 }
 
 class _Waveform extends StatelessWidget {
-  const _Waveform();
+  const _Waveform({this.levels});
+
+  /// Real microphone amplitude levels (0..1) when in Live Mode, most recent
+  /// last. Null falls back to the static Demo Mode animation.
+  final List<double>? levels;
+
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 38,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(23, (i) {
-        final heights = [8.0, 14.0, 22.0, 32.0, 18.0, 12.0];
-        return Container(
-          width: 3,
-          height: heights[i % heights.length],
-          margin: const EdgeInsets.symmetric(horizontal: 2.5),
-          decoration: BoxDecoration(
-            color: AppColors.safe.withValues(alpha: .35 + (i % 3) * .2),
-            borderRadius: BorderRadius.circular(3),
-          ),
-        );
-      }),
-    ),
-  );
+  Widget build(BuildContext context) {
+    const barCount = 23;
+    const demoHeights = [8.0, 14.0, 22.0, 32.0, 18.0, 12.0];
+    final realLevels = levels;
+
+    return SizedBox(
+      height: 38,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(barCount, (i) {
+          double height;
+          double alpha;
+          if (realLevels != null && realLevels.isNotEmpty) {
+            // Right-align real samples so the most recent value is the
+            // rightmost bar, matching a left-to-right time axis.
+            final offset = barCount - realLevels.length;
+            if (i < offset) {
+              height = 6.0;
+              alpha = .25;
+            } else {
+              final amplitude = realLevels[i - offset];
+              height = 6.0 + (amplitude * 32.0).clamp(0.0, 32.0);
+              alpha = .35 + (amplitude * .5).clamp(0.0, .5);
+            }
+          } else {
+            height = demoHeights[i % demoHeights.length];
+            alpha = .35 + (i % 3) * .2;
+          }
+          return Container(
+            width: 3,
+            height: height,
+            margin: const EdgeInsets.symmetric(horizontal: 2.5),
+            decoration: BoxDecoration(
+              color: AppColors.safe.withValues(alpha: alpha),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          );
+        }),
+      ),
+    );
+  }
 }
 

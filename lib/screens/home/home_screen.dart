@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/primary_action_button.dart';
+import '../../widgets/silent_sos_sheet.dart';
 import '../../widgets/suno_logo.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -33,7 +34,10 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  const SunoLogo(size: 118),
+                  GestureDetector(
+                    onLongPress: () => showSilentSosSheet(context),
+                    child: const SunoLogo(size: 118),
+                  ),
                   const SizedBox(height: 26),
                   const Text(
                     'SUNO',
@@ -69,6 +73,11 @@ class HomeScreen extends StatelessWidget {
                         style: TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Long-press the logo for Silent SOS',
+                    style: TextStyle(color: Colors.white30, fontSize: 11),
                   ),
                   const Spacer(),
                   PrimaryActionButton(
