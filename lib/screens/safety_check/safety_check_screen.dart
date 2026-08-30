@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../backend/safety/safety_check_engine.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
-import '../../backend/safety/safety_check_engine.dart';
 import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
 
@@ -15,50 +15,67 @@ class SafetyCheckScreen extends StatefulWidget {
 }
 
 class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
-  int seconds = 10;
-  Timer? timer;
-  bool completed = false;
+  static const _totalSeconds = 10;
+  int _seconds = _totalSeconds;
+  Timer? _timer;
+  bool _completed = false;
+
   @override
   void initState() {
     super.initState();
-    _runBackendCheck();
-    timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || completed) return;
-      setState(() => seconds = seconds > 1 ? seconds - 1 : 0);
+    _startIfIncidentExists();
+  }
+
+  Future<void> _startIfIncidentExists() async {
+    if (SunoRuntimeService.instance.currentIncident == null) {
+      if (mounted) {
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil(AppRoutes.home, (_) => false);
+      }
+      return;
+    }
+    _startTimer();
+    await _runBackendCheck();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _completed) return;
+      setState(() => _seconds = _seconds > 0 ? _seconds - 1 : 0);
     });
   }
 
   Future<void> _runBackendCheck() async {
     final result = await SunoRuntimeService.instance.startSafetyCheck();
-    if (completed || !mounted) return;
-    completed = true;
-    timer?.cancel();
+    if (_completed || !mounted) return;
+    _completed = true;
+    _timer?.cancel();
     await SunoRuntimeService.instance.applySafetyCheckResult(result);
     if (!mounted) return;
     Navigator.pushReplacementNamed(
       context,
       result.outcome == SafetyCheckOutcome.userConfirmedSafe
-          ? AppRoutes.history
+          ? AppRoutes.monitoring
           : AppRoutes.emergencyAlert,
     );
   }
 
   void _emergency() {
-    if (completed) return;
-    timer?.cancel();
+    if (_completed) return;
+    _timer?.cancel();
     SunoRuntimeService.instance.escalateSafetyCheck();
   }
 
   void _safe() {
-    if (completed) return;
-    timer?.cancel();
+    if (_completed) return;
+    _timer?.cancel();
     SunoRuntimeService.instance.confirmSafe();
   }
 
   @override
   void dispose() {
-    timer?.cancel();
-    if (!completed) SunoRuntimeService.instance.cancelSafetyCheck();
+    _timer?.cancel();
+    if (!_completed) SunoRuntimeService.instance.cancelSafetyCheck();
     super.dispose();
   }
 
@@ -81,11 +98,8 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                       color: AppColors.warning.withValues(alpha: .1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.warning_amber_rounded,
-                      size: 54,
-                      color: AppColors.warning,
-                    ),
+                    child: const Icon(Icons.warning_amber_rounded,
+                        size: 54, color: AppColors.warning),
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -102,10 +116,9 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                   const Text(
                     'Are you safe?',
                     style: TextStyle(
-                      color: AppColors.text,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                    ),
+                        color: AppColors.text,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 34),
                   SizedBox(
@@ -116,19 +129,18 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                       children: [
                         SizedBox.expand(
                           child: CircularProgressIndicator(
-                            value: seconds / 10,
+                            value: _seconds / _totalSeconds,
                             strokeWidth: 9,
                             color: AppColors.warning,
                             backgroundColor: AppColors.border,
                           ),
                         ),
                         Text(
-                          '$seconds',
+                          '$_seconds',
                           style: const TextStyle(
-                            fontSize: 44,
-                            color: AppColors.text,
-                            fontWeight: FontWeight.w900,
-                          ),
+                              fontSize: 44,
+                              color: AppColors.text,
+                              fontWeight: FontWeight.w900),
                         ),
                       ],
                     ),

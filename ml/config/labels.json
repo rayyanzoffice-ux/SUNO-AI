@@ -1,6 +1,6 @@
 {
-  "0": "normal",
-  "1": "distress_scream",
-  "2": "emergency_alarm",
-  "3": "glass_breaking"
+  "0": "ambient_safe",
+  "1": "distress_voice",
+  "2": "alarm_siren",
+  "3": "breaking_crash"
 }

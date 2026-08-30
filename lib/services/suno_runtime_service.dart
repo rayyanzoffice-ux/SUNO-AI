@@ -56,12 +56,20 @@ class SunoRuntimeService {
     IncidentStatus status, [
     String? response,
   ]) async {
-    final incident = currentIncident;
-    if (incident == null) return null;
-    incident.status = status;
-    incident.contactResponseText = response;
-    incident.updatedAt = DateTime.now();
-    currentIncident = await _incidents.update(incident);
+    final existing = currentIncident;
+    if (existing == null) return null;
+    // Build a fresh Incident rather than mutating the stored object.
+    final now = DateTime.now();
+    final updated = Incident(
+      id: existing.id,
+      detectionResult: existing.detectionResult,
+      status: status,
+      createdAt: existing.createdAt,
+      updatedAt: now,
+      // Only overwrite contactResponseText when a new value is supplied.
+      contactResponseText: response ?? existing.contactResponseText,
+    );
+    currentIncident = await _incidents.update(updated);
     return currentIncident;
   }
 

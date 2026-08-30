@@ -1,12 +1,23 @@
-// Single import point for the whole backend/logic layer. Screens and state
-// controllers can `import 'package:suno_ai/backend/backend_exports.dart';`
-// instead of importing each file under lib/backend/ individually.
+export 'alerts/alert_service.dart';
+export 'alerts/fcm_alert_service.dart';
+export 'audio/audio_preprocessor.dart';
+export 'audio/audio_waveform.dart';
+export 'audio/microphone_capture.dart';
 export 'contacts/in_memory_trusted_contact_repository.dart';
 export 'contacts/trusted_contact_repository.dart';
 export 'detection/detection_engine.dart';
 export 'detection/detection_repository.dart';
+export 'detection/live_detection_repository.dart';
 export 'detection/mock_detection_repository.dart';
+export 'detection/suno_audio_classifier.dart';
 export 'incidents/in_memory_incident_repository.dart';
 export 'incidents/incident_repository.dart';
+export 'location/location_service.dart';
+export 'ml/continuous_audio_detector.dart';
+export 'ml/yamnet_stage.dart';
+export 'motion/impact_stillness_detector.dart';
+export 'persistence/app_storage.dart';
+export 'persistence/hive_incident_repository.dart';
+export 'persistence/hive_trusted_contact_repository.dart';
 export 'risk/risk_engine.dart';
 export 'safety/safety_check_engine.dart';

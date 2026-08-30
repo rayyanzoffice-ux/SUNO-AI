@@ -52,13 +52,7 @@ app.*.map.json
 **/.gradle/
 *.apk
 *.aab
-*.png
-*.jpg
-*.jpeg
-*.webp
-*.ico
-*.zip
+# Only exclude raw dataset audio — keep test fixtures and app assets
 ml/raw_audio/
 ml/extracted_features/
-*.wav
-*.mp3
+ml/datasets/

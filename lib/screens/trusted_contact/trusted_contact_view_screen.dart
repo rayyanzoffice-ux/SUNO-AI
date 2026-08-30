@@ -16,14 +16,30 @@ class TrustedContactViewScreen extends StatefulWidget {
       _TrustedContactViewScreenState();
 }
 
-class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
+class _TrustedContactViewScreenState
+    extends State<TrustedContactViewScreen> {
   final ScrollController _scrollController = ScrollController();
-  String status = 'Alert received — response needed';
+  String _status = 'Alert received — response needed';
+  String _contactName = 'Your contact';
 
-  Future<void> update(IncidentStatus incidentStatus, String text) async {
-    await SunoRuntimeService.instance.updateStatus(incidentStatus, text);
+  @override
+  void initState() {
+    super.initState();
+    _loadContact();
+  }
+
+  Future<void> _loadContact() async {
+    final contacts =
+        await SunoRuntimeService.instance.getTrustedContacts();
+    if (contacts.isNotEmpty && mounted) {
+      setState(() => _contactName = contacts.first.name);
+    }
+  }
+
+  Future<void> _update(IncidentStatus status, String text) async {
+    await SunoRuntimeService.instance.updateStatus(status, text);
     if (!mounted) return;
-    setState(() => status = text);
+    setState(() => _status = text);
   }
 
   @override
@@ -34,10 +50,13 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final result = SunoRuntimeService.instance.currentIncident?.detectionResult;
+    final result =
+        SunoRuntimeService.instance.currentIncident?.detectionResult;
     final time = result?.detectedAt ?? DateTime.now();
     final displayTime =
-        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+        '${time.hour.toString().padLeft(2, '0')}:'
+        '${time.minute.toString().padLeft(2, '0')}';
+
     return Scaffold(
       appBar: AppBar(title: const Text('Safety alert')),
       body: SafeArea(
@@ -54,29 +73,25 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                   child: CircleAvatar(
                     radius: 29,
                     backgroundColor: Color(0xFFFFE8E9),
-                    child: Icon(
-                      Icons.person_rounded,
-                      color: AppColors.emergency,
-                      size: 32,
-                    ),
+                    child: Icon(Icons.person_rounded,
+                        color: AppColors.emergency, size: 32),
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Center(
+                Center(
                   child: Text(
-                    'Rayyan',
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    _contactName,
+                    style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w700),
                   ),
                 ),
                 const SizedBox(height: 3),
-                const Center(
+                Center(
                   child: Text(
-                    'Rayyan may be in danger',
+                    '$_contactName may be in danger',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppColors.text,
                       fontSize: 25,
                       fontWeight: FontWeight.w900,
@@ -94,33 +109,28 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 5,
-                    ),
+                        horizontal: 16, vertical: 5),
                     child: Column(
                       children: [
-                        _line(
-                          Icons.hearing_rounded,
-                          'Event',
-                          result?.eventType ?? 'Distress Sound + Impact',
-                        ),
+                        _line(Icons.hearing_rounded, 'Event',
+                            result?.eventType ?? '—'),
                         const Divider(height: 1),
-                        _line(
-                          Icons.schedule_rounded,
-                          'Detected',
-                          '$displayTime · Today',
-                        ),
+                        _line(Icons.schedule_rounded, 'Detected',
+                            '$displayTime · Today'),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text(
-                  'Live Location',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                ),
+                const Text('Live Location',
+                    style: TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 9),
-                const MapPreviewCard(),
+                MapPreviewCard(
+                  latitude: result?.latitude,
+                  longitude: result?.longitude,
+                  locationText: result?.locationText,
+                ),
                 const SizedBox(height: 12),
                 Container(
                   width: double.infinity,
@@ -130,7 +140,7 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
-                    status,
+                    _status,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.warning,
@@ -144,7 +154,7 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                   label: 'I AM CHECKING ON THEM',
                   color: AppColors.warning,
                   icon: Icons.directions_run_rounded,
-                  onPressed: () => update(
+                  onPressed: () => _update(
                     IncidentStatus.contactChecking,
                     'Contact checking — help is on the way',
                   ),
@@ -154,7 +164,7 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                   label: 'THEY ARE SAFE',
                   color: AppColors.safe,
                   icon: Icons.check_circle_outline_rounded,
-                  onPressed: () => update(
+                  onPressed: () => _update(
                     IncidentStatus.resolved,
                     'Resolved — contact confirmed they are safe',
                   ),
@@ -162,7 +172,7 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
                 const SizedBox(height: 4),
                 Center(
                   child: TextButton(
-                    onPressed: () => update(
+                    onPressed: () => _update(
                       IncidentStatus.alertTriggered,
                       'Unable to contact — emergency remains active',
                     ),
@@ -194,20 +204,12 @@ class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: AppColors.text,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              Text(label,
+                  style: const TextStyle(
+                      color: AppColors.textMuted, fontSize: 11)),
+              Text(value,
+                  style: const TextStyle(
+                      color: AppColors.text, fontWeight: FontWeight.w700)),
             ],
           ),
         ),

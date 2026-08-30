@@ -3,10 +3,13 @@ enum RiskLevel { low, medium, critical }
 extension RiskLevelContract on RiskLevel {
   String get wireValue => name;
 
-  static RiskLevel fromWireValue(String value) => RiskLevel.values.firstWhere(
-    (level) => level.wireValue == value,
-    orElse: () => RiskLevel.low,
-  );
+  static RiskLevel fromWireValue(String value) {
+    for (final level in RiskLevel.values) {
+      if (level.wireValue == value) return level;
+    }
+    assert(false, 'Unknown RiskLevel wire value: $value');
+    return RiskLevel.low;
+  }
 }
 
 class DetectionResult {
@@ -34,7 +37,30 @@ class DetectionResult {
     required this.detectedAt,
   });
 
-  /// Maps the shared API contract without coupling screens to JSON parsing.
+  DetectionResult copyWith({
+    String? eventType,
+    double? confidence,
+    bool? impactDetected,
+    bool? stillnessDetected,
+    int? riskScore,
+    RiskLevel? riskLevel,
+    double? latitude,
+    double? longitude,
+    String? locationText,
+    DateTime? detectedAt,
+  }) => DetectionResult(
+    eventType: eventType ?? this.eventType,
+    confidence: confidence ?? this.confidence,
+    impactDetected: impactDetected ?? this.impactDetected,
+    stillnessDetected: stillnessDetected ?? this.stillnessDetected,
+    riskScore: riskScore ?? this.riskScore,
+    riskLevel: riskLevel ?? this.riskLevel,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
+    locationText: locationText ?? this.locationText,
+    detectedAt: detectedAt ?? this.detectedAt,
+  );
+
   factory DetectionResult.fromJson(Map<String, Object?> json) =>
       DetectionResult(
         eventType: json['eventType']! as String,

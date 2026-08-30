@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/detection_result.dart';
 import '../../models/incident.dart';
 import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
@@ -11,7 +12,9 @@ class EmergencyAlertScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final result = SunoRuntimeService.instance.currentIncident?.detectionResult;
+    final incident = SunoRuntimeService.instance.currentIncident;
+    final result = incident?.detectionResult;
+
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
@@ -19,9 +22,8 @@ class EmergencyAlertScreen extends StatelessWidget {
           builder: (context, constraints) => SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(22, 4, 22, 20),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight - 24,
-              ),
+              constraints:
+                  BoxConstraints(minHeight: constraints.maxHeight - 24),
               child: IntrinsicHeight(
                 child: Column(
                   children: [
@@ -42,11 +44,8 @@ class EmergencyAlertScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.notifications_active_rounded,
-                        color: AppColors.emergency,
-                        size: 53,
-                      ),
+                      child: const Icon(Icons.notifications_active_rounded,
+                          color: AppColors.emergency, size: 53),
                     ),
                     const SizedBox(height: 18),
                     const Text(
@@ -66,66 +65,57 @@ class EmergencyAlertScreen extends StatelessWidget {
                       style: TextStyle(color: AppColors.textMuted),
                     ),
                     const SizedBox(height: 22),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 6,
-                        ),
-                        child: Column(
-                          children: [
-                            _Detail(
-                              icon: Icons.hearing_rounded,
-                              label: 'Event',
-                              value:
-                                  result?.eventType ??
-                                  'Distress Sound + Impact',
-                            ),
-                            const Divider(height: 1),
-                            _Detail(
-                              icon: Icons.speed_rounded,
-                              label: 'Risk Score',
-                              value:
-                                  '${result?.riskScore ?? 0}% (${_label(result?.riskLevel)})',
-                              critical: true,
-                            ),
-                            const Divider(height: 1),
-                            _Detail(
-                              icon: Icons.analytics_outlined,
-                              label: 'Confidence',
-                              value:
-                                  '${((result?.confidence ?? 0) * 100).round()}%',
-                            ),
-                            const Divider(height: 1),
-                            _Detail(
-                              icon: Icons.location_on_outlined,
-                              label: 'Location',
-                              value:
-                                  result?.locationText ??
-                                  'Location unavailable',
-                            ),
-                          ],
+                    if (result != null)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 6),
+                          child: Column(
+                            children: [
+                              _Detail(
+                                icon: Icons.hearing_rounded,
+                                label: 'Event',
+                                value: result.eventType,
+                              ),
+                              const Divider(height: 1),
+                              _Detail(
+                                icon: Icons.speed_rounded,
+                                label: 'Risk Score',
+                                value: '${result.riskScore}% '
+                                    '(${_levelLabel(result.riskLevel)})',
+                                critical: true,
+                              ),
+                              const Divider(height: 1),
+                              _Detail(
+                                icon: Icons.analytics_outlined,
+                                label: 'Confidence',
+                                value:
+                                    '${(result.confidence * 100).round()}%',
+                              ),
+                              const Divider(height: 1),
+                              _Detail(
+                                icon: Icons.location_on_outlined,
+                                label: 'Location',
+                                value: result.locationText ??
+                                    'Location unavailable',
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
                     const Spacer(),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 14),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.verified_user_outlined,
-                            color: AppColors.safe,
-                            size: 18,
-                          ),
+                          Icon(Icons.verified_user_outlined,
+                              color: AppColors.safe, size: 18),
                           SizedBox(width: 7),
                           Text(
                             'Safety network activated',
                             style: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 13,
-                            ),
+                                color: AppColors.textMuted, fontSize: 13),
                           ),
                         ],
                       ),
@@ -134,14 +124,13 @@ class EmergencyAlertScreen extends StatelessWidget {
                       label: 'VIEW LOCATION',
                       color: AppColors.emergency,
                       icon: Icons.location_on_rounded,
-                      onPressed: () {
-                        SunoRuntimeService.instance.updateStatus(
-                          IncidentStatus.contactNotified,
-                        );
-                        Navigator.pushNamed(
-                          context,
-                          AppRoutes.trustedContactView,
-                        );
+                      onPressed: () async {
+                        await SunoRuntimeService.instance
+                            .updateStatus(IncidentStatus.contactNotified);
+                        if (context.mounted) {
+                          Navigator.pushNamed(
+                              context, AppRoutes.trustedContactView);
+                        }
                       },
                     ),
                     const SizedBox(height: 8),
@@ -160,9 +149,9 @@ class EmergencyAlertScreen extends StatelessWidget {
     );
   }
 
-  static String _label(Object? level) {
-    final name = level?.toString().split('.').last ?? 'unknown';
-    return '${name[0].toUpperCase()}${name.substring(1)}';
+  static String _levelLabel(RiskLevel level) {
+    final w = level.wireValue;
+    return '${w[0].toUpperCase()}${w.substring(1)}';
   }
 }
 
@@ -176,6 +165,7 @@ class _Detail extends StatelessWidget {
   final IconData icon;
   final String label, value;
   final bool critical;
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 13),
@@ -188,32 +178,23 @@ class _Detail extends StatelessWidget {
                 .withValues(alpha: .09),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            size: 21,
-            color: critical ? AppColors.emergency : AppColors.purple,
-          ),
+          child: Icon(icon, size: 21,
+              color: critical ? AppColors.emergency : AppColors.purple),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 12,
-                ),
-              ),
+              Text(label,
+                  style: const TextStyle(
+                      color: AppColors.textMuted, fontSize: 12)),
               const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  color: critical ? AppColors.emergency : AppColors.text,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              Text(value,
+                  style: TextStyle(
+                    color: critical ? AppColors.emergency : AppColors.text,
+                    fontWeight: FontWeight.w800,
+                  )),
             ],
           ),
         ),

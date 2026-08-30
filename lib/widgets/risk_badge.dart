@@ -10,16 +10,16 @@ class RiskBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = score < 40
-        ? AppColors.safe
-        : score < 70
-        ? AppColors.warning
-        : AppColors.emergency;
-    final label = score < 40
-        ? 'Low'
-        : score < 70
-        ? 'Medium'
-        : 'Critical';
+    final color = switch (level) {
+      RiskLevel.low => AppColors.safe,
+      RiskLevel.medium => AppColors.warning,
+      RiskLevel.critical => AppColors.emergency,
+    };
+    final label = switch (level) {
+      RiskLevel.low => 'Low',
+      RiskLevel.medium => 'Medium',
+      RiskLevel.critical => 'Critical',
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(

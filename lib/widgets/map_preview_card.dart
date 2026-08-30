@@ -1,28 +1,87 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../core/theme/app_theme.dart';
 
 class MapPreviewCard extends StatelessWidget {
-  const MapPreviewCard({super.key});
+  const MapPreviewCard({
+    this.latitude,
+    this.longitude,
+    this.locationText,
+    super.key,
+  });
+
+  final double? latitude;
+  final double? longitude;
+  final String? locationText;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 180,
-    clipBehavior: Clip.antiAlias,
-    decoration: BoxDecoration(
-      color: const Color(0xFFEAF3EC),
-      borderRadius: BorderRadius.circular(22),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: Stack(
+  Widget build(BuildContext context) {
+    final hasCoords = latitude != null && longitude != null;
+    return Container(
+      height: 200,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF3EC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: hasCoords
+          ? _RealMap(
+              latitude: latitude!,
+              longitude: longitude!,
+              locationText: locationText,
+            )
+          : _NoLocationPlaceholder(locationText: locationText),
+    );
+  }
+}
+
+class _RealMap extends StatelessWidget {
+  const _RealMap({
+    required this.latitude,
+    required this.longitude,
+    this.locationText,
+  });
+
+  final double latitude;
+  final double longitude;
+  final String? locationText;
+
+  @override
+  Widget build(BuildContext context) {
+    final point = LatLng(latitude, longitude);
+    return Stack(
       children: [
-        Positioned.fill(child: CustomPaint(painter: _MapPainter())),
-        const Center(
-          child: Icon(
-            Icons.location_on_rounded,
-            color: AppColors.emergency,
-            size: 42,
+        FlutterMap(
+          options: MapOptions(
+            initialCenter: point,
+            initialZoom: 15,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.none,
+            ),
           ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.suno_ai',
+            ),
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: point,
+                  width: 42,
+                  height: 42,
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: AppColors.emergency,
+                    size: 42,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         Positioned(
           left: 14,
@@ -34,21 +93,26 @@ class MapPreviewCard extends StatelessWidget {
               color: Colors.white.withValues(alpha: .94),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.near_me_rounded, color: AppColors.purple, size: 20),
-                SizedBox(width: 10),
+                const Icon(Icons.near_me_rounded,
+                    color: AppColors.purple, size: 20),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Main Boulevard, Gulberg\nLahore, Pakistan',
-                    style: TextStyle(
+                    locationText ??
+                        '${latitude.toStringAsFixed(4)}, '
+                        '${longitude.toStringAsFixed(4)}',
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       height: 1.35,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
+                const Text(
                   'LIVE',
                   style: TextStyle(
                     color: AppColors.safe,
@@ -61,39 +125,29 @@ class MapPreviewCard extends StatelessWidget {
           ),
         ),
       ],
-    ),
-  );
+    );
+  }
 }
 
-class _MapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final road = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 9
-      ..style = PaintingStyle.stroke;
-    final minor = Paint()
-      ..color = const Color(0xFFD4E3D9)
-      ..strokeWidth = 3;
-    canvas.drawLine(
-      Offset(0, size.height * .3),
-      Offset(size.width, size.height * .72),
-      road,
-    );
-    canvas.drawLine(
-      Offset(size.width * .2, 0),
-      Offset(size.width * .62, size.height),
-      road,
-    );
-    for (var i = 1; i < 5; i++) {
-      canvas.drawLine(
-        Offset(size.width * i / 5, 0),
-        Offset(size.width * (i - 1) / 5, size.height),
-        minor,
-      );
-    }
-  }
+class _NoLocationPlaceholder extends StatelessWidget {
+  const _NoLocationPlaceholder({this.locationText});
+  final String? locationText;
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.location_off_rounded,
+            color: AppColors.textMuted, size: 36),
+        const SizedBox(height: 10),
+        Text(
+          locationText ?? 'Location unavailable',
+          style: const TextStyle(
+              color: AppColors.textMuted, fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
 }
