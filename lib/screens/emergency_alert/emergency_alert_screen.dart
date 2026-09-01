@@ -112,8 +112,11 @@ class EmergencyAlertScreen extends StatelessWidget {
                         spacing: 7,
                         runSpacing: 4,
                         children: [
-                          Icon(Icons.verified_user_outlined,
-                              color: AppColors.safe, size: 18),
+                          Icon(
+                            Icons.verified_user_outlined,
+                            color: AppColors.safe,
+                            size: 18,
+                          ),
                           Text(
                             'Safety network activated',
                             textAlign: TextAlign.center,

@@ -538,8 +538,9 @@ class _Waveform extends StatelessWidget {
               alpha = .25;
             } else {
               final amplitude = realLevels[i - offset];
-              height = 6.0 + (amplitude * 32.0).clamp(0.0, 32.0);
-              alpha = .35 + (amplitude * .5).clamp(0.0, .5);
+              height =
+                  6.0 + (amplitude * 32.0).clamp(0.0, 32.0).toDouble();
+              alpha = .35 + (amplitude * .5).clamp(0.0, .5).toDouble();
             }
           } else {
             height = demoHeights[i % demoHeights.length];
