@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   }
 
   const accessToken = await getAccessToken(clientEmail, privateKey);
-  const results = [];
+  const results: Array<{ ok: boolean; status: number }> = [];
   for (const token of tokens) {
     const res = await fetch(
       `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
         }),
       },
     );
-    results.push({ token, ok: res.ok, status: res.status, body: await res.text() });
+    results.push({ ok: res.ok, status: res.status });
   }
 
   return json({ ok: true, sent: results.filter((r) => r.ok).length, results });
