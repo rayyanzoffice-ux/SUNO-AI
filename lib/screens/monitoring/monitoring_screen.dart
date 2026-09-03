@@ -168,13 +168,21 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     // Low risk stays silent — keep listening, no incident, no interruption.
     if (result.riskLevel == RiskLevel.low) return;
 
+    final route = result.riskLevel == RiskLevel.medium
+        ? AppRoutes.safetyCheck
+        : AppRoutes.emergencyAlert;
     _runtime.recordDetection(result).then((_) async {
       if (!mounted) return;
-      final route = result.riskLevel == RiskLevel.medium
-          ? AppRoutes.safetyCheck
-          : AppRoutes.emergencyAlert;
-      // Release the microphone before navigating away — Safety Check and
-      // Emergency Alert don't need the live pipeline running behind them.
+      // Release the microphone before navigating away.
+      await _disableLiveMode();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, route);
+    }).catchError((Object e) async {
+      // Even if something unexpected throws, still navigate to the
+      // emergency screen — the local incident was already saved.
+      // ignore: avoid_print
+      print('[SUNO] recordDetection error (non-fatal): $e');
+      if (!mounted) return;
       await _disableLiveMode();
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, route);

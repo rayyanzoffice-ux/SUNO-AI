@@ -118,7 +118,15 @@ class SunoRuntimeService {
         'locationText': detection.locationText!,
     };
 
-    await alertService.sendAlert(contactTokens: tokens, payload: payload);
+    try {
+      await alertService.sendAlert(contactTokens: tokens, payload: payload);
+    } catch (e) {
+      // Network failure, relay error, or timeout — log and continue.
+      // The local incident is already saved and the UI will still navigate
+      // to the Emergency Alert screen regardless of push delivery status.
+      // ignore: avoid_print
+      print('[SUNO] Alert relay failed (non-fatal): $e');
+    }
   }
 
   /// Deliberate manual/silent trigger — the "Silent SOS" action.
