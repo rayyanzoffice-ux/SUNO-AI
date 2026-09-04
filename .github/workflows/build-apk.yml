@@ -36,6 +36,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Align tflite_flutter JVM target
+        run: |
+          TFLITE_GRADLE="$(find "$PUB_CACHE" -path '*/tflite_flutter-0.12.1/android/build.gradle' -print -quit)"
+          test -n "$TFLITE_GRADLE"
+          sed -i 's/JavaVersion.VERSION_11/JavaVersion.VERSION_17/g' "$TFLITE_GRADLE"
+          grep -n 'Compatibility' "$TFLITE_GRADLE"
+
       - name: Analyze
         continue-on-error: true
         run: flutter analyze
