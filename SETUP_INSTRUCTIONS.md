@@ -80,19 +80,29 @@ Set these Supabase secrets from your Firebase service account JSON:
 supabase secrets set FIREBASE_PROJECT_ID="suno-ai-c5463"
 supabase secrets set FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@suno-ai-c5463.iam.gserviceaccount.com"
 supabase secrets set FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+supabase secrets set SUNO_RELAY_AUTH_KEY="use-a-random-demo-only-value"
 ```
+
+The relay requires the same `SUNO_RELAY_AUTH_KEY` at runtime. Provide it to
+the app with `--dart-define=SUNO_RELAY_AUTH_KEY="..."`; never commit the value.
+An APK-embedded key can be extracted, so this is temporary hackathon abuse
+resistance, not production-grade user authentication. Durable production rate
+limiting and authenticated user access remain future work.
 
 After deploy, copy the function URL and run the app with:
 
 ```bash
-flutter run --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"
+flutter run \
+  --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"
+  --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
 
 For a release APK:
 
 ```bash
 flutter build apk --release \
-  --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"
+  --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert" \
+  --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
 
 Trusted contacts only receive push alerts if their saved contact record includes

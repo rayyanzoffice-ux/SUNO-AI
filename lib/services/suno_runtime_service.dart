@@ -2,6 +2,7 @@ import '../backend/backend_exports.dart';
 import '../models/detection_result.dart';
 import '../models/incident.dart';
 import '../models/trusted_contact.dart';
+import '../models/received_alert.dart';
 
 enum DetectionScenario { low, medium, critical }
 
@@ -29,6 +30,11 @@ class SunoRuntimeService {
   final AlertService? _alertService;
 
   Incident? currentIncident;
+  ReceivedAlert? receivedAlert;
+
+  void acceptReceivedAlert(ReceivedAlert alert) {
+    receivedAlert = alert;
+  }
 
   String? get deviceToken {
     final alertService = _alertService;
@@ -130,9 +136,9 @@ class SunoRuntimeService {
 
     try {
       await alertService.sendAlert(contactTokens: tokens, payload: payload);
-    } catch (e) {
+    } catch (_) {
       // ignore: avoid_print
-      print('[SUNO] Alert relay failed (non-fatal): $e');
+      print('[SUNO] Alert relay delivery failed (non-fatal).');
     }
   }
 
@@ -150,7 +156,7 @@ class SunoRuntimeService {
       longitude: location?.longitude,
       locationText: location != null
           ? '${location.latitude.toStringAsFixed(4)}, '
-            '${location.longitude.toStringAsFixed(4)}'
+                '${location.longitude.toStringAsFixed(4)}'
           : null,
       detectedAt: now,
     );

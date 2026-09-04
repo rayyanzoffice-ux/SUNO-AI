@@ -1,3 +1,7 @@
+import org.gradle.api.JavaVersion
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 allprojects {
     repositories {
         google()
@@ -17,6 +21,16 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+subprojects {
+    plugins.withId("org.jetbrains.kotlin.android") {
+        if (name == "tflite_flutter") {
+            tasks.withType<KotlinCompile>().configureEach {
+                compilerOptions.jvmTarget.set(JvmTarget.JVM_11)
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

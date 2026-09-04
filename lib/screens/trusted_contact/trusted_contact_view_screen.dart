@@ -17,8 +17,7 @@ class TrustedContactViewScreen extends StatefulWidget {
       _TrustedContactViewScreenState();
 }
 
-class _TrustedContactViewScreenState
-    extends State<TrustedContactViewScreen> {
+class _TrustedContactViewScreenState extends State<TrustedContactViewScreen> {
   final ScrollController _scrollController = ScrollController();
   String _status = 'Alert received — response needed';
   String _contactName = 'Your contact';
@@ -30,15 +29,17 @@ class _TrustedContactViewScreenState
   }
 
   Future<void> _loadContact() async {
-    final contacts =
-        await SunoRuntimeService.instance.getTrustedContacts();
+    final contacts = await SunoRuntimeService.instance.getTrustedContacts();
     if (contacts.isNotEmpty && mounted) {
       setState(() => _contactName = contacts.first.name);
     }
   }
 
   Future<void> _update(IncidentStatus status, String text) async {
-    await SunoRuntimeService.instance.updateStatus(status, text);
+    final runtime = SunoRuntimeService.instance;
+    if (runtime.currentIncident != null) {
+      await runtime.updateStatus(status, text);
+    }
     if (!mounted) return;
     setState(() => _status = text);
   }
@@ -51,9 +52,15 @@ class _TrustedContactViewScreenState
 
   @override
   Widget build(BuildContext context) {
-    final result =
-        SunoRuntimeService.instance.currentIncident?.detectionResult;
-    final time = result?.detectedAt ?? DateTime.now();
+    final runtime = SunoRuntimeService.instance;
+    final result = runtime.currentIncident?.detectionResult;
+    final received = runtime.receivedAlert;
+    final score = result?.riskScore ?? int.tryParse(received?.riskScore ?? '');
+    final level = result?.riskLevel ?? _riskLevel(received?.riskLevel);
+    final time =
+        result?.detectedAt ??
+        DateTime.tryParse(received?.detectedAt ?? '') ??
+        DateTime.now();
     final displayTime = formatClock12Hour(time);
 
     return Scaffold(
@@ -72,8 +79,11 @@ class _TrustedContactViewScreenState
                   child: CircleAvatar(
                     radius: 29,
                     backgroundColor: Color(0xFFFFE8E9),
-                    child: Icon(Icons.person_rounded,
-                        color: AppColors.emergency, size: 32),
+                    child: Icon(
+                      Icons.person_rounded,
+                      color: AppColors.emergency,
+                      size: 32,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -81,8 +91,9 @@ class _TrustedContactViewScreenState
                   child: Text(
                     _contactName,
                     style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.w700),
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -99,36 +110,42 @@ class _TrustedContactViewScreenState
                 ),
                 const SizedBox(height: 12),
                 Center(
-                  child: RiskBadge(
-                    score: result?.riskScore ?? 0,
-                    level: result?.riskLevel ?? RiskLevel.critical,
-                  ),
+                  child: RiskBadge(score: score ?? 0, level: level),
                 ),
                 const SizedBox(height: 18),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 5),
+                      horizontal: 16,
+                      vertical: 5,
+                    ),
                     child: Column(
                       children: [
-                        _line(Icons.hearing_rounded, 'Event',
-                            result?.eventType ?? '—'),
+                        _line(
+                          Icons.hearing_rounded,
+                          'Event',
+                          result?.eventType ?? received?.eventType ?? '—',
+                        ),
                         const Divider(height: 1),
-                        _line(Icons.schedule_rounded, 'Detected',
-                            '$displayTime · Today'),
+                        _line(
+                          Icons.schedule_rounded,
+                          'Detected',
+                          '$displayTime · Today',
+                        ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text('Live Location',
-                    style: TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Live Location',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 9),
                 MapPreviewCard(
                   latitude: result?.latitude,
                   longitude: result?.longitude,
-                  locationText: result?.locationText,
+                  locationText: result?.locationText ?? received?.location,
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -203,16 +220,30 @@ class _TrustedContactViewScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: const TextStyle(
-                      color: AppColors.textMuted, fontSize: 11)),
-              Text(value,
-                  style: const TextStyle(
-                      color: AppColors.text, fontWeight: FontWeight.w700)),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.text,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),
       ],
     ),
   );
+
+  static RiskLevel _riskLevel(String? value) => switch (value) {
+    'low' => RiskLevel.low,
+    'medium' => RiskLevel.medium,
+    _ => RiskLevel.critical,
+  };
 }

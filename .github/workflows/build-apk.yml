@@ -54,6 +54,7 @@ jobs:
         run: >-
           flutter build apk --release
           --dart-define=SUNO_ALERT_RELAY_URL=https://uxqthxlgcyybbrpmfevk.supabase.co/functions/v1/send-alert
+          --dart-define=SUNO_RELAY_AUTH_KEY=${{ secrets.SUNO_RELAY_AUTH_KEY }}
 
       - name: Prepare final APK
         run: cp build/app/outputs/flutter-apk/app-release.apk SUNO-final.apk
