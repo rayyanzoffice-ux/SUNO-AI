@@ -30,7 +30,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('LOW'));
-    await tester.tap(find.text('Demo: Simulate Distress'));
+    await _tapSimulateDistress(tester);
     await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('SUNO is Active'), findsOneWidget);
@@ -41,7 +41,7 @@ void main() {
 
   testWidgets('low detection remains on Monitoring', (tester) async {
     await _pumpScenario(tester, DetectionScenario.low);
-    await tester.tap(find.text('Demo: Simulate Distress'));
+    await _tapSimulateDistress(tester);
     await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('SUNO is Active'), findsOneWidget);
@@ -53,7 +53,7 @@ void main() {
     tester,
   ) async {
     await _pumpScenario(tester, DetectionScenario.medium);
-    await tester.tap(find.text('Demo: Simulate Distress'));
+    await _tapSimulateDistress(tester);
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
 
@@ -73,7 +73,7 @@ void main() {
     'medium detection can escalate immediately when user cannot respond',
     (tester) async {
       await _pumpScenario(tester, DetectionScenario.medium);
-      await tester.tap(find.text('Demo: Simulate Distress'));
+      await _tapSimulateDistress(tester);
       await tester.pump(const Duration(seconds: 1));
       await tester.pump();
 
@@ -93,7 +93,7 @@ void main() {
     tester,
   ) async {
     await _pumpScenario(tester, DetectionScenario.medium);
-    await tester.tap(find.text('Demo: Simulate Distress'));
+    await _tapSimulateDistress(tester);
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
 
@@ -112,7 +112,7 @@ void main() {
     tester,
   ) async {
     await _pumpScenario(tester, DetectionScenario.critical);
-    await tester.tap(find.text('Demo: Simulate Distress'));
+    await _tapSimulateDistress(tester);
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
 
@@ -282,6 +282,13 @@ Incident _historyIncident({
   createdAt: createdAt,
   updatedAt: createdAt,
 );
+
+Future<void> _tapSimulateDistress(WidgetTester tester) async {
+  final trigger = find.text('Demo: Simulate Distress');
+  await tester.ensureVisible(trigger);
+  await tester.pump();
+  await tester.tap(trigger);
+}
 
 Future<void> _pumpScenario(WidgetTester tester, DetectionScenario scenario) =>
     tester.pumpWidget(
