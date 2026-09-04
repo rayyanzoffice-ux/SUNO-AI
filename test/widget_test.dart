@@ -61,12 +61,11 @@ void main() {
     await tester.tap(find.text('I AM SAFE'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Incident History'), findsOneWidget);
+    expect(find.text('SUNO is Active'), findsOneWidget);
     expect(
       SunoRuntimeService.instance.currentIncident?.status,
       IncidentStatus.cancelled,
     );
-    expect(find.text('Possible Distress Sound'), findsWidgets);
   });
 
   testWidgets(
@@ -295,6 +294,7 @@ Future<void> _pumpScenario(WidgetTester tester, DetectionScenario scenario) =>
       MaterialApp(
         home: MonitoringScreen(scenario: scenario),
         routes: {
+          AppRoutes.monitoring: (_) => const MonitoringScreen(),
           AppRoutes.safetyCheck: (_) => const SafetyCheckScreen(),
           AppRoutes.emergencyAlert: (_) => const EmergencyAlertScreen(),
           AppRoutes.trustedContactView: (_) => const TrustedContactViewScreen(),
