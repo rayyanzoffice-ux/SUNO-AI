@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "864037463589",
+    "project_id": "suno-ai-c5463",
+    "storage_bucket": "suno-ai-c5463.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:864037463589:android:a376e34e88512c598341cc",
+        "android_client_info": {
+          "package_name": "com.example.suno_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEFYbLUGGVA1b-ga4dLEODU46dVtEaCqk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
