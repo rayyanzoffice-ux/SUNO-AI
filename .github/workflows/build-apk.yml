@@ -51,7 +51,9 @@ jobs:
         run: flutter test
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: >-
+          flutter build apk --release
+          --dart-define=SUNO_ALERT_RELAY_URL=https://uxqthxlgcyybbrpmfevk.supabase.co/functions/v1/send-alert
 
       - name: Prepare final APK
         run: cp build/app/outputs/flutter-apk/app-release.apk SUNO-final.apk
