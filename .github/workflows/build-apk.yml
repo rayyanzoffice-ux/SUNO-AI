@@ -51,6 +51,8 @@ jobs:
         run: flutter test
 
       - name: Build release APK
+        env:
+          ORG_GRADLE_PROJECT_sunoTfliteJava17: 'true'
         run: >-
           flutter build apk --release
           --dart-define=SUNO_ALERT_RELAY_URL=https://uxqthxlgcyybbrpmfevk.supabase.co/functions/v1/send-alert

@@ -27,7 +27,13 @@ subprojects {
     plugins.withId("org.jetbrains.kotlin.android") {
         if (name == "tflite_flutter") {
             tasks.withType<KotlinCompile>().configureEach {
-                compilerOptions.jvmTarget.set(JvmTarget.JVM_11)
+                compilerOptions.jvmTarget.set(
+                    if (providers.gradleProperty("sunoTfliteJava17").isPresent) {
+                        JvmTarget.JVM_17
+                    } else {
+                        JvmTarget.JVM_11
+                    },
+                )
             }
         }
     }
