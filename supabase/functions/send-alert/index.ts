@@ -8,7 +8,15 @@ const projectId = Deno.env.get('FIREBASE_PROJECT_ID');
 const clientEmail = Deno.env.get('FIREBASE_CLIENT_EMAIL');
 const privateKey = Deno.env.get('FIREBASE_PRIVATE_KEY')?.replace(/\\n/g, '\n');
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
+  if (req.method === 'GET') {
+    return json({
+      ok: true,
+      service: 'suno-send-alert',
+      firebaseConfigured: Boolean(projectId && clientEmail && privateKey),
+    });
+  }
+
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405);
   }
@@ -17,51 +25,76 @@ Deno.serve(async (req) => {
     return json({ error: 'Firebase service account env vars missing' }, 500);
   }
 
-  const body = await req.json() as AlertPayload;
+  let body: AlertPayload;
+  try {
+    body = await req.json() as AlertPayload;
+  } catch (_) {
+    return json({ error: 'Invalid JSON body' }, 400);
+  }
+
   if (body.cancelIncidentId) {
     return json({ ok: true, cancelled: body.cancelIncidentId });
   }
 
-  const tokens = body.contactTokens ?? [];
+  const tokens = (body.contactTokens ?? [])
+    .filter((token): token is string =>
+      typeof token === 'string' && token.trim().length > 20
+    )
+    .slice(0, 10);
   const payload = body.payload ?? {};
+
   if (tokens.length === 0) {
     return json({ ok: true, sent: 0 });
   }
 
-  const accessToken = await getAccessToken(clientEmail, privateKey);
-  const results: Array<{ ok: boolean; status: number }> = [];
-  for (const token of tokens) {
-    const res = await fetch(
-      `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: {
-            token,
-            notification: {
-              title: 'SUNO emergency alert',
-              body: `${payload.eventType ?? 'Emergency'} · Risk ${payload.riskScore ?? '?'}%`,
-            },
-            data: payload,
-            android: {
-              priority: 'HIGH',
+  try {
+    const accessToken = await getAccessToken(clientEmail, privateKey);
+    const results: Array<{ ok: boolean; status: number }> = [];
+
+    for (const token of tokens) {
+      const res = await fetch(
+        `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: {
+              token,
               notification: {
-                channel_id: 'suno_alerts',
-                click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                title: 'SUNO emergency alert',
+                body: `${payload.eventType ?? 'Emergency'} · Risk ${payload.riskScore ?? '?'}%`,
+              },
+              data: payload,
+              android: {
+                priority: 'HIGH',
+                notification: {
+                  channel_id: 'suno_alerts',
+                  click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                },
               },
             },
-          },
-        }),
-      },
-    );
-    results.push({ ok: res.ok, status: res.status });
-  }
+          }),
+        },
+      );
+      results.push({ ok: res.ok, status: res.status });
+    }
 
-  return json({ ok: true, sent: results.filter((r) => r.ok).length, results });
+    return json({
+      ok: results.every((result) => result.ok),
+      sent: results.filter((result) => result.ok).length,
+      attempted: results.length,
+      results,
+    });
+  } catch (error) {
+    console.error(
+      '[SUNO relay] delivery failed',
+      error instanceof Error ? error.message : String(error),
+    );
+    return json({ error: 'Push delivery failed' }, 502);
+  }
 });
 
 function json(body: unknown, status = 200): Response {
@@ -105,7 +138,9 @@ async function getAccessToken(email: string, key: string): Promise<string> {
       assertion: jwt,
     }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    throw new Error(`OAuth token request failed with ${res.status}`);
+  }
   const decoded = await res.json() as { access_token: string };
   return decoded.access_token;
 }
