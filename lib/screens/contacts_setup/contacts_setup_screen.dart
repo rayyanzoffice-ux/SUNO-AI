@@ -135,7 +135,9 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                           SizedBox(width: 10),
-                          Text('Getting token from Firebase...'),
+                          Expanded(
+                            child: Text('Getting token from Firebase...'),
+                          ),
                         ],
                       )
                     else if (myFcmToken == null || myFcmToken!.isEmpty)
