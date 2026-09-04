@@ -1,9 +1,9 @@
-# SUNO-AI — Setup Instructions
+# SUNO — Setup Instructions
 
 ## 1. Install Flutter packages
 
 ```bash
-cd ~/SUNO-AI
+cd SUNO-AI
 flutter pub get
 ```
 
@@ -15,7 +15,7 @@ YAMNet converts raw 16 kHz audio into 1024-dimensional embeddings that the
 SUNO classifier head consumes. Without it, only the demo/mock path works.
 
 ```bash
-cd ~/SUNO-AI
+cd SUNO-AI
 curl -L -o assets/ml/yamnet.tflite \
   "https://tfhub.dev/google/lite-model/yamnet/tflite/1?lite-format=tflite"
 
@@ -126,11 +126,11 @@ flutter build apk --release
 ## 7. Push to GitHub
 
 ```bash
-cd ~/SUNO-AI
+cd SUNO-AI
 git add -A
 git status          # verify what's staged
-git commit -m "feat: Phase 1-6 ML pipeline, real maps, Hive persistence, FCM push, bug fixes"
-git push origin feature/backend-yamnet-tflite
+git commit -m "feat: describe your change"
+git push origin feature/day2-integration
 ```
 
 ---
