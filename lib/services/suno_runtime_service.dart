@@ -30,6 +30,18 @@ class SunoRuntimeService {
 
   Incident? currentIncident;
 
+  String? get deviceToken {
+    final alertService = _alertService;
+    return alertService is FcmAlertService ? alertService.deviceToken : null;
+  }
+
+  Future<String?> refreshDeviceToken() async {
+    final alertService = _alertService;
+    return alertService is FcmAlertService
+        ? alertService.registerDevice()
+        : null;
+  }
+
   Future<DetectionResult> runDetection(DetectionScenario scenario) =>
       switch (scenario) {
         DetectionScenario.low => _detectionEngine.simulateLowRiskDetection(),
@@ -64,7 +76,6 @@ class SunoRuntimeService {
   ]) async {
     final existing = currentIncident;
     if (existing == null) return null;
-    // Build a fresh Incident rather than mutating the stored object.
     final now = DateTime.now();
     final updated = Incident(
       id: existing.id,
@@ -72,7 +83,6 @@ class SunoRuntimeService {
       status: status,
       createdAt: existing.createdAt,
       updatedAt: now,
-      // Only overwrite contactResponseText when a new value is supplied.
       contactResponseText: response ?? existing.contactResponseText,
     );
     currentIncident = await _incidents.update(updated);
@@ -121,22 +131,11 @@ class SunoRuntimeService {
     try {
       await alertService.sendAlert(contactTokens: tokens, payload: payload);
     } catch (e) {
-      // Network failure, relay error, or timeout — log and continue.
-      // The local incident is already saved and the UI will still navigate
-      // to the Emergency Alert screen regardless of push delivery status.
       // ignore: avoid_print
       print('[SUNO] Alert relay failed (non-fatal): $e');
     }
   }
 
-  /// Deliberate manual/silent trigger — the "Silent SOS" action.
-  ///
-  /// Skips audio classification and motion scoring entirely. This exists
-  /// because audio/motion detection cannot cover emergencies that are
-  /// silent or purely visual/physical — the user needs a way to reach the
-  /// same Emergency Alert path without making a sound. Routes through the
-  /// exact same incident + notification path as any other critical
-  /// detection so downstream behavior stays consistent.
   Future<Incident?> triggerManualAlert({String? onlyContactId}) async {
     final location = await LocationService().currentLocation();
     final now = DateTime.now();
