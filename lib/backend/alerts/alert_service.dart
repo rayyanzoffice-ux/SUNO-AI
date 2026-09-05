@@ -3,7 +3,9 @@ abstract interface class AlertService {
   /// The token for this device, if push notifications are available.
   String? get deviceToken;
 
-  Future<void> sendAlert({
+  /// Sends an emergency alert and returns the number of contacts that the
+  /// relay reports as successfully accepted by FCM.
+  Future<int> sendAlert({
     required List<String> contactTokens,
     required Map<String, String> payload,
   });
