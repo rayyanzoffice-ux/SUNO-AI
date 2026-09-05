@@ -53,7 +53,9 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     await Clipboard.setData(ClipboardData(text: token));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('FCM token copied. Send it to your trusted contact.')),
+      const SnackBar(
+        content: Text('FCM token copied. Send it to your trusted contact.'),
+      ),
     );
   }
 
@@ -66,35 +68,49 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     }
 
     setState(() => _saving = true);
+    final editingId = _editingId;
     try {
       final trimmedToken = fcmToken.text.trim();
+      final normalizedToken = trimmedToken.isEmpty ? null : trimmedToken;
+      TrustedContact? existing;
+      if (editingId != null) {
+        final index = contacts.indexWhere((c) => c.id == editingId);
+        if (index != -1) existing = contacts[index];
+      }
+
       final contact = TrustedContact(
-        id: _editingId ?? DateTime.now().toString(),
+        id: editingId ?? DateTime.now().toString(),
         name: name.text.trim(),
         phone: phone.text.trim(),
         relationship: relationship.text.trim(),
-        fcmToken: trimmedToken.isEmpty ? null : trimmedToken,
+        fcmToken: normalizedToken,
+        verifiedAt: existing?.fcmToken == normalizedToken
+            ? existing?.verifiedAt
+            : null,
       );
 
-      final saved = _editingId == null
+      final saved = editingId == null
           ? await SunoRuntimeService.instance.addTrustedContact(contact)
           : await SunoRuntimeService.instance.updateTrustedContact(contact);
 
       if (!mounted) return;
       setState(() {
-        if (_editingId == null) {
+        if (editingId == null) {
           contacts.add(saved);
         } else {
-          final index = contacts.indexWhere((c) => c.id == _editingId);
+          final index = contacts.indexWhere((c) => c.id == editingId);
           if (index != -1) contacts[index] = saved;
         }
         _clearForm();
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(_editingId == null
+          content: Text(
+            editingId == null
                 ? 'Trusted contact saved locally.'
-                : 'Trusted contact updated.')),
+                : 'Trusted contact updated.',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -152,9 +168,11 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
       );
       if (!mounted) return;
       if (ok) {
-        final updated = await SunoRuntimeService.instance
-            .getTrustedContacts()
-            .then((all) => all.firstWhere((c) => c.id == contact.id));
+        final updatedContacts =
+            await SunoRuntimeService.instance.getTrustedContacts();
+        if (!mounted) return;
+        final updated =
+            updatedContacts.firstWhere((c) => c.id == contact.id);
         setState(() {
           final index = contacts.indexWhere((c) => c.id == contact.id);
           if (index != -1) contacts[index] = updated;
@@ -166,7 +184,8 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                '${contact.name} token rejected by FCM. Check the token.'),
+              '${contact.name} token rejected by FCM. Check the token.',
+            ),
           ),
         );
       }
@@ -186,6 +205,13 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     }
     if (contact.isVerified) return 'Verified reachable';
     return 'Token saved, unverified';
+  }
+
+  String _formatVerifiedAt(DateTime value) {
+    final local = value.toLocal();
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
   }
 
   Color _pushStatusColor(TrustedContact contact) {
@@ -315,15 +341,28 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                                 color: _pushStatusColor(contact),
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                _pushStatus(contact),
-                                style: TextStyle(
-                                  color: _pushStatusColor(contact),
-                                  fontWeight: FontWeight.w700,
+                              Flexible(
+                                child: Text(
+                                  _pushStatus(contact),
+                                  style: TextStyle(
+                                    color: _pushStatusColor(contact),
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
+                          if (contact.verifiedAt != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                'Last verified: ${_formatVerifiedAt(contact.verifiedAt!)}',
+                                style: const TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       isThreeLine: true,
@@ -349,10 +388,13 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
-                                              strokeWidth: 2),
+                                            strokeWidth: 2,
+                                          ),
                                         )
-                                      : const Icon(Icons.send_outlined,
-                                          size: 18),
+                                      : const Icon(
+                                          Icons.send_outlined,
+                                          size: 18,
+                                        ),
                                   const SizedBox(width: 10),
                                   const Text('Test reachability'),
                                 ],
@@ -372,12 +414,16 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete_outline,
-                                    size: 18, color: AppColors.emergency),
+                                Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: AppColors.emergency,
+                                ),
                                 SizedBox(width: 10),
-                                Text('Delete',
-                                    style:
-                                        TextStyle(color: AppColors.emergency)),
+                                Text(
+                                  'Delete',
+                                  style: TextStyle(color: AppColors.emergency),
+                                ),
                               ],
                             ),
                           ),
@@ -389,8 +435,10 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                 const SizedBox(height: 24),
                 Text(
                   _editingId == null ? 'Add a contact' : 'Edit contact',
-                  style:
-                      const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -421,7 +469,8 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                   maxLines: 3,
                   decoration: const InputDecoration(
                     labelText: 'FCM token (optional)',
-                    helperText: 'Needed only for real push alerts to this contact.',
+                    helperText:
+                        'Needed only for real push alerts to this contact.',
                   ),
                 ),
                 const SizedBox(height: 18),
