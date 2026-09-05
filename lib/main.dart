@@ -26,7 +26,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void _onLocalNotificationTap(NotificationResponse response) {
   final payload = response.payload;
   if (payload == null || payload.isEmpty) return;
-  _navigateToAlertReceived(_parsePayload(payload));
+  final data = _parsePayload(payload);
+  if (data['type'] == 'response') return;
+  _navigateToAlertReceived(data);
 }
 
 Map<String, String> _parsePayload(String payload) {
@@ -77,8 +79,10 @@ Future<void> _initLocalNotifications() async {
   _localNotificationsInitialized = true;
 }
 
-Future<Map<String, String>?> _handleRemoteMessage(RemoteMessage message,
-    {bool showLocalNotification = false}) async {
+Future<Map<String, String>?> _handleRemoteMessage(
+  RemoteMessage message, {
+  bool showLocalNotification = false,
+}) async {
   final data = Map<String, String>.from(message.data);
   final type = data['type'];
 
@@ -121,6 +125,15 @@ Future<Map<String, String>?> _handleRemoteMessage(RemoteMessage message,
   return data;
 }
 
+Future<void> _handleOpenedRemoteMessage(RemoteMessage message) async {
+  final data = await _handleRemoteMessage(message);
+  if (data != null &&
+      data['type'] != 'response' &&
+      data.containsKey('incidentId')) {
+    _navigateToAlertReceived(data);
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -157,29 +170,27 @@ void main() async {
     trustedContactRepository: const HiveTrustedContactRepository(),
     alertService: alertService,
   );
+  await SunoRuntimeService.instance.restoreLatestIncident();
 
-  Map<String, String>? pendingAlertPayload;
+  RemoteMessage? initialMessage;
   if (firebaseReady) {
     FirebaseMessaging.onMessage.listen(
       (message) => _handleRemoteMessage(message, showLocalNotification: true),
     );
-    FirebaseMessaging.onMessageOpenedApp.listen(
-      (message) => _handleRemoteMessage(message),
-    );
-
-    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-    if (initialMessage != null &&
-        initialMessage.data.containsKey('incidentId') &&
-        initialMessage.data['type'] != 'response') {
-      pendingAlertPayload = Map<String, String>.from(initialMessage.data);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedRemoteMessage);
+    initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null && initialMessage.data['type'] == 'response') {
+      await _handleRemoteMessage(initialMessage);
+      initialMessage = null;
     }
   }
 
   runApp(const SunoApp());
 
-  if (pendingAlertPayload != null) {
+  if (initialMessage != null && initialMessage.data.containsKey('incidentId')) {
+    final pendingAlertPayload = Map<String, String>.from(initialMessage.data);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _navigateToAlertReceived(pendingAlertPayload!);
+      _navigateToAlertReceived(pendingAlertPayload);
     });
   }
 }
