@@ -21,7 +21,11 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
       return 'Your trusted contacts are being notified.';
     }
     if (dispatch.success) {
-      return 'Contacts notified (${dispatch.attemptedCount}).';
+      return '${dispatch.sentCount} of ${dispatch.attemptedCount} contacts notified.';
+    }
+    if (dispatch.partiallyDelivered) {
+      return '${dispatch.sentCount} of ${dispatch.attemptedCount} contacts notified. '
+          '${dispatch.failedCount} could not be reached.';
     }
     return 'Alert saved locally — contacts could not be reached '
         '(${dispatch.failedReason ?? 'unknown reason'}).';
