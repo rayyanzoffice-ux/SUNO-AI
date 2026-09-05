@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/day2-integration
   workflow_dispatch:
 
 permissions:
@@ -44,7 +45,6 @@ jobs:
           grep -n 'Compatibility' "$TFLITE_GRADLE"
 
       - name: Analyze
-        continue-on-error: true
         run: flutter analyze
 
       - name: Run tests
