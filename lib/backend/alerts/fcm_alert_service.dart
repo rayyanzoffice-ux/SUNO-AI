@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -35,22 +35,18 @@ class FcmAlertService implements AlertService {
     return _deviceToken;
   }
 
+  @override
   String? get deviceToken => _deviceToken;
 
   @override
-  Future<void> sendAlert({
+  Future<int> sendAlert({
     required List<String> contactTokens,
     required Map<String, String> payload,
   }) async {
-    if (contactTokens.isEmpty) return;
+    if (contactTokens.isEmpty) return 0;
 
     if (_relayEndpoint.trim().isEmpty) {
-      // ignore: avoid_print
-      print(
-        '[SUNO FCM] Relay not configured. Would notify '
-        '${contactTokens.length} contact(s): ${jsonEncode(payload)}',
-      );
-      return;
+      throw StateError('Alert relay URL is not configured.');
     }
 
     final uri = Uri.parse(_relayEndpoint);
@@ -67,24 +63,32 @@ class FcmAlertService implements AlertService {
         onTimeout: () =>
             throw TimeoutException('Alert relay response timed out.'),
       );
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(
-            const Duration(seconds: 8),
-            onTimeout: () =>
-                throw TimeoutException('Alert relay response timed out.'),
-          );
+      final body = await utf8.decodeStream(response).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () =>
+            throw TimeoutException('Alert relay response timed out.'),
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError('Alert relay failed (${response.statusCode}): $body');
       }
+
       final decoded = jsonDecode(body) as Map<String, dynamic>;
-      final results = decoded['results'] as List<dynamic>?;
-      if (results != null && results.isNotEmpty) {
-        final allFailed = results.every((r) => r['ok'] != true);
-        if (allFailed) {
-          throw StateError('Alert relay delivered to 0/${results.length} contacts.');
-        }
+      final sent = decoded['sent'];
+      final attempted = decoded['attempted'];
+      if (sent is! int) {
+        throw StateError('Alert relay returned an invalid delivery result.');
       }
+      if (attempted is int && attempted != contactTokens.length) {
+        throw StateError(
+          'Alert relay attempted $attempted/${contactTokens.length} contacts.',
+        );
+      }
+      if (sent == 0) {
+        throw StateError(
+          'Alert relay delivered to 0/${contactTokens.length} contacts.',
+        );
+      }
+      return sent;
     } finally {
       client.close(force: true);
     }
@@ -112,13 +116,11 @@ class FcmAlertService implements AlertService {
         onTimeout: () =>
             throw TimeoutException('Test message response timed out.'),
       );
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(
-            const Duration(seconds: 8),
-            onTimeout: () =>
-                throw TimeoutException('Test message response timed out.'),
-          );
+      final body = await utf8.decodeStream(response).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () =>
+            throw TimeoutException('Test message response timed out.'),
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError('Test message failed (${response.statusCode}): $body');
       }
@@ -166,9 +168,17 @@ class FcmAlertService implements AlertService {
         onTimeout: () =>
             throw TimeoutException('Response relay response timed out.'),
       );
+      final body = await utf8.decodeStream(response).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () =>
+            throw TimeoutException('Response relay response timed out.'),
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final body = await utf8.decodeStream(response);
         throw StateError('Response relay failed (${response.statusCode}): $body');
+      }
+      final decoded = jsonDecode(body) as Map<String, dynamic>;
+      if (decoded['ok'] != true || decoded['sent'] != 1) {
+        throw StateError('Response relay did not deliver the contact response.');
       }
     } finally {
       client.close(force: true);
