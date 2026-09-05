@@ -15,6 +15,11 @@ abstract final class AppRoutes {
   static const safetyCheck = '/safety-check';
   static const emergencyAlert = '/emergency-alert';
   static const trustedContactPreview = '/trusted-contact-preview';
+
+  /// Backward-compatible alias kept for older callers/tests.
+  @Deprecated('Use trustedContactPreview')
+  static const trustedContactView = trustedContactPreview;
+
   static const alertReceived = '/alert-received';
   static const history = '/history';
   static const contactsSetup = '/contacts-setup';
