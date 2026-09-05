@@ -2,6 +2,14 @@ type AlertPayload = {
   contactTokens?: string[];
   payload?: Record<string, string>;
   cancelIncidentId?: string;
+  test?: boolean;
+  response?: {
+    recipientToken: string;
+    incidentId: string;
+    responderName: string;
+    status: string;
+    message: string;
+  };
 };
 
 const projectId = Deno.env.get('FIREBASE_PROJECT_ID');
@@ -22,47 +30,83 @@ Deno.serve(async (req) => {
     return json({ ok: true, cancelled: body.cancelIncidentId });
   }
 
+  const accessToken = await getAccessToken(clientEmail, privateKey);
+
+  if (body.response) {
+    const r = body.response;
+    const res = await sendFcm(accessToken, r.recipientToken, {
+      data: {
+        type: 'response',
+        incidentId: r.incidentId,
+        responderName: r.responderName,
+        status: r.status,
+        message: r.message,
+      },
+      android: {
+        priority: 'HIGH',
+        notification: {
+          channel_id: 'suno_alerts',
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      },
+    });
+    return json({
+      ok: res.ok,
+      sent: res.ok ? 1 : 0,
+      results: [{ ok: res.ok, status: res.status }],
+    });
+  }
+
   const tokens = body.contactTokens ?? [];
   const payload = body.payload ?? {};
   if (tokens.length === 0) {
     return json({ ok: true, sent: 0 });
   }
 
-  const accessToken = await getAccessToken(clientEmail, privateKey);
+  const isTest = body.test === true;
   const results: Array<{ ok: boolean; status: number }> = [];
   for (const token of tokens) {
-    const res = await fetch(
-      `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: {
-            token,
-            notification: {
-              title: 'SUNO emergency alert',
-              body: `${payload.eventType ?? 'Emergency'} · Risk ${payload.riskScore ?? '?'}%`,
-            },
-            data: payload,
-            android: {
-              priority: 'HIGH',
-              notification: {
-                channel_id: 'suno_alerts',
-                click_action: 'FLUTTER_NOTIFICATION_CLICK',
-              },
-            },
+    const res = await sendFcm(accessToken, token, {
+      ...(isTest
+        ? {}
+        : {
+          notification: {
+            title: 'SUNO emergency alert',
+            body: `${payload.eventType ?? 'Emergency'} · Risk ${payload.riskScore ?? '?'}%`,
           },
         }),
+      data: payload,
+      android: {
+        priority: 'HIGH',
+        notification: {
+          channel_id: 'suno_alerts',
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        },
       },
-    );
+    });
     results.push({ ok: res.ok, status: res.status });
   }
 
   return json({ ok: true, sent: results.filter((r) => r.ok).length, results });
 });
+
+function sendFcm(
+  accessToken: string,
+  token: string,
+  message: Record<string, unknown>,
+): Promise<{ ok: boolean; status: number }> {
+  return fetch(
+    `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message: { token, ...message } }),
+    },
+  );
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

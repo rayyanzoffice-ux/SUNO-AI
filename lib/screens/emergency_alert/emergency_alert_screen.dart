@@ -59,11 +59,31 @@ class EmergencyAlertScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Your trusted contacts are being notified.',
+                    Text(
+                      _dispatchSubtitle(),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textMuted),
+                      style: const TextStyle(color: AppColors.textMuted),
                     ),
+                    if (incident?.contactResponseText != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.safe.withValues(alpha: .1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            incident!.contactResponseText!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.safe,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 22),
                     if (result != null)
                       Card(
@@ -135,7 +155,7 @@ class EmergencyAlertScreen extends StatelessWidget {
                             .updateStatus(IncidentStatus.contactNotified);
                         if (context.mounted) {
                           Navigator.pushNamed(
-                              context, AppRoutes.trustedContactView);
+                              context, AppRoutes.trustedContactPreview);
                         }
                       },
                     ),
@@ -153,6 +173,18 @@ class EmergencyAlertScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _dispatchSubtitle() {
+    final dispatch = SunoRuntimeService.instance.lastDispatchResult;
+    if (dispatch == null) {
+      return 'Your trusted contacts are being notified.';
+    }
+    if (dispatch.success) {
+      return 'Contacts notified (${dispatch.attemptedCount}).';
+    }
+    return 'Alert saved locally — contacts could not be reached '
+        '(${dispatch.failedReason ?? 'unknown reason'}).';
   }
 
   static String _levelLabel(RiskLevel level) {

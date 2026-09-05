@@ -36,4 +36,14 @@ class InMemoryIncidentRepository implements IncidentRepository {
   @override
   Future<List<Incident>> getAll() async =>
       List.unmodifiable(_incidents.reversed);
+
+  @override
+  Future<void> remove(String incidentId) async {
+    _incidents.removeWhere((i) => i.id == incidentId);
+  }
+
+  @override
+  Future<void> clear() async {
+    _incidents.clear();
+  }
 }

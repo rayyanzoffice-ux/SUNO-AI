@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart' as handler;
 
 /// Location snapshot attached to a detection event.
 class LocationSnapshot {
@@ -37,6 +38,16 @@ class LocationService {
       return null;
     }
 
+    // Android requires background location to be requested as a separate,
+    // second prompt after foreground location has already been granted.
+    if (permission == LocationPermission.whileInUse) {
+      final backgroundStatus =
+          await handler.Permission.locationAlways.request();
+      if (backgroundStatus.isGranted) {
+        permission = await Geolocator.checkPermission();
+      }
+    }
+
     try {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -49,7 +60,7 @@ class LocationService {
         longitude: position.longitude,
         capturedAt: DateTime.now(),
       );
-    } on Exception {
+    } catch (_) {
       return null;
     }
   }

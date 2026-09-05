@@ -66,4 +66,14 @@ class HiveIncidentRepository implements IncidentRepository {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return List.unmodifiable(all);
   }
+
+  @override
+  Future<void> remove(String incidentId) async {
+    await incidentBox.delete(incidentId);
+  }
+
+  @override
+  Future<void> clear() async {
+    await incidentBox.clear();
+  }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../screens/alert_received/alert_received_screen.dart';
 import '../../screens/contacts_setup/contacts_setup_screen.dart';
 import '../../screens/emergency_alert/emergency_alert_screen.dart';
 import '../../screens/history/history_screen.dart';
@@ -13,7 +14,8 @@ abstract final class AppRoutes {
   static const monitoring = '/monitoring';
   static const safetyCheck = '/safety-check';
   static const emergencyAlert = '/emergency-alert';
-  static const trustedContactView = '/trusted-contact-view';
+  static const trustedContactPreview = '/trusted-contact-preview';
+  static const alertReceived = '/alert-received';
   static const history = '/history';
   static const contactsSetup = '/contacts-setup';
 
@@ -22,8 +24,19 @@ abstract final class AppRoutes {
     monitoring: (_) => const MonitoringScreen(),
     safetyCheck: (_) => const SafetyCheckScreen(),
     emergencyAlert: (_) => const EmergencyAlertScreen(),
-    trustedContactView: (_) => const TrustedContactViewScreen(),
+    trustedContactPreview: (_) => const TrustedContactViewScreen(),
     history: (_) => const HistoryScreen(),
     contactsSetup: (_) => const ContactsSetupScreen(),
   };
+
+  static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
+    if (settings.name == alertReceived) {
+      final payload = settings.arguments as Map<String, String>? ?? {};
+      return MaterialPageRoute<Map<String, String>>(
+        settings: settings,
+        builder: (_) => AlertReceivedScreen(payload: payload),
+      );
+    }
+    return null;
+  }
 }

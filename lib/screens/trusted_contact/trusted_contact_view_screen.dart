@@ -57,7 +57,7 @@ class _TrustedContactViewScreenState
     final displayTime = formatClock12Hour(time);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Safety alert')),
+      appBar: AppBar(title: const Text('Preview: what your contact sees')),
       body: SafeArea(
         child: Scrollbar(
           controller: _scrollController,

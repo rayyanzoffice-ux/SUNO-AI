@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme/app_theme.dart';
 
@@ -16,24 +17,38 @@ class MapPreviewCard extends StatelessWidget {
   final double? longitude;
   final String? locationText;
 
+  Future<void> _openExternalMap() async {
+    if (latitude == null || longitude == null) return;
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasCoords = latitude != null && longitude != null;
-    return Container(
-      height: 200,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAF3EC),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.border),
+    return GestureDetector(
+      onTap: hasCoords ? _openExternalMap : null,
+      child: Container(
+        height: 200,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF3EC),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: hasCoords
+            ? _RealMap(
+                latitude: latitude!,
+                longitude: longitude!,
+                locationText: locationText,
+                onOpenExternal: _openExternalMap,
+              )
+            : _NoLocationPlaceholder(locationText: locationText),
       ),
-      child: hasCoords
-          ? _RealMap(
-              latitude: latitude!,
-              longitude: longitude!,
-              locationText: locationText,
-            )
-          : _NoLocationPlaceholder(locationText: locationText),
     );
   }
 }
@@ -43,11 +58,13 @@ class _RealMap extends StatelessWidget {
     required this.latitude,
     required this.longitude,
     this.locationText,
+    required this.onOpenExternal,
   });
 
   final double latitude;
   final double longitude;
   final String? locationText;
+  final VoidCallback onOpenExternal;
 
   @override
   Widget build(BuildContext context) {
@@ -112,12 +129,31 @@ class _RealMap extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Text(
-                  'LIVE',
-                  style: TextStyle(
-                    color: AppColors.safe,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
+                GestureDetector(
+                  onTap: onOpenExternal,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.purple.withValues(alpha: .1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.open_in_new_rounded,
+                            color: AppColors.purple, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'OPEN',
+                          style: TextStyle(
+                            color: AppColors.purple,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -135,19 +171,19 @@ class _NoLocationPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.location_off_rounded,
-            color: AppColors.textMuted, size: 36),
-        const SizedBox(height: 10),
-        Text(
-          locationText ?? 'Location unavailable',
-          style: const TextStyle(
-              color: AppColors.textMuted, fontWeight: FontWeight.w600),
-          textAlign: TextAlign.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_off_rounded,
+                color: AppColors.textMuted, size: 36),
+            const SizedBox(height: 10),
+            Text(
+              locationText ?? 'Location unavailable',
+              style: const TextStyle(
+                  color: AppColors.textMuted, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 }

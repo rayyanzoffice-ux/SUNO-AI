@@ -12,9 +12,11 @@ SUNO is an Android-first Flutter prototype that uses on-device audio AI to detec
 - **Safety Check countdown** for medium-risk events — user can confirm they are safe.
 - **Emergency Alert** for critical risk, with location and event details.
 - **Trusted Contact notifications** via Firebase Cloud Messaging (FCM relay through Supabase Edge Functions).
+- **Two-way contact responses** — contacts who receive an alert can tap *I AM CHECKING ON THEM*, *THEY ARE SAFE*, or *UNABLE TO CONTACT*, and the response is relayed back to the sender's device.
 - **Silent SOS** manual trigger for situations where the user cannot make a sound.
-- **Incident history** persisted locally with Hive.
-- **Map preview** of incident location using OpenStreetMap.
+- **Incident history** persisted locally with Hive, with swipe-to-dismiss and clear-all support.
+- **Map preview** of incident location using OpenStreetMap, with one-tap open in Google Maps.
+- **Contact reachability testing** — send a silent FCM test message and mark contacts as verified when delivery succeeds.
 
 ## On-device ML pipeline
 
@@ -67,6 +69,7 @@ lib/
 - Supabase Edge Functions for the FCM relay
 - OpenStreetMap via `flutter_map`
 - `geolocator`, `sensors_plus`, `permission_handler`, `record`
+- `flutter_local_notifications`, `url_launcher`
 
 ## Setup
 
@@ -91,8 +94,9 @@ flutter run
    - **Medium risk** → Safety Check countdown (tap *I AM SAFE* to cancel).
    - **Critical risk** → Emergency Alert is triggered immediately.
 5. Emergency Alert shows event type, risk score, and location.
-6. Trusted contacts with a saved FCM token receive a push notification.
-7. Incident is saved to local history.
+6. Trusted contacts with a saved FCM token receive a push notification and can respond back to the sender.
+7. The sender sees the contact's response on the Emergency Alert screen.
+8. Incident is saved to local history.
 
 ## Privacy
 
@@ -101,6 +105,7 @@ SUNO is designed to be privacy-first:
 - All audio classification runs on the device.
 - Raw audio never leaves the phone.
 - Only incident metadata (event type, risk score, location coordinates, timestamp) is sent to trusted contacts when an alert is triggered.
+- Contact responses (responder name, chosen status, short message) are relayed back to the original sender through the same FCM relay; no response data is stored on Supabase.
 
 ## License
 

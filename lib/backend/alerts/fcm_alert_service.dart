@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import '../../core/config/app_config.dart';
 import 'alert_service.dart';
 
 /// Firebase Cloud Messaging implementation of [AlertService].
@@ -13,11 +14,9 @@ import 'alert_service.dart';
 class FcmAlertService implements AlertService {
   FcmAlertService({
     required FirebaseMessaging messaging,
-    String relayEndpoint = const String.fromEnvironment(
-      'SUNO_ALERT_RELAY_URL',
-    ),
+    String? relayEndpoint,
   }) : _messaging = messaging,
-       _relayEndpoint = relayEndpoint;
+       _relayEndpoint = relayEndpoint ?? AppConfig.alertRelayUrl;
 
   final FirebaseMessaging _messaging;
   final String _relayEndpoint;
@@ -66,6 +65,75 @@ class FcmAlertService implements AlertService {
         throw StateError(
           'Alert relay failed (${response.statusCode}): $body',
         );
+      }
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  @override
+  Future<bool> sendTestMessage(String token) async {
+    if (_relayEndpoint.trim().isEmpty) {
+      throw StateError('Alert relay URL is not configured.');
+    }
+
+    final uri = Uri.parse(_relayEndpoint);
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'contactTokens': [token],
+        'payload': {'type': 'test'},
+        'test': true,
+      }));
+      final response = await request.close();
+      final body = await utf8.decodeStream(response);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('Test message failed (${response.statusCode}): $body');
+      }
+      final decoded = jsonDecode(body) as Map<String, dynamic>;
+      final results = decoded['results'] as List<dynamic>?;
+      if (results == null || results.isEmpty) return false;
+      return results.first['ok'] == true;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  @override
+  Future<void> sendResponse({
+    required String recipientToken,
+    required String incidentId,
+    required String responderName,
+    required String status,
+    required String message,
+  }) async {
+    if (_relayEndpoint.trim().isEmpty) {
+      throw StateError('Alert relay URL is not configured.');
+    }
+    if (recipientToken.trim().isEmpty) {
+      throw StateError('Recipient token is missing.');
+    }
+
+    final uri = Uri.parse(_relayEndpoint);
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'response': {
+          'recipientToken': recipientToken,
+          'incidentId': incidentId,
+          'responderName': responderName,
+          'status': status,
+          'message': message,
+        },
+      }));
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = await utf8.decodeStream(response);
+        throw StateError('Response relay failed (${response.statusCode}): $body');
       }
     } finally {
       client.close(force: true);

@@ -25,6 +25,18 @@ class InMemoryTrustedContactRepository implements TrustedContactRepository {
   }
 
   @override
+  Future<TrustedContact> update(TrustedContact contact) async {
+    final index = _contacts.indexWhere((c) => c.id == contact.id);
+    if (index == -1) {
+      throw StateError(
+        'Cannot update contact ${contact.id} — it was never saved.',
+      );
+    }
+    _contacts[index] = contact;
+    return contact;
+  }
+
+  @override
   Future<void> remove(String contactId) async {
     _contacts.removeWhere((contact) => contact.id == contactId);
   }

@@ -35,6 +35,37 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
+  Future<void> _remove(String id) async {
+    await _runtime.removeIncident(id);
+    if (!mounted) return;
+    setState(() => _incidents.removeWhere((i) => i.id == id));
+  }
+
+  Future<void> _clearAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear all history?'),
+        content: const Text(
+            'This permanently deletes every incident from this device.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('CLEAR ALL'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runtime.clearIncidentHistory();
+    if (!mounted) return;
+    setState(() => _incidents = []);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -54,7 +85,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
     };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Incident History')),
+      appBar: AppBar(
+        title: const Text('Incident History'),
+        actions: [
+          if (_incidents.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_outlined),
+              tooltip: 'Clear all history',
+              onPressed: _clearAll,
+            ),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
@@ -89,8 +130,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) =>
                             const SizedBox(height: 11),
-                        itemBuilder: (_, i) =>
-                            _HistoryCard.from(filtered[i]),
+                        itemBuilder: (_, i) => Dismissible(
+                          key: ValueKey(filtered[i].id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            decoration: BoxDecoration(
+                              color: AppColors.emergency,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(Icons.delete_outline,
+                                color: Colors.white),
+                          ),
+                          onDismissed: (_) => _remove(filtered[i].id),
+                          child: _HistoryCard.from(filtered[i]),
+                        ),
                       ),
               ),
             ],
@@ -101,10 +156,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _emptyState() => switch (_filter) {
-    1 => 'No alert incidents',
-    2 => 'No canceled incidents',
-    _ => 'No incidents yet',
-  };
+        1 => 'No alert incidents',
+        2 => 'No canceled incidents',
+        _ => 'No incidents yet',
+      };
 }
 
 class _FilterBar extends StatelessWidget {
@@ -114,46 +169,44 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: const Color(0xFFEDEFF5),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: List.generate(3, (i) {
-        const labels = ['All', 'Alerts', 'Canceled'];
-        return Expanded(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => onSelected(i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: selected == i ? Colors.white : Colors.transparent,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEDEFF5),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: List.generate(3, (i) {
+            const labels = ['All', 'Alerts', 'Canceled'];
+            return Expanded(
+              child: InkWell(
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: selected == i
-                    ? const [
-                        BoxShadow(color: Colors.black12, blurRadius: 5)
-                      ]
-                    : null,
-              ),
-              child: Text(
-                labels[i],
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: selected == i
-                      ? AppColors.text
-                      : AppColors.textMuted,
-                  fontWeight: FontWeight.w700,
+                onTap: () => onSelected(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selected == i ? Colors.white : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: selected == i
+                        ? const [BoxShadow(color: Colors.black12, blurRadius: 5)]
+                        : null,
+                  ),
+                  child: Text(
+                    labels[i],
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: selected == i
+                          ? AppColors.text
+                          : AppColors.textMuted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        );
-      }),
-    ),
-  );
+            );
+          }),
+        ),
+      );
 }
 
 class _HistoryCard extends StatelessWidget {
@@ -165,11 +218,13 @@ class _HistoryCard extends StatelessWidget {
     required this.time,
     required this.color,
     required this.icon,
+    required this.id,
   });
 
   factory _HistoryCard.from(Incident incident) {
     final s = incident.status;
     return _HistoryCard(
+      id: incident.id,
       title: _titleFor(s),
       event: incident.detectionResult.eventType,
       score: '${incident.detectionResult.riskScore}%',
@@ -180,42 +235,43 @@ class _HistoryCard extends StatelessWidget {
     );
   }
 
+  final String id;
   final String title, event, score, status, time;
   final Color color;
   final IconData icon;
 
   static String _titleFor(IncidentStatus s) => switch (s) {
-    IncidentStatus.cancelled => 'Canceled alert',
-    IncidentStatus.safetyCheck => 'Safety check',
-    IncidentStatus.resolved => 'Resolved alert',
-    IncidentStatus.monitoring => 'Monitoring',
-    _ => 'Critical alert',
-  };
+        IncidentStatus.cancelled => 'Canceled alert',
+        IncidentStatus.safetyCheck => 'Safety check',
+        IncidentStatus.resolved => 'Resolved alert',
+        IncidentStatus.monitoring => 'Monitoring',
+        _ => 'Critical alert',
+      };
 
   static String _statusFor(IncidentStatus s) => switch (s) {
-    IncidentStatus.contactChecking => 'Contact checking',
-    IncidentStatus.resolved => 'Resolved — confirmed safe',
-    IncidentStatus.cancelled => 'User confirmed safe',
-    IncidentStatus.alertTriggered => 'Escalation needed',
-    IncidentStatus.contactNotified => 'Contact notified',
-    IncidentStatus.safetyCheck => 'Safety check shown',
-    IncidentStatus.monitoring => 'Monitoring',
-  };
+        IncidentStatus.contactChecking => 'Contact checking',
+        IncidentStatus.resolved => 'Resolved — confirmed safe',
+        IncidentStatus.cancelled => 'User confirmed safe',
+        IncidentStatus.alertTriggered => 'Escalation needed',
+        IncidentStatus.contactNotified => 'Contact notified',
+        IncidentStatus.safetyCheck => 'Safety check shown',
+        IncidentStatus.monitoring => 'Monitoring',
+      };
 
   static Color _colorFor(IncidentStatus s) => switch (s) {
-    IncidentStatus.cancelled || IncidentStatus.resolved => AppColors.safe,
-    IncidentStatus.safetyCheck => AppColors.warning,
-    IncidentStatus.monitoring => AppColors.indigo,
-    _ => AppColors.emergency,
-  };
+        IncidentStatus.cancelled || IncidentStatus.resolved => AppColors.safe,
+        IncidentStatus.safetyCheck => AppColors.warning,
+        IncidentStatus.monitoring => AppColors.indigo,
+        _ => AppColors.emergency,
+      };
 
   static IconData _iconFor(IncidentStatus s) => switch (s) {
-    IncidentStatus.cancelled || IncidentStatus.resolved =>
-      Icons.check_rounded,
-    IncidentStatus.safetyCheck => Icons.shield_outlined,
-    IncidentStatus.monitoring => Icons.hearing_outlined,
-    _ => Icons.notifications_active_outlined,
-  };
+        IncidentStatus.cancelled || IncidentStatus.resolved =>
+          Icons.check_rounded,
+        IncidentStatus.safetyCheck => Icons.shield_outlined,
+        IncidentStatus.monitoring => Icons.hearing_outlined,
+        _ => Icons.notifications_active_outlined,
+      };
 
   static String _time(DateTime t) {
     final now = DateTime.now();
@@ -235,60 +291,60 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(15),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Expanded(
-                      child: Text(title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w800))),
-                  Text(score,
-                      style: TextStyle(
-                          color: color, fontWeight: FontWeight.w900)),
-                ]),
-                const SizedBox(height: 4),
-                Text(event,
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textMuted)),
-                const SizedBox(height: 9),
-                Row(children: [
-                  Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                          color: color, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                      child: Text(status,
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text(title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800))),
+                      Text(score,
                           style: TextStyle(
-                              color: color,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700))),
-                  Text(time,
-                      style: const TextStyle(
-                          color: AppColors.textMuted, fontSize: 11)),
-                ]),
-              ],
-            ),
+                              color: color, fontWeight: FontWeight.w900)),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text(event,
+                        style: const TextStyle(
+                            fontSize: 13, color: AppColors.textMuted)),
+                    const SizedBox(height: 9),
+                    Row(children: [
+                      Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                              color: color, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                          child: Text(status,
+                              style: TextStyle(
+                                  color: color,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700))),
+                      Text(time,
+                          style: const TextStyle(
+                              color: AppColors.textMuted, fontSize: 11)),
+                    ]),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }

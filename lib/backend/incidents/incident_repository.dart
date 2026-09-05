@@ -22,4 +22,10 @@ abstract interface class IncidentRepository {
 
   /// Returns all incidents, most recent first — backs the History screen.
   Future<List<Incident>> getAll();
+
+  /// Deletes a single incident by id. No-ops silently if not found.
+  Future<void> remove(String incidentId);
+
+  /// Deletes every stored incident.
+  Future<void> clear();
 }

@@ -8,6 +8,9 @@ abstract interface class TrustedContactRepository {
   /// Adds a new trusted contact and returns it.
   Future<TrustedContact> add(TrustedContact contact);
 
+  /// Updates an existing contact. Throws [StateError] if the id is not found.
+  Future<TrustedContact> update(TrustedContact contact);
+
   /// Removes a contact by id. No-ops silently if the id isn't found — the
   /// UI has nothing further to react to either way.
   Future<void> remove(String contactId);

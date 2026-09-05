@@ -5,6 +5,7 @@ class TrustedContact {
     required this.phone,
     required this.relationship,
     this.fcmToken,
+    this.verifiedAt,
   });
 
   final String id;
@@ -12,6 +13,10 @@ class TrustedContact {
   final String phone;
   final String relationship;
   final String? fcmToken;
+  final DateTime? verifiedAt;
+
+  bool get isVerified =>
+      fcmToken != null && fcmToken!.trim().isNotEmpty && verifiedAt != null;
 
   factory TrustedContact.fromJson(Map<String, Object?> json) => TrustedContact(
     id: json['id']! as String,
@@ -19,6 +24,10 @@ class TrustedContact {
     phone: json['phone']! as String,
     relationship: json['relationship']! as String,
     fcmToken: json['fcmToken'] as String?,
+    verifiedAt:
+        json['verifiedAt'] == null
+            ? null
+            : DateTime.parse(json['verifiedAt']! as String),
   );
 
   Map<String, Object?> toJson() => {
@@ -27,5 +36,6 @@ class TrustedContact {
     'phone': phone,
     'relationship': relationship,
     'fcmToken': fcmToken,
+    'verifiedAt': verifiedAt?.toIso8601String(),
   };
 }

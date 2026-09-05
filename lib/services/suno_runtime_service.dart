@@ -1,4 +1,5 @@
 import '../backend/backend_exports.dart';
+import '../models/alert_dispatch_result.dart';
 import '../models/detection_result.dart';
 import '../models/incident.dart';
 import '../models/trusted_contact.dart';
@@ -29,6 +30,7 @@ class SunoRuntimeService {
   final AlertService? _alertService;
 
   Incident? currentIncident;
+  AlertDispatchResult? lastDispatchResult;
 
   Future<DetectionResult> runDetection(DetectionScenario scenario) =>
       switch (scenario) {
@@ -53,7 +55,10 @@ class SunoRuntimeService {
     );
     currentIncident = await _incidents.save(incident);
     if (status == IncidentStatus.alertTriggered) {
-      await notifyTrustedContactsForCurrentIncident();
+      lastDispatchResult =
+          await notifyTrustedContactsForCurrentIncident();
+    } else {
+      lastDispatchResult = null;
     }
     return currentIncident;
   }
@@ -81,17 +86,76 @@ class SunoRuntimeService {
 
   Future<List<Incident>> getIncidentHistory() => _incidents.getAll();
 
+  Future<void> removeIncident(String id) => _incidents.remove(id);
+
+  Future<void> clearIncidentHistory() => _incidents.clear();
+
+  /// Sends a response back to the original alert sender's device.
+  Future<void> sendResponse({
+    required String recipientToken,
+    required String incidentId,
+    required String responderName,
+    required String status,
+    required String message,
+  }) async {
+    final alertService = _alertService;
+    if (alertService == null) {
+      throw StateError('Alert service not available.');
+    }
+    await alertService.sendResponse(
+      recipientToken: recipientToken,
+      incidentId: incidentId,
+      responderName: responderName,
+      status: status,
+      message: message,
+    );
+  }
+
   Future<List<TrustedContact>> getTrustedContacts() => _contacts.getAll();
 
   Future<TrustedContact> addTrustedContact(TrustedContact contact) =>
       _contacts.add(contact);
 
-  Future<void> notifyTrustedContactsForCurrentIncident({
+  Future<TrustedContact> updateTrustedContact(TrustedContact contact) =>
+      _contacts.update(contact);
+
+  Future<void> removeTrustedContact(String id) => _contacts.remove(id);
+
+  /// Sends a silent test message to a single contact's FCM token and, if the
+  /// relay reports success, marks the contact as verified locally.
+  Future<bool> testContactNotification(TrustedContact contact) async {
+    final alertService = _alertService;
+    final token = contact.fcmToken;
+    if (alertService == null || token == null || token.trim().isEmpty) {
+      return false;
+    }
+    final ok = await alertService.sendTestMessage(token);
+    if (ok) {
+      final updated = TrustedContact(
+        id: contact.id,
+        name: contact.name,
+        phone: contact.phone,
+        relationship: contact.relationship,
+        fcmToken: token,
+        verifiedAt: DateTime.now(),
+      );
+      await _contacts.update(updated);
+    }
+    return ok;
+  }
+
+  Future<AlertDispatchResult> notifyTrustedContactsForCurrentIncident({
     String? onlyContactId,
   }) async {
     final alertService = _alertService;
     final incident = currentIncident;
-    if (alertService == null || incident == null) return;
+    if (alertService == null || incident == null) {
+      return const AlertDispatchResult(
+        success: false,
+        attemptedCount: 0,
+        failedReason: 'Alert service not available',
+      );
+    }
 
     var contacts = await _contacts.getAll();
     if (onlyContactId != null) {
@@ -102,7 +166,13 @@ class SunoRuntimeService {
         .whereType<String>()
         .where((token) => token.trim().isNotEmpty)
         .toList(growable: false);
-    if (tokens.isEmpty) return;
+    if (tokens.isEmpty) {
+      return const AlertDispatchResult(
+        success: false,
+        attemptedCount: 0,
+        failedReason: 'No contacts with an FCM token',
+      );
+    }
 
     final detection = incident.detectionResult;
     final payload = <String, String>{
@@ -116,16 +186,27 @@ class SunoRuntimeService {
         'longitude': detection.longitude.toString(),
       if (detection.locationText != null)
         'locationText': detection.locationText!,
+      if (alertService.deviceToken != null)
+        'senderToken': alertService.deviceToken!,
     };
 
     try {
       await alertService.sendAlert(contactTokens: tokens, payload: payload);
+      return AlertDispatchResult(
+        success: true,
+        attemptedCount: tokens.length,
+      );
     } catch (e) {
       // Network failure, relay error, or timeout — log and continue.
       // The local incident is already saved and the UI will still navigate
       // to the Emergency Alert screen regardless of push delivery status.
       // ignore: avoid_print
       print('[SUNO] Alert relay failed (non-fatal): $e');
+      return AlertDispatchResult(
+        success: false,
+        attemptedCount: tokens.length,
+        failedReason: e.toString(),
+      );
     }
   }
 
@@ -164,8 +245,39 @@ class SunoRuntimeService {
       updatedAt: now,
     );
     currentIncident = await _incidents.save(incident);
-    await notifyTrustedContactsForCurrentIncident(onlyContactId: onlyContactId);
+    lastDispatchResult =
+        await notifyTrustedContactsForCurrentIncident(onlyContactId: onlyContactId);
     return currentIncident;
+  }
+
+  /// Applies a response received from a trusted contact's device via FCM.
+  /// Returns true if the response matched the current incident and was stored.
+  Future<bool> applyContactResponse({
+    required String incidentId,
+    required String responderName,
+    required String status,
+    required String message,
+  }) async {
+    final existing = currentIncident;
+    if (existing == null || existing.id != incidentId) {
+      // Response is for an incident that is not currently active on this
+      // device. Ignore it rather than touching unrelated history.
+      return false;
+    }
+    final now = DateTime.now();
+    final updatedStatus = status == 'resolved'
+        ? IncidentStatus.resolved
+        : IncidentStatus.contactChecking;
+    final updated = Incident(
+      id: existing.id,
+      detectionResult: existing.detectionResult,
+      status: updatedStatus,
+      createdAt: existing.createdAt,
+      updatedAt: now,
+      contactResponseText: '$responderName: $message',
+    );
+    currentIncident = await _incidents.update(updated);
+    return true;
   }
 
   Future<SafetyCheckResult> startSafetyCheck() {
@@ -203,7 +315,8 @@ class SunoRuntimeService {
     );
     currentIncident = await _incidents.update(updated);
     if (updated.status == IncidentStatus.alertTriggered) {
-      await notifyTrustedContactsForCurrentIncident();
+      lastDispatchResult =
+          await notifyTrustedContactsForCurrentIncident();
     }
     return currentIncident;
   }
