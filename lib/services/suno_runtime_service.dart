@@ -4,8 +4,8 @@ import '../backend/backend_exports.dart';
 import '../models/alert_dispatch_result.dart';
 import '../models/detection_result.dart';
 import '../models/incident.dart';
-import '../models/trusted_contact.dart';
 import '../models/received_alert.dart';
+import '../models/trusted_contact.dart';
 
 enum DetectionScenario { low, medium, critical }
 
@@ -36,21 +36,23 @@ class SunoRuntimeService extends ChangeNotifier {
   AlertDispatchResult? lastDispatchResult;
   ReceivedAlert? receivedAlert;
 
+  Future<void> restoreLatestIncident() async {
+    currentIncident = await _incidents.latest();
+    notifyListeners();
+  }
+
   void acceptReceivedAlert(ReceivedAlert alert) {
     receivedAlert = alert;
     notifyListeners();
   }
 
-  String? get deviceToken {
-    final alertService = _alertService;
-    return alertService is FcmAlertService ? alertService.deviceToken : null;
-  }
+  String? get deviceToken => _alertService?.deviceToken;
 
   Future<String?> refreshDeviceToken() async {
     final alertService = _alertService;
     return alertService is FcmAlertService
         ? alertService.registerDevice()
-        : null;
+        : alertService?.deviceToken;
   }
 
   Future<DetectionResult> runDetection(DetectionScenario scenario) =>
@@ -174,6 +176,7 @@ class SunoRuntimeService extends ChangeNotifier {
       return const AlertDispatchResult(
         success: false,
         attemptedCount: 0,
+        sentCount: 0,
         failedReason: 'Alert service not available',
       );
     }
@@ -191,6 +194,7 @@ class SunoRuntimeService extends ChangeNotifier {
       return const AlertDispatchResult(
         success: false,
         attemptedCount: 0,
+        sentCount: 0,
         failedReason: 'No contacts with an FCM token',
       );
     }
@@ -212,10 +216,17 @@ class SunoRuntimeService extends ChangeNotifier {
     };
 
     try {
-      await alertService.sendAlert(contactTokens: tokens, payload: payload);
+      final sentCount = await alertService.sendAlert(
+        contactTokens: tokens,
+        payload: payload,
+      );
       return AlertDispatchResult(
-        success: true,
+        success: sentCount == tokens.length,
         attemptedCount: tokens.length,
+        sentCount: sentCount,
+        failedReason: sentCount == tokens.length
+            ? null
+            : 'Only $sentCount/${tokens.length} contacts were reached',
       );
     } catch (e) {
       // ignore: avoid_print
@@ -223,6 +234,7 @@ class SunoRuntimeService extends ChangeNotifier {
       return AlertDispatchResult(
         success: false,
         attemptedCount: tokens.length,
+        sentCount: 0,
         failedReason: e.toString(),
       );
     }
@@ -255,8 +267,10 @@ class SunoRuntimeService extends ChangeNotifier {
       updatedAt: now,
     );
     currentIncident = await _incidents.save(incident);
-    lastDispatchResult =
-        await notifyTrustedContactsForCurrentIncident(onlyContactId: onlyContactId);
+    lastDispatchResult = await notifyTrustedContactsForCurrentIncident(
+      onlyContactId: onlyContactId,
+    );
+    notifyListeners();
     return currentIncident;
   }
 
@@ -267,14 +281,26 @@ class SunoRuntimeService extends ChangeNotifier {
     required String status,
     required String message,
   }) async {
-    final existing = currentIncident;
+    var existing = currentIncident;
+    if (existing == null || existing.id != incidentId) {
+      final history = await _incidents.getAll();
+      for (final incident in history) {
+        if (incident.id == incidentId) {
+          existing = incident;
+          break;
+        }
+      }
+    }
     if (existing == null || existing.id != incidentId) {
       return false;
     }
+
     final now = DateTime.now();
-    final updatedStatus = status == 'resolved'
-        ? IncidentStatus.resolved
-        : IncidentStatus.contactChecking;
+    final updatedStatus = switch (status) {
+      'resolved' => IncidentStatus.resolved,
+      'alertTriggered' => IncidentStatus.alertTriggered,
+      _ => IncidentStatus.contactChecking,
+    };
     final updated = Incident(
       id: existing.id,
       detectionResult: existing.detectionResult,
@@ -326,6 +352,7 @@ class SunoRuntimeService extends ChangeNotifier {
       lastDispatchResult =
           await notifyTrustedContactsForCurrentIncident();
     }
+    notifyListeners();
     return currentIncident;
   }
 }
