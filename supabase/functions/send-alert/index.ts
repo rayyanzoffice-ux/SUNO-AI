@@ -15,6 +15,7 @@ type AlertPayload = {
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_TOKENS = 10;
 const MAX_TOKEN_LENGTH = 4096;
+const MAX_TEXT_LENGTH = 256;
 const ALLOWED_EVENTS = new Set([
   'Distress Sound',
   'Distress Sound + Impact',
@@ -24,6 +25,11 @@ const ALLOWED_EVENTS = new Set([
   'Manual Silent Alert',
   'Live Detector Event',
   'SUNO preflight',
+]);
+const ALLOWED_RESPONSE_STATUSES = new Set([
+  'contactChecking',
+  'resolved',
+  'alertTriggered',
 ]);
 
 const projectId = Deno.env.get('FIREBASE_PROJECT_ID');
@@ -82,7 +88,30 @@ Deno.serve(async (req: Request) => {
 
   if (body.response) {
     const r = body.response;
-    const res = await sendFcm(accessToken, r.recipientToken, {
+    if (
+      typeof r.recipientToken !== 'string' ||
+      r.recipientToken.trim().length < 21 ||
+      r.recipientToken.length > MAX_TOKEN_LENGTH ||
+      typeof r.incidentId !== 'string' ||
+      r.incidentId.length === 0 ||
+      r.incidentId.length > 128 ||
+      typeof r.responderName !== 'string' ||
+      r.responderName.length === 0 ||
+      r.responderName.length > MAX_TEXT_LENGTH ||
+      typeof r.status !== 'string' ||
+      !ALLOWED_RESPONSE_STATUSES.has(r.status) ||
+      typeof r.message !== 'string' ||
+      r.message.length === 0 ||
+      r.message.length > MAX_TEXT_LENGTH
+    ) {
+      return json({ error: 'Invalid response payload' }, 400);
+    }
+
+    const res = await sendFcm(accessToken, r.recipientToken.trim(), {
+      notification: {
+        title: 'SUNO contact response',
+        body: `${r.responderName}: ${r.message}`,
+      },
       data: {
         type: 'response',
         incidentId: r.incidentId,
@@ -101,6 +130,7 @@ Deno.serve(async (req: Request) => {
     return json({
       ok: res.ok,
       sent: res.ok ? 1 : 0,
+      attempted: 1,
       results: [{ ok: res.ok, status: res.status }],
     });
   }
@@ -119,7 +149,7 @@ Deno.serve(async (req: Request) => {
 
   const payload = body.payload;
   if (Object.keys(payload).length > 16 || Object.entries(payload).some(([key, value]) =>
-    key.length > 64 || typeof value !== 'string' || value.length > 256
+    key.length > 64 || typeof value !== 'string' || value.length > MAX_TEXT_LENGTH
   )) {
     return json({ error: 'Invalid payload' }, 400);
   }
@@ -135,7 +165,7 @@ Deno.serve(async (req: Request) => {
 
   const tokens = body.contactTokens.map((token) => token.trim());
   if (tokens.length === 0) {
-    return json({ ok: true, sent: 0 });
+    return json({ ok: true, sent: 0, attempted: 0, results: [] });
   }
 
   try {
@@ -244,7 +274,7 @@ async function getAccessToken(email: string, key: string): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      grant_type: 'urn:ietf:params:oauth-type:jwt-bearer',
       assertion: jwt,
     }),
   });
