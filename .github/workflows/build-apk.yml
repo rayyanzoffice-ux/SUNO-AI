@@ -1,0 +1,70 @@
+name: Build SUNO APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Align tflite_flutter JVM target
+        run: |
+          TFLITE_GRADLE="$(find "$PUB_CACHE" -path '*/tflite_flutter-0.12.1/android/build.gradle' -print -quit)"
+          test -n "$TFLITE_GRADLE"
+          sed -i 's/JavaVersion.VERSION_11/JavaVersion.VERSION_17/g' "$TFLITE_GRADLE"
+          grep -n 'Compatibility' "$TFLITE_GRADLE"
+
+      - name: Analyze
+        continue-on-error: true
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build release APK
+        env:
+          ORG_GRADLE_PROJECT_sunoTfliteJava17: 'true'
+        run: >-
+          flutter build apk --release
+          --dart-define=SUNO_ALERT_RELAY_URL=https://uxqthxlgcyybbrpmfevk.supabase.co/functions/v1/send-alert
+          --dart-define=SUNO_RELAY_AUTH_KEY=${{ secrets.SUNO_RELAY_AUTH_KEY }}
+
+      - name: Prepare final APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk SUNO-final.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SUNO-final-apk
+          path: SUNO-final.apk
+          if-no-files-found: error
+          retention-days: 30

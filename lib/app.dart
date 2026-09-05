@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'core/routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
+import 'core/navigation/navigator_key.dart';
 
 class SunoApp extends StatelessWidget {
-  const SunoApp({super.key, this.navigatorKey});
-
-  final GlobalKey<NavigatorState>? navigatorKey;
+  const SunoApp({super.key});
 
   @override
   Widget build(BuildContext context) => MaterialApp(

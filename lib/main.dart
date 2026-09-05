@@ -9,17 +9,17 @@ import 'backend/persistence/app_storage.dart';
 import 'backend/persistence/hive_incident_repository.dart';
 import 'backend/persistence/hive_trusted_contact_repository.dart';
 import 'core/config/app_config.dart';
+import 'core/navigation/navigator_key.dart';
 import 'core/routes/app_routes.dart';
+import 'models/received_alert.dart';
 import 'services/suno_runtime_service.dart';
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 final _localNotifications = FlutterLocalNotificationsPlugin();
 bool _localNotificationsInitialized = false;
 
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background/terminated messages are handled by the system notification
-  // tray; we do not need to show a local notification here.
+  await Firebase.initializeApp();
 }
 
 @pragma('vm:entry-point')
@@ -55,7 +55,7 @@ void _navigateToAlertReceived(Map<String, String> data) {
 Future<void> _initLocalNotifications() async {
   if (_localNotificationsInitialized) return;
   const androidSettings =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
+      AndroidInitializationSettings('@android:drawable/ic_dialog_alert');
   const initSettings = InitializationSettings(android: androidSettings);
   await _localNotifications.initialize(
     initSettings,
@@ -68,7 +68,6 @@ Future<void> _initLocalNotifications() async {
     'SUNO Emergency Alerts',
     description: 'High-priority alerts from trusted contacts',
     importance: Importance.max,
-    sound: RawResourceAndroidNotificationSound('notification'),
   );
   await _localNotifications
       .resolvePlatformSpecificImplementation<
@@ -78,7 +77,7 @@ Future<void> _initLocalNotifications() async {
   _localNotificationsInitialized = true;
 }
 
-Future<void> _handleRemoteMessage(RemoteMessage message,
+Future<Map<String, String>?> _handleRemoteMessage(RemoteMessage message,
     {bool showLocalNotification = false}) async {
   final data = Map<String, String>.from(message.data);
   final type = data['type'];
@@ -90,7 +89,13 @@ Future<void> _handleRemoteMessage(RemoteMessage message,
       status: data['status'] ?? 'contactChecking',
       message: data['message'] ?? '',
     );
-    return;
+    return null;
+  }
+
+  if (data.containsKey('incidentId')) {
+    SunoRuntimeService.instance.acceptReceivedAlert(
+      ReceivedAlert.fromData(message.data),
+    );
   }
 
   if (showLocalNotification && data.containsKey('incidentId')) {
@@ -112,6 +117,8 @@ Future<void> _handleRemoteMessage(RemoteMessage message,
       payload: _encodePayload(data),
     );
   }
+
+  return data;
 }
 
 void main() async {
@@ -132,8 +139,10 @@ void main() async {
   }
 
   FcmAlertService? alertService;
+  var firebaseReady = false;
   try {
     await Firebase.initializeApp();
+    firebaseReady = true;
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     alertService = FcmAlertService(messaging: FirebaseMessaging.instance);
     await alertService.registerDevice();
@@ -149,22 +158,24 @@ void main() async {
     alertService: alertService,
   );
 
-  FirebaseMessaging.onMessage.listen(
-    (message) => _handleRemoteMessage(message, showLocalNotification: true),
-  );
-  FirebaseMessaging.onMessageOpenedApp.listen(
-    (message) => _handleRemoteMessage(message),
-  );
-
-  final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   Map<String, String>? pendingAlertPayload;
-  if (initialMessage != null &&
-      initialMessage.data.containsKey('incidentId') &&
-      initialMessage.data['type'] != 'response') {
-    pendingAlertPayload = Map<String, String>.from(initialMessage.data);
+  if (firebaseReady) {
+    FirebaseMessaging.onMessage.listen(
+      (message) => _handleRemoteMessage(message, showLocalNotification: true),
+    );
+    FirebaseMessaging.onMessageOpenedApp.listen(
+      (message) => _handleRemoteMessage(message),
+    );
+
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null &&
+        initialMessage.data.containsKey('incidentId') &&
+        initialMessage.data['type'] != 'response') {
+      pendingAlertPayload = Map<String, String>.from(initialMessage.data);
+    }
   }
 
-  runApp(const SunoApp(navigatorKey: navigatorKey));
+  runApp(const SunoApp());
 
   if (pendingAlertPayload != null) {
     WidgetsBinding.instance.addPostFrameCallback((_) {

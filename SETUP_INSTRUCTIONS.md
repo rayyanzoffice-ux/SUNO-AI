@@ -24,7 +24,7 @@ cd SUNO-AI
 curl -L -o assets/ml/yamnet.tflite \
   "https://tfhub.dev/google/lite-model/yamnet/tflite/1?lite-format=tflite"
 
-# Verify size (~16 MB expected for the float32 TF Hub Lite model):
+# Verify size (~16 MB expected for the float32 TF Hub lite model):
 ls -lh assets/ml/yamnet.tflite
 file assets/ml/yamnet.tflite
 ```
@@ -110,23 +110,34 @@ Set these Supabase secrets from your Firebase service account JSON:
 supabase secrets set FIREBASE_PROJECT_ID="suno-ai-c5463"
 supabase secrets set FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@suno-ai-c5463.iam.gserviceaccount.com"
 supabase secrets set FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+supabase secrets set SUNO_RELAY_AUTH_KEY="use-a-random-demo-only-value"
 ```
 
 The production Supabase function URL is already baked into
 `lib/core/config/app_config.dart`, so a plain `flutter run` or
 `flutter build apk --release` will use it automatically. You only need to
 override it at compile time if you are deploying against a different Supabase
-project:
+project.
+
+The relay also accepts the `SUNO_RELAY_AUTH_KEY` if set. Provide it to
+the app with `--dart-define=SUNO_RELAY_AUTH_KEY="..."`; never commit the value.
+An APK-embedded key can be extracted, so this is temporary hackathon abuse
+resistance, not production-grade user authentication.
+
+### Building with overrides (only if using a different Supabase project)
 
 ```bash
-flutter run --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"
+flutter run \
+  --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert" \
+  --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
 
 For a release APK:
 
 ```bash
 flutter build apk --release \
-  --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"
+  --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert" \
+  --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
 
 > **Important:** If you fork this project and change the Supabase project,
@@ -138,10 +149,11 @@ Trusted contacts only receive push alerts if their saved contact record includes
 that phone's FCM token. The contact setup screen has an optional FCM token
 field for hackathon testing.
 
-Two-phone test flow:
+### Two-phone test flow
+
 1. Install/run SUNO on the contact phone.
 2. Read the console line: `[SUNO FCM] This device token: ...`.
-3. Copy that token into the sender phone's Trusted Contact → FCM token field.
+3. Copy that token into the sender phone's Trusted contacts → FCM token field.
 4. On the sender phone, tap the contact's **⋮ → Test reachability**. A silent
    FCM ping is sent; if delivery succeeds, the contact status changes to
    **Verified reachable**.

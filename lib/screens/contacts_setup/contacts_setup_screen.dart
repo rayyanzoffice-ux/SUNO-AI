@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/trusted_contact.dart';
@@ -17,6 +18,8 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
   final relationship = TextEditingController();
   final fcmToken = TextEditingController();
   final contacts = <TrustedContact>[];
+  String? myFcmToken;
+  bool loadingToken = true;
 
   String? _editingId;
   bool _saving = false;
@@ -26,11 +29,32 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
   void initState() {
     super.initState();
     _loadContacts();
+    _loadMyToken();
   }
 
   Future<void> _loadContacts() async {
     final saved = await SunoRuntimeService.instance.getTrustedContacts();
     if (mounted) setState(() => contacts.addAll(saved));
+  }
+
+  Future<void> _loadMyToken() async {
+    var token = SunoRuntimeService.instance.deviceToken;
+    token ??= await SunoRuntimeService.instance.refreshDeviceToken();
+    if (!mounted) return;
+    setState(() {
+      myFcmToken = token;
+      loadingToken = false;
+    });
+  }
+
+  Future<void> _copyMyToken() async {
+    final token = myFcmToken;
+    if (token == null || token.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: token));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('FCM token copied. Send it to your trusted contact.')),
+    );
   }
 
   Future<void> save() async {
@@ -204,8 +228,62 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Contacts are stored locally on this device. Add an FCM token when the contact also has SUNO installed and should receive push alerts.',
+                  'Contacts are stored locally on this device. Exchange FCM tokens between two phones so SUNO can route emergency push alerts to the trusted contact.',
                   style: TextStyle(color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'MY FCM TOKEN',
+                          style: TextStyle(
+                            color: AppColors.navy,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (loadingToken)
+                          const Row(
+                            children: [
+                              SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text('Getting token from Firebase...'),
+                              ),
+                            ],
+                          )
+                        else if (myFcmToken == null || myFcmToken!.isEmpty)
+                          const Text(
+                            'Token unavailable. Check internet, Firebase setup, and notification permission, then reopen SUNO.',
+                            style: TextStyle(color: AppColors.textMuted),
+                          )
+                        else ...[
+                          SelectableText(
+                            myFcmToken!,
+                            maxLines: 4,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _copyMyToken,
+                              icon: const Icon(Icons.copy),
+                              label: const Text('COPY MY FCM TOKEN'),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 ...contacts.map(

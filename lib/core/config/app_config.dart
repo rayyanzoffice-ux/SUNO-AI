@@ -9,7 +9,7 @@ abstract final class AppConfig {
   /// Override at compile time with:
   ///   --dart-define=SUNO_ALERT_RELAY_URL=https://.../send-alert
   static const String _defaultAlertRelayUrl =
-      'https://uxqthxlgcyybbrpmfevk.functions.supabase.co/send-alert';
+      'https://uxqthxlgcyybbrpmfevk.supabase.co/functions/v1/send-alert';
 
   static const String _envRelayUrl = String.fromEnvironment(
     'SUNO_ALERT_RELAY_URL',
