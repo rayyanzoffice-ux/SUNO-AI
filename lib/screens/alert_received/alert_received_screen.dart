@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_format.dart';
+import '../../models/detection_result.dart';
 import '../../models/incident.dart';
-import '../../models/risk_level.dart';
 import '../../services/suno_runtime_service.dart';
 import '../../widgets/map_preview_card.dart';
 import '../../widgets/primary_action_button.dart';
@@ -136,9 +136,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Center(
-                  child: RiskBadge(score: score, level: level),
-                ),
+                Center(child: RiskBadge(score: score, level: level)),
                 const SizedBox(height: 18),
                 Card(
                   child: Padding(
@@ -156,8 +154,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                 ),
                 const SizedBox(height: 18),
                 const Text('Live Location',
-                    style:
-                        TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 9),
                 MapPreviewCard(
                   latitude: _latitude,
