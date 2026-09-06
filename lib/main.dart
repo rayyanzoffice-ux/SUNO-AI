@@ -12,6 +12,7 @@ import 'core/config/app_config.dart';
 import 'core/navigation/navigator_key.dart';
 import 'core/routes/app_routes.dart';
 import 'models/received_alert.dart';
+import 'services/detection_notification_service.dart';
 import 'services/suno_runtime_service.dart';
 
 final _localNotifications = FlutterLocalNotificationsPlugin();
@@ -27,7 +28,16 @@ void _onLocalNotificationTap(NotificationResponse response) {
   final payload = response.payload;
   if (payload == null || payload.isEmpty) return;
   final data = _parsePayload(payload);
-  if (data['type'] == 'response') return;
+  final type = data['type'];
+  if (type == 'safety_check') {
+    _navigateTo(AppRoutes.safetyCheck);
+    return;
+  }
+  if (type == 'emergency_alert') {
+    _navigateTo(AppRoutes.emergencyAlert);
+    return;
+  }
+  if (type == 'response') return;
   _navigateToAlertReceived(data);
 }
 
@@ -46,6 +56,12 @@ String _encodePayload(Map<String, String> data) {
   return data.entries
       .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
       .join('&');
+}
+
+void _navigateTo(String routeName) {
+  final context = navigatorKey.currentContext;
+  if (context == null) return;
+  Navigator.pushNamed(context, routeName);
 }
 
 void _navigateToAlertReceived(Map<String, String> data) {
@@ -164,6 +180,7 @@ void main() async {
   }
 
   await _initLocalNotifications();
+  await initDetectionNotificationChannel();
 
   SunoRuntimeService.instance = SunoRuntimeService(
     incidentRepository: const HiveIncidentRepository(),

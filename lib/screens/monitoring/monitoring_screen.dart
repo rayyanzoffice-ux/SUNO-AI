@@ -11,6 +11,7 @@ import '../../backend/services/foreground_service_bridge.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
+import '../../services/detection_notification_service.dart';
 import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
 import '../../widgets/silent_sos_sheet.dart';
@@ -28,7 +29,8 @@ class MonitoringScreen extends StatefulWidget {
   State<MonitoringScreen> createState() => _MonitoringScreenState();
 }
 
-class _MonitoringScreenState extends State<MonitoringScreen> {
+class _MonitoringScreenState extends State<MonitoringScreen>
+    with WidgetsBindingObserver {
   bool detecting = false;
   late DetectionScenario selectedScenario;
 
@@ -36,6 +38,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   bool _liveStarting = false;
   bool _liveActive = false;
   String? _liveError;
+  bool _isInBackground = false;
 
   LiveDetectionRepository? _liveRepo;
   YamNetStage? _yamnet;
@@ -49,7 +52,15 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     selectedScenario = widget.scenario;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isInBackground =
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached;
   }
 
   Future<void> _simulate() async {
@@ -164,22 +175,36 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   }
 
   void _onLiveDetection(DetectionResult result) {
-    if (!mounted) return;
-    // Low risk stays silent — keep listening, no incident, no interruption.
     if (result.riskLevel == RiskLevel.low) return;
 
-    final route = result.riskLevel == RiskLevel.medium
-        ? AppRoutes.safetyCheck
-        : AppRoutes.emergencyAlert;
+    final isCritical = result.riskLevel == RiskLevel.critical;
+
+    if (_isInBackground) {
+      _runtime.recordDetection(result).then((_) {
+        showFullScreenDetectionNotification(
+          title: isCritical ? 'Emergency Detected' : 'Possible Danger',
+          body: isCritical
+              ? '${result.eventType} — alerts sent to your contacts'
+              : '${result.eventType} detected — tap to check',
+          isCritical: isCritical,
+        );
+      }).catchError((Object e) {
+        // ignore: avoid_print
+        print('[SUNO] Background detection error (non-fatal): $e');
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    final route = isCritical
+        ? AppRoutes.emergencyAlert
+        : AppRoutes.safetyCheck;
     _runtime.recordDetection(result).then((_) async {
       if (!mounted) return;
-      // Release the microphone before navigating away.
       await _disableLiveMode();
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, route);
     }).catchError((Object e) async {
-      // Even if something unexpected throws, still navigate to the
-      // emergency screen — the local incident was already saved.
       // ignore: avoid_print
       print('[SUNO] recordDetection error (non-fatal): $e');
       if (!mounted) return;
@@ -191,6 +216,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_liveActive) {
       _levelSub?.cancel();
       _liveRepo?.stopMonitoring();

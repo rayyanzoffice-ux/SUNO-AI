@@ -12,6 +12,17 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.navy,
+    appBar: AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.history_rounded, color: Colors.white70, size: 24),
+          onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
+        ),
+      ],
+    ),
     body: SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(

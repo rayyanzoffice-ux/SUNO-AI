@@ -10,5 +10,5 @@
     "alarm_siren",
     "breaking_crash"
   ],
-  "confidence_threshold": 0.3
+  "confidence_threshold": 0.6
 }
