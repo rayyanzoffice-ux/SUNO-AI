@@ -25,7 +25,7 @@ void main() {
       'alarm_siren',
       'breaking_crash',
     ]);
-    expect(contract['confidence_threshold'], 0.3);
+    expect(contract['confidence_threshold'], 0.6);
   });
 
   test('SUNO TFLite model asset is bundled and non-empty', () async {
