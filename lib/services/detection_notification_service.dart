@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 const int _detectionNotificationId = 9001;
+
+final _vibrationPattern = Int64List.fromList([0, 400, 200, 400, 200, 800]);
 
 final _plugin = FlutterLocalNotificationsPlugin();
 bool _channelCreated = false;
@@ -10,13 +14,13 @@ Future<void> initDetectionNotificationChannel() async {
   final android = _plugin.resolvePlatformSpecificImplementation<
     AndroidFlutterLocalNotificationsPlugin>();
   await android?.createNotificationChannel(
-    const AndroidNotificationChannel(
+    AndroidNotificationChannel(
       'suno_detection',
       'SUNO Danger Detected',
       description: 'Interrupts when danger is detected while backgrounded',
       importance: Importance.max,
       enableVibration: true,
-      vibrationPattern: [0, 400, 200, 400, 200, 800],
+      vibrationPattern: _vibrationPattern,
       playSound: true,
     ),
   );
@@ -28,7 +32,7 @@ Future<void> showFullScreenDetectionNotification({
   required String body,
   required bool isCritical,
 }) async {
-  const androidDetails = AndroidNotificationDetails(
+  final androidDetails = AndroidNotificationDetails(
     'suno_detection',
     'SUNO Danger Detected',
     channelDescription: 'Interrupts when danger is detected while backgrounded',
@@ -36,7 +40,7 @@ Future<void> showFullScreenDetectionNotification({
     priority: Priority.high,
     fullScreenIntent: true,
     enableVibration: true,
-    vibrationPattern: [0, 400, 200, 400, 200, 800],
+    vibrationPattern: _vibrationPattern,
     ticker: 'SUNO: Danger detected',
     category: AndroidNotificationCategory.alarm,
   );
@@ -44,7 +48,7 @@ Future<void> showFullScreenDetectionNotification({
     _detectionNotificationId,
     title,
     body,
-    const NotificationDetails(android: androidDetails),
+    NotificationDetails(android: androidDetails),
     payload: isCritical ? 'type=emergency_alert' : 'type=safety_check',
   );
 }
