@@ -11,7 +11,6 @@ import 'package:suno_ai/screens/history/history_screen.dart';
 import 'package:suno_ai/screens/home/home_screen.dart';
 import 'package:suno_ai/screens/monitoring/monitoring_screen.dart';
 import 'package:suno_ai/screens/safety_check/safety_check_screen.dart';
-import 'package:suno_ai/screens/trusted_contact/trusted_contact_view_screen.dart';
 import 'package:suno_ai/services/suno_runtime_service.dart';
 
 void main() {
@@ -118,21 +117,10 @@ void main() {
     expect(find.text('Emergency Alert Activated'), findsOneWidget);
     expect(find.text('95% (Critical)'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('VIEW LOCATION'));
-    await tester.tap(find.text('VIEW LOCATION'));
+    await tester.ensureVisible(find.text('View incident history'));
+    await tester.tap(find.text('View incident history'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('I AM CHECKING ON THEM'));
-    await tester.tap(find.text('I AM CHECKING ON THEM'));
-    await tester.pumpAndSettle();
-    expect(
-      SunoRuntimeService.instance.currentIncident?.status,
-      IncidentStatus.contactChecking,
-    );
-
-    await tester.ensureVisible(find.text('VIEW HISTORY'));
-    await tester.tap(find.text('VIEW HISTORY'));
-    await tester.pumpAndSettle();
-    expect(find.text('Contact checking'), findsOneWidget);
+    expect(find.text('Incident History'), findsOneWidget);
     expect(find.text('Distress Sound + Impact'), findsOneWidget);
   });
 
@@ -220,7 +208,6 @@ void main() {
       const MonitoringScreen(),
       const SafetyCheckScreen(),
       const EmergencyAlertScreen(),
-      const TrustedContactViewScreen(),
       const HistoryScreen(),
       const ContactsSetupScreen(),
     ];
@@ -297,7 +284,6 @@ Future<void> _pumpScenario(WidgetTester tester, DetectionScenario scenario) =>
           AppRoutes.monitoring: (_) => const MonitoringScreen(),
           AppRoutes.safetyCheck: (_) => const SafetyCheckScreen(),
           AppRoutes.emergencyAlert: (_) => const EmergencyAlertScreen(),
-          AppRoutes.trustedContactView: (_) => const TrustedContactViewScreen(),
           AppRoutes.history: (_) => const HistoryScreen(),
         },
       ),
