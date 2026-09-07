@@ -30,6 +30,7 @@ class Incident {
     required this.createdAt,
     required this.updatedAt,
     this.contactResponseText,
+    this.origin = 'self',
   });
 
   final String id;
@@ -38,4 +39,9 @@ class Incident {
   final DateTime createdAt;
   DateTime updatedAt;
   String? contactResponseText;
+
+  /// 'self' for locally-triggered incidents, or a display name for received alerts.
+  String origin;
+
+  bool get isReceived => origin != 'self';
 }

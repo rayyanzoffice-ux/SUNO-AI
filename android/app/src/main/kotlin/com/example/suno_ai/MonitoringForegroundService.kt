@@ -82,5 +82,12 @@ class MonitoringForegroundService : Service() {
         }
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        val restartIntent = Intent(applicationContext, MonitoringForegroundService::class.java)
+        restartIntent.setPackage(packageName)
+        startService(restartIntent)
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 }

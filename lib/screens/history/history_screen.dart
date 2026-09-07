@@ -219,19 +219,21 @@ class _HistoryCard extends StatelessWidget {
     required this.color,
     required this.icon,
     required this.id,
+    this.origin,
   });
 
   factory _HistoryCard.from(Incident incident) {
     final s = incident.status;
     return _HistoryCard(
       id: incident.id,
-      title: _titleFor(s),
+      title: _titleFor(s, incident.isReceived),
       event: incident.detectionResult.eventType,
       score: '${incident.detectionResult.riskScore}%',
       status: _statusFor(s),
       time: _time(incident.createdAt),
       color: _colorFor(s),
-      icon: _iconFor(s),
+      icon: _iconFor(s, incident.isReceived),
+      origin: incident.isReceived ? incident.origin : null,
     );
   }
 
@@ -239,14 +241,18 @@ class _HistoryCard extends StatelessWidget {
   final String title, event, score, status, time;
   final Color color;
   final IconData icon;
+  final String? origin;
 
-  static String _titleFor(IncidentStatus s) => switch (s) {
-        IncidentStatus.cancelled => 'Canceled alert',
-        IncidentStatus.safetyCheck => 'Safety check',
-        IncidentStatus.resolved => 'Resolved alert',
-        IncidentStatus.monitoring => 'Monitoring',
-        _ => 'Critical alert',
-      };
+  static String _titleFor(IncidentStatus s, bool isReceived) {
+    if (isReceived) return 'Received alert';
+    return switch (s) {
+      IncidentStatus.cancelled => 'Canceled alert',
+      IncidentStatus.safetyCheck => 'Safety check',
+      IncidentStatus.resolved => 'Resolved alert',
+      IncidentStatus.monitoring => 'Monitoring',
+      _ => 'Critical alert',
+    };
+  }
 
   static String _statusFor(IncidentStatus s) => switch (s) {
         IncidentStatus.contactChecking => 'Contact checking',
@@ -265,13 +271,16 @@ class _HistoryCard extends StatelessWidget {
         _ => AppColors.emergency,
       };
 
-  static IconData _iconFor(IncidentStatus s) => switch (s) {
-        IncidentStatus.cancelled || IncidentStatus.resolved =>
-          Icons.check_rounded,
-        IncidentStatus.safetyCheck => Icons.shield_outlined,
-        IncidentStatus.monitoring => Icons.hearing_outlined,
-        _ => Icons.notifications_active_outlined,
-      };
+  static IconData _iconFor(IncidentStatus s, bool isReceived) {
+    if (isReceived) return Icons.download_rounded;
+    return switch (s) {
+      IncidentStatus.cancelled || IncidentStatus.resolved =>
+        Icons.check_rounded,
+      IncidentStatus.safetyCheck => Icons.shield_outlined,
+      IncidentStatus.monitoring => Icons.hearing_outlined,
+      _ => Icons.notifications_active_outlined,
+    };
+  }
 
   static String _time(DateTime t) {
     final now = DateTime.now();
@@ -318,6 +327,14 @@ class _HistoryCard extends StatelessWidget {
                           style: TextStyle(
                               color: color, fontWeight: FontWeight.w900)),
                     ]),
+                    if (origin != null) ...[
+                      const SizedBox(height: 2),
+                      Text('from $origin',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.indigo,
+                              fontWeight: FontWeight.w600)),
+                    ],
                     const SizedBox(height: 4),
                     Text(event,
                         style: const TextStyle(

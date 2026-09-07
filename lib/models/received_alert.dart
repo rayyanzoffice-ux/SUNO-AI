@@ -6,6 +6,9 @@ class ReceivedAlert {
     required this.riskLevel,
     required this.detectedAt,
     required this.location,
+    this.senderToken,
+    this.latitude,
+    this.longitude,
   });
 
   final String? incidentId;
@@ -14,6 +17,9 @@ class ReceivedAlert {
   final String? riskLevel;
   final String? detectedAt;
   final String? location;
+  final String? senderToken;
+  final String? latitude;
+  final String? longitude;
 
   factory ReceivedAlert.fromData(Map<String, dynamic> data) {
     String? value(String key) {
@@ -28,6 +34,9 @@ class ReceivedAlert {
       riskLevel: value('riskLevel'),
       detectedAt: value('detectedAt'),
       location: value('location') ?? value('locationText'),
+      senderToken: value('senderToken'),
+      latitude: value('latitude'),
+      longitude: value('longitude'),
     );
   }
 }

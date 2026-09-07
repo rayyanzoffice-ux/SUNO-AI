@@ -113,7 +113,7 @@ Future<Map<String, String>?> _handleRemoteMessage(
   }
 
   if (data.containsKey('incidentId')) {
-    SunoRuntimeService.instance.acceptReceivedAlert(
+    await SunoRuntimeService.instance.acceptReceivedAlert(
       ReceivedAlert.fromData(message.data),
     );
   }

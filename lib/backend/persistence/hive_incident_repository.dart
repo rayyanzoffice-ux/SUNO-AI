@@ -10,6 +10,7 @@ Map<String, dynamic> _incidentToMap(Incident incident) => {
   'updatedAt': incident.updatedAt.toIso8601String(),
   'contactResponseText': incident.contactResponseText,
   'detection': incident.detectionResult.toJson(),
+  'origin': incident.origin,
 };
 
 Incident _incidentFromMap(Map<dynamic, dynamic> raw) {
@@ -29,6 +30,7 @@ Incident _incidentFromMap(Map<dynamic, dynamic> raw) {
     createdAt: DateTime.parse(m['createdAt'] as String),
     updatedAt: DateTime.parse(m['updatedAt'] as String),
     contactResponseText: m['contactResponseText'] as String?,
+    origin: (m['origin'] as String?) ?? 'self',
   );
 }
 

@@ -7,19 +7,12 @@ import '../../screens/history/history_screen.dart';
 import '../../screens/home/home_screen.dart';
 import '../../screens/monitoring/monitoring_screen.dart';
 import '../../screens/safety_check/safety_check_screen.dart';
-import '../../screens/trusted_contact/trusted_contact_view_screen.dart';
 
 abstract final class AppRoutes {
   static const home = '/';
   static const monitoring = '/monitoring';
   static const safetyCheck = '/safety-check';
   static const emergencyAlert = '/emergency-alert';
-  static const trustedContactPreview = '/trusted-contact-preview';
-
-  /// Backward-compatible alias kept for older callers/tests.
-  @Deprecated('Use trustedContactPreview')
-  static const trustedContactView = trustedContactPreview;
-
   static const alertReceived = '/alert-received';
   static const history = '/history';
   static const contactsSetup = '/contacts-setup';
@@ -29,7 +22,6 @@ abstract final class AppRoutes {
     monitoring: (_) => const MonitoringScreen(),
     safetyCheck: (_) => const SafetyCheckScreen(),
     emergencyAlert: (_) => const EmergencyAlertScreen(),
-    trustedContactPreview: (_) => const TrustedContactViewScreen(),
     history: (_) => const HistoryScreen(),
     contactsSetup: (_) => const ContactsSetupScreen(),
   };

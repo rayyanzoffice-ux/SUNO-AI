@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
-import '../../models/incident.dart';
 import '../../services/suno_runtime_service.dart';
-import '../../widgets/primary_action_button.dart';
+import '../../widgets/map_preview_card.dart';
 
 class EmergencyAlertScreen extends StatefulWidget {
   const EmergencyAlertScreen({super.key});
@@ -152,6 +151,18 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                               ),
                             ),
                           ),
+                        if (result != null) ...[
+                          const SizedBox(height: 16),
+                          const Text('Live Location',
+                              style: TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 8),
+                          MapPreviewCard(
+                            latitude: result.latitude,
+                            longitude: result.longitude,
+                            locationText: result.locationText,
+                          ),
+                        ],
                         const Spacer(),
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 14),
@@ -175,20 +186,6 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                             ],
                           ),
                         ),
-                        PrimaryActionButton(
-                          label: 'VIEW LOCATION',
-                          color: AppColors.emergency,
-                          icon: Icons.location_on_rounded,
-                          onPressed: () async {
-                            await SunoRuntimeService.instance
-                                .updateStatus(IncidentStatus.contactNotified);
-                            if (context.mounted) {
-                              Navigator.pushNamed(
-                                  context, AppRoutes.trustedContactPreview);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 8),
                         TextButton(
                           onPressed: () =>
                               Navigator.pushNamed(context, AppRoutes.history),

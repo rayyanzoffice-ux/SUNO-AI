@@ -41,8 +41,42 @@ class SunoRuntimeService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void acceptReceivedAlert(ReceivedAlert alert) {
+  Future<void> acceptReceivedAlert(ReceivedAlert alert) async {
     receivedAlert = alert;
+    final now = DateTime.now();
+    final detectedAt =
+        DateTime.tryParse(alert.detectedAt ?? '') ?? now;
+    final riskLevel = switch (alert.riskLevel) {
+      'low' => RiskLevel.low,
+      'medium' => RiskLevel.medium,
+      _ => RiskLevel.critical,
+    };
+    final riskScore = int.tryParse(alert.riskScore ?? '') ?? 100;
+    final latitude =
+        alert.latitude != null ? double.tryParse(alert.latitude!) : null;
+    final longitude =
+        alert.longitude != null ? double.tryParse(alert.longitude!) : null;
+    final detection = DetectionResult(
+      eventType: alert.eventType ?? 'Emergency Alert',
+      confidence: 1.0,
+      impactDetected: false,
+      stillnessDetected: false,
+      riskScore: riskScore,
+      riskLevel: riskLevel,
+      latitude: latitude,
+      longitude: longitude,
+      locationText: alert.location,
+      detectedAt: detectedAt,
+    );
+    final incident = Incident(
+      id: alert.incidentId ?? 'SUNO-RCV-${now.microsecondsSinceEpoch}',
+      detectionResult: detection,
+      status: IncidentStatus.alertTriggered,
+      createdAt: detectedAt,
+      updatedAt: now,
+      origin: 'Trusted Contact',
+    );
+    currentIncident = await _incidents.save(incident);
     notifyListeners();
   }
 
@@ -101,6 +135,7 @@ class SunoRuntimeService extends ChangeNotifier {
       createdAt: existing.createdAt,
       updatedAt: now,
       contactResponseText: response ?? existing.contactResponseText,
+      origin: existing.origin,
     );
     currentIncident = await _incidents.update(updated);
     notifyListeners();
@@ -308,6 +343,7 @@ class SunoRuntimeService extends ChangeNotifier {
       createdAt: existing.createdAt,
       updatedAt: now,
       contactResponseText: '$responderName: $message',
+      origin: existing.origin,
     );
     currentIncident = await _incidents.update(updated);
     notifyListeners();
@@ -346,6 +382,7 @@ class SunoRuntimeService extends ChangeNotifier {
           result.outcome == SafetyCheckOutcome.userConfirmedSafe
               ? 'User confirmed safe'
               : 'No response received',
+      origin: existing.origin,
     );
     currentIncident = await _incidents.update(updated);
     if (updated.status == IncidentStatus.alertTriggered) {
