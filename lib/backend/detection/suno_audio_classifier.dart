@@ -36,11 +36,10 @@ class SunoAudioClassifier {
   ];
 
   SunoAudioClassifier._({
-    required Interpreter interpreter,
+    required this._interpreter,
     required List<String> labels,
     required this.confidenceThreshold,
-  }) : _interpreter = interpreter,
-       _labels = List.unmodifiable(labels);
+  }) : _labels = List.unmodifiable(labels);
 
   final Interpreter _interpreter;
   final List<String> _labels;
@@ -55,9 +54,7 @@ class SunoAudioClassifier {
     final decoded = jsonDecode(configText);
 
     if (decoded is! Map<String, dynamic>) {
-      throw const FormatException(
-        'SUNO labels.json must contain an object.',
-      );
+      throw const FormatException('SUNO labels.json must contain an object.');
     }
 
     final classes = decoded['classes'];
@@ -73,14 +70,16 @@ class SunoAudioClassifier {
       );
     }
 
-    final labels = classes.map((value) {
-      if (value is! String || value.isEmpty) {
-        throw const FormatException(
-          'SUNO class labels must be non-empty strings.',
-        );
-      }
-      return value;
-    }).toList(growable: false);
+    final labels = classes
+        .map((value) {
+          if (value is! String || value.isEmpty) {
+            throw const FormatException(
+              'SUNO class labels must be non-empty strings.',
+            );
+          }
+          return value;
+        })
+        .toList(growable: false);
 
     if (!_sameLabels(labels, expectedLabels)) {
       throw FormatException(
@@ -195,19 +194,13 @@ class SunoAudioClassifier {
 
     for (final value in embedding) {
       if (!value.isFinite) {
-        throw ArgumentError(
-          'Embedding contains a non-finite value: $value.',
-        );
+        throw ArgumentError('Embedding contains a non-finite value: $value.');
       }
     }
 
-    final input = <List<double>>[
-      List<double>.from(embedding),
-    ];
+    final input = <List<double>>[List<double>.from(embedding)];
 
-    final output = <List<double>>[
-      List<double>.filled(expectedClassCount, 0.0),
-    ];
+    final output = <List<double>>[List<double>.filled(expectedClassCount, 0.0)];
 
     _interpreter.run(input, output);
 
@@ -215,9 +208,7 @@ class SunoAudioClassifier {
 
     for (final score in scores) {
       if (!score.isFinite || score < 0 || score > 1) {
-        throw StateError(
-          'Classifier returned an invalid probability: $score',
-        );
+        throw StateError('Classifier returned an invalid probability: $score');
       }
     }
 
@@ -253,10 +244,7 @@ class SunoAudioClassifier {
     _interpreter.close();
   }
 
-  static bool _sameLabels(
-    List<String> actual,
-    List<String> expected,
-  ) {
+  static bool _sameLabels(List<String> actual, List<String> expected) {
     if (actual.length != expected.length) {
       return false;
     }

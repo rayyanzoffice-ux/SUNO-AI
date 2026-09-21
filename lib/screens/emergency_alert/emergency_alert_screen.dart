@@ -3,28 +3,52 @@ import 'package:flutter/material.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
+import '../../models/incident.dart';
 import '../../services/suno_runtime_service.dart';
 import '../../widgets/map_preview_card.dart';
 
 class EmergencyAlertScreen extends StatefulWidget {
-  const EmergencyAlertScreen({super.key});
+  const EmergencyAlertScreen({super.key, this.incidentId});
+  final String? incidentId;
 
   @override
   State<EmergencyAlertScreen> createState() => _EmergencyAlertScreenState();
 }
 
 class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
+  late final String? _incidentId;
+
+  @override
+  void initState() {
+    super.initState();
+    _incidentId =
+        widget.incidentId ?? SunoRuntimeService.instance.currentIncident?.id;
+  }
+
   String _dispatchSubtitle() {
-    final dispatch = SunoRuntimeService.instance.lastDispatchResult;
+    final runtime = SunoRuntimeService.instance;
+    final incident = _incidentId == null
+        ? null
+        : runtime.incidentById(_incidentId);
+    if (incident?.status == IncidentStatus.cancelled) {
+      return 'You confirmed safe. This safety check is closed.';
+    }
+    if (incident?.status == IncidentStatus.resolved) {
+      return 'A contact marked this incident as resolved.';
+    }
+    if (_incidentId != null && runtime.isDispatching(_incidentId)) {
+      return 'Sending alerts to your trusted contacts…';
+    }
+    final dispatch = incident?.dispatchResult;
     if (dispatch == null) {
-      return 'Your trusted contacts are being notified.';
+      return 'No confirmed delivery result. Check your contacts and retry if needed.';
     }
     if (dispatch.success) {
-      return '${dispatch.sentCount} of ${dispatch.attemptedCount} contacts notified.';
+      return 'FCM accepted ${dispatch.sentCount} of ${dispatch.attemptedCount} alerts. Awaiting a contact response.';
     }
     if (dispatch.partiallyDelivered) {
-      return '${dispatch.sentCount} of ${dispatch.attemptedCount} contacts notified. '
-          '${dispatch.failedCount} could not be reached.';
+      return 'FCM accepted ${dispatch.sentCount} of ${dispatch.attemptedCount} alerts. '
+          '${dispatch.failedCount} failed.';
     }
     return 'Alert saved locally — contacts could not be reached '
         '(${dispatch.failedReason ?? 'unknown reason'}).';
@@ -43,15 +67,24 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
         child: ListenableBuilder(
           listenable: SunoRuntimeService.instance,
           builder: (context, _) {
-            final incident = SunoRuntimeService.instance.currentIncident;
+            final runtime = SunoRuntimeService.instance;
+            final incident = _incidentId == null
+                ? null
+                : runtime.incidentById(_incidentId);
             final result = incident?.detectionResult;
+            if (incident == null) {
+              return const Center(
+                child: Text('This incident is no longer available.'),
+              );
+            }
 
             return LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(22, 4, 22, 20),
                 child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(minHeight: constraints.maxHeight - 24),
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 24,
+                  ),
                   child: IntrinsicHeight(
                     child: Column(
                       children: [
@@ -67,19 +100,28 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.emergency.withValues(alpha: .16),
+                                color: AppColors.emergency.withValues(
+                                  alpha: .16,
+                                ),
                                 blurRadius: 30,
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.notifications_active_rounded,
-                              color: AppColors.emergency, size: 53),
+                          child: const Icon(
+                            Icons.notifications_active_rounded,
+                            color: AppColors.emergency,
+                            size: 53,
+                          ),
                         ),
                         const SizedBox(height: 18),
-                        const Text(
-                          'Emergency Alert Activated',
+                        Text(
+                          incident.status == IncidentStatus.resolved
+                              ? 'Incident resolved'
+                              : incident.status == IncidentStatus.cancelled
+                              ? 'Safety check cancelled'
+                              : 'Emergency Alert Activated',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: AppColors.emergency,
                             fontSize: 30,
                             height: 1.08,
@@ -92,18 +134,20 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: AppColors.textMuted),
                         ),
-                        if (incident?.contactResponseText != null)
+                        if (incident.contactResponseText != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 10),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.safe.withValues(alpha: .1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                incident!.contactResponseText!,
+                                incident.contactResponseText!,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   color: AppColors.safe,
@@ -112,12 +156,43 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                               ),
                             ),
                           ),
+                        if (result?.isSimulated == true)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 12),
+                            child: Text(
+                              'DEMO: simulated danger, real contact notifications',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        if (incident.status != IncidentStatus.resolved &&
+                            incident.status != IncidentStatus.cancelled &&
+                            !runtime.isDispatching(incident.id) &&
+                            (incident.dispatchResult?.success != true))
+                          TextButton(
+                            onPressed: () async {
+                              try {
+                                await runtime.dispatchIncident(incident.id);
+                              } catch (_) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Could not retry. Please check connectivity.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Text('RETRY ALERT TO ALL CONTACTS'),
+                          ),
                         const SizedBox(height: 22),
                         if (result != null)
                           Card(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 18, vertical: 6),
+                                horizontal: 18,
+                                vertical: 6,
+                              ),
                               child: Column(
                                 children: [
                                   _Detail(
@@ -129,7 +204,8 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                                   _Detail(
                                     icon: Icons.speed_rounded,
                                     label: 'Risk Score',
-                                    value: '${result.riskScore}% '
+                                    value:
+                                        '${result.riskScore}% '
                                         '(${_levelLabel(result.riskLevel)})',
                                     critical: true,
                                   ),
@@ -144,7 +220,8 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                                   _Detail(
                                     icon: Icons.location_on_outlined,
                                     label: 'Location',
-                                    value: result.locationText ??
+                                    value:
+                                        result.locationText ??
                                         'Location unavailable',
                                   ),
                                 ],
@@ -153,9 +230,13 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                           ),
                         if (result != null) ...[
                           const SizedBox(height: 16),
-                          const Text('Live Location',
-                              style: TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w800)),
+                          const Text(
+                            'Location at alert time',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           MapPreviewCard(
                             latitude: result.latitude,
@@ -178,10 +259,12 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                                 size: 18,
                               ),
                               Text(
-                                'Safety network activated',
+                                'In immediate danger, contact local emergency services.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    color: AppColors.textMuted, fontSize: 13),
+                                  color: AppColors.textMuted,
+                                  fontSize: 13,
+                                ),
                               ),
                             ],
                           ),
@@ -217,37 +300,46 @@ class _Detail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: (critical ? AppColors.emergency : AppColors.purple)
-                    .withValues(alpha: .09),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, size: 21,
-                  color: critical ? AppColors.emergency : AppColors.purple),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: const TextStyle(
-                          color: AppColors.textMuted, fontSize: 12)),
-                  const SizedBox(height: 2),
-                  Text(value,
-                      style: TextStyle(
-                        color: critical ? AppColors.emergency : AppColors.text,
-                        fontWeight: FontWeight.w800,
-                      )),
-                ],
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 13),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: (critical ? AppColors.emergency : AppColors.purple)
+                .withValues(alpha: .09),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            size: 21,
+            color: critical ? AppColors.emergency : AppColors.purple,
+          ),
         ),
-      );
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  color: critical ? AppColors.emergency : AppColors.text,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }

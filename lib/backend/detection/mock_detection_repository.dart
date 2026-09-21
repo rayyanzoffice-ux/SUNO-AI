@@ -9,10 +9,6 @@ class MockDetectionRepository implements DetectionRepository {
 
   final RiskEngine _riskEngine;
 
-  static const _demoLatitude = 31.5204;
-  static const _demoLongitude = 74.3587;
-  static const _demoLocationText = 'Lahore, Pakistan';
-
   Future<DetectionResult> simulateCriticalDetection() async {
     await Future<void>.delayed(const Duration(milliseconds: 900));
     return _buildResult(
@@ -69,9 +65,7 @@ class MockDetectionRepository implements DetectionRepository {
       stillnessDetected: stillnessDetected,
       riskScore: assessment.riskScore,
       riskLevel: assessment.riskLevel,
-      latitude: _demoLatitude,
-      longitude: _demoLongitude,
-      locationText: _demoLocationText,
+      isSimulated: true,
       detectedAt: DateTime.now(),
     );
   }

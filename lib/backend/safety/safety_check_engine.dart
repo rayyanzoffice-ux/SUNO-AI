@@ -41,13 +41,18 @@ class SafetyCheckEngine {
   /// if [confirmSafe] isn't called before the countdown elapses, or with
   /// [SafetyCheckOutcome.userConfirmedSafe] and the original (unescalated)
   /// result if it is.
-  Future<SafetyCheckResult> startCountdown(DetectionResult detection) {
+  Duration get countdownDuration => _countdownDuration;
+
+  Future<SafetyCheckResult> startCountdown(
+    DetectionResult detection, {
+    Duration? remaining,
+  }) {
     _cancelActiveCountdown();
     final completer = Completer<SafetyCheckResult>();
     _pendingCompleter = completer;
     _pendingDetection = detection;
 
-    _timer = Timer(_countdownDuration, () {
+    _timer = Timer(remaining ?? _countdownDuration, () {
       final pending = _pendingDetection;
       if (pending == null || completer.isCompleted) return;
       final escalated = _escalate(pending);
@@ -123,17 +128,9 @@ class SafetyCheckEngine {
       riskLevel: detection.riskLevel,
     );
     final escalated = _riskEngine.escalateForNoResponse(previousAssessment);
-    return DetectionResult(
-      eventType: detection.eventType,
-      confidence: detection.confidence,
-      impactDetected: detection.impactDetected,
-      stillnessDetected: detection.stillnessDetected,
+    return detection.copyWith(
       riskScore: escalated.riskScore,
       riskLevel: escalated.riskLevel,
-      latitude: detection.latitude,
-      longitude: detection.longitude,
-      locationText: detection.locationText,
-      detectedAt: detection.detectedAt,
     );
   }
 

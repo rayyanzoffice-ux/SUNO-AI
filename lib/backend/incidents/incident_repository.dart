@@ -28,4 +28,6 @@ abstract interface class IncidentRepository {
 
   /// Deletes every stored incident.
   Future<void> clear();
+
+  Future<bool> isDeleted(String incidentId);
 }

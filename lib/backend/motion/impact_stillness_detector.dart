@@ -34,9 +34,13 @@ class ImpactStillnessDetector {
     this.impactThreshold = 15.0,
     this.stillnessThreshold = 1.5,
     this.postImpactWindowMs = 2000,
-    void Function(MotionResult)? onResult,
-  }) : _onResult = onResult;
+    this._onResult,
+    this._onError,
+    this._events,
+  });
 
+  final void Function(Object)? _onError;
+  final Stream<UserAccelerometerEvent>? _events;
   final double impactThreshold;
   final double stillnessThreshold;
   final int postImpactWindowMs;
@@ -51,23 +55,29 @@ class ImpactStillnessDetector {
   bool get isListening => _sub != null;
 
   void start() {
-    _sub ??= userAccelerometerEventStream(
-      samplingPeriod: SensorInterval.normalInterval,
-    ).listen(_onAccelerometer);
+    _sub ??=
+        (_events ??
+                userAccelerometerEventStream(
+                  samplingPeriod: SensorInterval.normalInterval,
+                ))
+            .listen(
+              _onAccelerometer,
+              onError: (Object error) => _onError?.call(error),
+            );
   }
 
-  void stop() {
-    _sub?.cancel();
+  Future<void> stop() async {
+    final subscription = _sub;
     _sub = null;
     _postImpactTimer?.cancel();
     _observingPostImpact = false;
     _postImpactSamples.clear();
     _peakMagnitude = 0;
+    await subscription?.cancel();
   }
 
   void _onAccelerometer(UserAccelerometerEvent event) {
-    final mag =
-        sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+    final mag = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
 
     if (!_observingPostImpact && mag >= impactThreshold) {
       _observingPostImpact = true;
@@ -90,17 +100,20 @@ class ImpactStillnessDetector {
         : _postImpactSamples.reduce((a, b) => a + b) /
               _postImpactSamples.length;
 
-    _onResult?.call(MotionResult(
-      impactDetected: true,
-      stillnessDetected: avg <= stillnessThreshold,
-      peakMagnitude: _peakMagnitude,
-      capturedAt: DateTime.now(),
-    ));
+    _onResult?.call(
+      MotionResult(
+        impactDetected: true,
+        stillnessDetected:
+            _postImpactSamples.isNotEmpty && avg <= stillnessThreshold,
+        peakMagnitude: _peakMagnitude,
+        capturedAt: DateTime.now(),
+      ),
+    );
 
     _observingPostImpact = false;
     _postImpactSamples.clear();
     _peakMagnitude = 0;
   }
 
-  void dispose() => stop();
+  Future<void> dispose() => stop();
 }

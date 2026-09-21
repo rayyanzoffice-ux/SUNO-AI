@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - feature/day2-integration
+      - feat/integration
   workflow_dispatch:
 
 permissions:

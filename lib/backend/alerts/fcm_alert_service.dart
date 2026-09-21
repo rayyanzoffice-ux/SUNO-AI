@@ -9,29 +9,42 @@ import 'alert_service.dart';
 
 class FcmAlertService implements AlertService {
   FcmAlertService({
-    required FirebaseMessaging messaging,
+    required this._messaging,
     String? relayEndpoint,
-    String relayAuthKey = const String.fromEnvironment('SUNO_RELAY_AUTH_KEY'),
-  }) : _messaging = messaging,
-       _relayEndpoint = relayEndpoint ?? AppConfig.alertRelayUrl,
-       _relayAuthKey = relayAuthKey;
+    this._relayAuthKey = const String.fromEnvironment('SUNO_RELAY_AUTH_KEY'),
+  }) : _relayEndpoint = relayEndpoint ?? AppConfig.alertRelayUrl;
 
   final FirebaseMessaging _messaging;
   final String _relayEndpoint;
   final String _relayAuthKey;
   String? _deviceToken;
   StreamSubscription<String>? _tokenRefreshSubscription;
+  Future<String?>? _registration;
 
-  Future<String?> registerDevice() async {
-    await _messaging.requestPermission(alert: true, badge: true, sound: true);
-    _deviceToken = await _messaging.getToken();
-    _tokenRefreshSubscription ??= _messaging.onTokenRefresh.listen((token) {
-      _deviceToken = token;
-      // ignore: avoid_print
-      print('[SUNO FCM] Device token refreshed: ${_redactToken(token)}');
-    });
-    // ignore: avoid_print
-    print('[SUNO FCM] This device token: ${_redactToken(_deviceToken)}');
+  Future<String?> registerDevice() => _registration ??= _registerDevice()
+      .whenComplete(() => _registration = null);
+
+  Future<String?> _registerDevice() async {
+    final settings = await _messaging
+        .requestPermission(alert: true, badge: true, sound: true)
+        .timeout(const Duration(seconds: 30));
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      throw StateError(
+        'Enable SUNO notifications in Android Settings, then retry.',
+      );
+    }
+    _tokenRefreshSubscription ??= _messaging.onTokenRefresh.listen(
+      (token) => _deviceToken = token,
+      onError: (Object _) {
+        _deviceToken = null;
+      },
+    );
+    _deviceToken = await _messaging.getToken().timeout(
+      const Duration(seconds: 12),
+    );
+    if (_deviceToken == null) {
+      throw StateError('Push token unavailable. Check connectivity and retry.');
+    }
     return _deviceToken;
   }
 
@@ -43,94 +56,75 @@ class FcmAlertService implements AlertService {
     required List<String> contactTokens,
     required Map<String, String> payload,
   }) async {
-    if (contactTokens.isEmpty) return 0;
-
-    if (_relayEndpoint.trim().isEmpty) {
-      throw StateError('Alert relay URL is not configured.');
+    final tokens = contactTokens.map((token) => token.trim()).toSet().toList();
+    if (tokens.isEmpty) return 0;
+    if (tokens.any((token) => token.length < 21 || token.length > 4096)) {
+      throw StateError(
+        'A contact token is invalid. Update it in Trusted Contacts.',
+      );
     }
-
-    final uri = Uri.parse(_relayEndpoint);
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-    try {
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      _setRelayHeaders(request);
-      request.write(
-        jsonEncode({'contactTokens': contactTokens, 'payload': payload}),
-      );
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-        onTimeout: () =>
-            throw TimeoutException('Alert relay response timed out.'),
-      );
-      final body = await utf8.decodeStream(response).timeout(
-        const Duration(seconds: 8),
-        onTimeout: () =>
-            throw TimeoutException('Alert relay response timed out.'),
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError('Alert relay failed (${response.statusCode}): $body');
+    final batches = <List<String>>[];
+    var batch = <String>[];
+    for (final token in tokens) {
+      final candidate = [...batch, token];
+      if (candidate.length > 10 || _bodySize(candidate, payload) > 16384) {
+        if (batch.isEmpty) throw StateError('Alert payload is too large.');
+        batches.add(batch);
+        batch = <String>[];
       }
-
-      final decoded = jsonDecode(body) as Map<String, dynamic>;
-      final sent = decoded['sent'];
-      final attempted = decoded['attempted'];
-      if (sent is! int) {
-        throw StateError('Alert relay returned an invalid delivery result.');
+      batch.add(token);
+      if (_bodySize(batch, payload) > 16384) {
+        throw StateError('Alert payload is too large.');
       }
-      if (attempted is int && attempted != contactTokens.length) {
-        throw StateError(
-          'Alert relay attempted $attempted/${contactTokens.length} contacts.',
-        );
-      }
-      if (sent == 0) {
-        throw StateError(
-          'Alert relay delivered to 0/${contactTokens.length} contacts.',
-        );
-      }
-      return sent;
-    } finally {
-      client.close(force: true);
     }
+    if (batch.isNotEmpty) batches.add(batch);
+    var accepted = 0;
+    Object? failure;
+    for (final recipients in batches) {
+      try {
+        final result = await _post({
+          'contactTokens': recipients,
+          'payload': payload,
+        });
+        accepted += _acceptedCount(result, recipients.length);
+      } catch (error) {
+        failure = error;
+      }
+    }
+    // An unsuccessful later batch must not erase already accepted deliveries.
+    if (accepted == 0 && failure != null) {
+      throw StateError(
+        'Alert relay unavailable. Check connectivity and configuration.',
+      );
+    }
+    return accepted;
+  }
+
+  int _bodySize(List<String> tokens, Map<String, String> payload) => utf8
+      .encode(jsonEncode({'contactTokens': tokens, 'payload': payload}))
+      .length;
+
+  int _acceptedCount(Map<String, dynamic> result, int expected) {
+    final sent = result['sent'];
+    final attempted = result['attempted'];
+    if (sent is! int ||
+        attempted is! int ||
+        attempted != expected ||
+        sent < 0 ||
+        sent > attempted) {
+      throw StateError('Alert relay returned an invalid acceptance count.');
+    }
+    return sent;
   }
 
   @override
   Future<bool> sendTestMessage(String token) async {
-    if (_relayEndpoint.trim().isEmpty) {
-      throw StateError('Alert relay URL is not configured.');
-    }
-
-    final uri = Uri.parse(_relayEndpoint);
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-    try {
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      _setRelayHeaders(request);
-      request.write(jsonEncode({
-        'contactTokens': [token],
-        'payload': {'type': 'test'},
-        'test': true,
-      }));
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-        onTimeout: () =>
-            throw TimeoutException('Test message response timed out.'),
-      );
-      final body = await utf8.decodeStream(response).timeout(
-        const Duration(seconds: 8),
-        onTimeout: () =>
-            throw TimeoutException('Test message response timed out.'),
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError('Test message failed (${response.statusCode}): $body');
-      }
-      final decoded = jsonDecode(body) as Map<String, dynamic>;
-      final results = decoded['results'] as List<dynamic>?;
-      if (results == null || results.isEmpty) return false;
-      return results.first['ok'] == true;
-    } finally {
-      client.close(force: true);
-    }
+    final result = await _post({
+      'contactTokens': [token.trim()],
+      'payload': {'type': 'test'},
+      'test': true,
+    });
+    return _acceptedCount(result, 1) == 1;
   }
 
   @override
@@ -141,68 +135,58 @@ class FcmAlertService implements AlertService {
     required String status,
     required String message,
   }) async {
-    if (_relayEndpoint.trim().isEmpty) {
-      throw StateError('Alert relay URL is not configured.');
-    }
     if (recipientToken.trim().isEmpty) {
-      throw StateError('Recipient token is missing.');
+      throw StateError('Sender token is missing.');
     }
-
-    final uri = Uri.parse(_relayEndpoint);
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-    try {
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      _setRelayHeaders(request);
-      request.write(jsonEncode({
-        'response': {
-          'recipientToken': recipientToken,
-          'incidentId': incidentId,
-          'responderName': responderName,
-          'status': status,
-          'message': message,
-        },
-      }));
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-        onTimeout: () =>
-            throw TimeoutException('Response relay response timed out.'),
-      );
-      final body = await utf8.decodeStream(response).timeout(
-        const Duration(seconds: 8),
-        onTimeout: () =>
-            throw TimeoutException('Response relay response timed out.'),
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError('Response relay failed (${response.statusCode}): $body');
-      }
-      final decoded = jsonDecode(body) as Map<String, dynamic>;
-      if (decoded['ok'] != true || decoded['sent'] != 1) {
-        throw StateError('Response relay did not deliver the contact response.');
-      }
-    } finally {
-      client.close(force: true);
+    final result = await _post({
+      'response': {
+        'recipientToken': recipientToken.trim(),
+        'incidentId': incidentId,
+        'responderName': responderName,
+        'status': status,
+        'message': message,
+      },
+    });
+    if (_acceptedCount(result, 1) != 1) {
+      throw StateError('FCM did not accept this response. Please retry.');
     }
   }
 
   @override
   Future<void> cancelAlert(String incidentId) async {
-    if (_relayEndpoint.trim().isEmpty) return;
-    final uri = Uri.parse(_relayEndpoint);
+    await _post({'cancelIncidentId': incidentId});
+  }
+
+  Future<Map<String, dynamic>> _post(Map<String, Object> body) async {
+    if (_relayEndpoint.trim().isEmpty || _relayAuthKey.trim().isEmpty) {
+      throw StateError('Alert relay configuration is missing.');
+    }
+    final bytes = utf8.encode(jsonEncode(body));
+    if (bytes.length > 16384) throw StateError('Alert payload is too large.');
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
     try {
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      _setRelayHeaders(request);
-      request.write(jsonEncode({'cancelIncidentId': incidentId}));
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-        onTimeout: () =>
-            throw TimeoutException('Alert cancellation timed out.'),
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError('Alert cancellation failed (${response.statusCode}).');
-      }
+      return await (() async {
+        final request = await client.postUrl(Uri.parse(_relayEndpoint));
+        request.headers.contentType = ContentType.json;
+        request.headers.set('X-SUNO-Relay-Key', _relayAuthKey.trim());
+        request.add(bytes);
+        final response = await request.close();
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw StateError('Alert relay failed (${response.statusCode}).');
+        }
+        final data = <int>[];
+        await for (final chunk in response) {
+          if (data.length + chunk.length > 65536) {
+            throw StateError('Invalid relay response.');
+          }
+          data.addAll(chunk);
+        }
+        final decoded = jsonDecode(utf8.decode(data));
+        if (decoded is! Map<String, dynamic>) {
+          throw StateError('Invalid relay response.');
+        }
+        return decoded;
+      })().timeout(const Duration(seconds: 20));
     } finally {
       client.close(force: true);
     }
@@ -211,17 +195,5 @@ class FcmAlertService implements AlertService {
   Future<void> dispose() async {
     await _tokenRefreshSubscription?.cancel();
     _tokenRefreshSubscription = null;
-  }
-
-  void _setRelayHeaders(HttpClientRequest request) {
-    if (_relayAuthKey.trim().isNotEmpty) {
-      request.headers.set('X-SUNO-Relay-Key', _relayAuthKey.trim());
-    }
-  }
-
-  static String _redactToken(String? token) {
-    if (token == null || token.isEmpty) return '<unavailable>';
-    if (token.length <= 10) return 'REDACTED';
-    return '${token.substring(0, 7)}...REDACTED...${token.substring(token.length - 4)}';
   }
 }

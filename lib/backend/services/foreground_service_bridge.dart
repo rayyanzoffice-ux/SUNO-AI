@@ -1,37 +1,55 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Bridges to the native Android foreground service that keeps SUNO's
-/// microphone monitoring alive when the app is backgrounded.
-///
-/// No-ops safely when the native implementation is unavailable (e.g. in
-/// widget tests, or on platforms other than Android) so callers never
-/// need special-case handling — starting/stopping the service is always
-/// best-effort and never blocks the in-app detection pipeline.
 class ForegroundServiceBridge {
   const ForegroundServiceBridge._();
-
   static const _channel = MethodChannel(
     'com.example.suno_ai/monitoring_service',
   );
+  static AsyncCallback? onStopRequested;
+  static AsyncCallback? onServiceStopped;
+  static bool _initialized = false;
+  static bool get _android =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-  static Future<void> start() async {
+  static Future<void> start({
+    bool microphoneEnabled = true,
+    bool locationEnabled = false,
+    String status = 'SUNO is listening',
+  }) async {
+    if (!_android) return;
+    if (!_initialized) {
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'stopRequested') await onStopRequested?.call();
+        if (call.method == 'serviceStopped') await onServiceStopped?.call();
+      });
+      _initialized = true;
+    }
     try {
-      await _channel.invokeMethod('start');
-    } on MissingPluginException {
-      // No native implementation available (e.g. widget tests) — ignore.
-    } on PlatformException {
-      // Non-fatal: live detection continues in-app even if the persistent
-      // notification/service could not be started.
+      await _channel
+          .invokeMethod<void>('start', {
+            'microphoneEnabled': microphoneEnabled,
+            'locationEnabled': locationEnabled,
+            'status': status,
+          })
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      await stop();
+      rethrow;
+    }
+  }
+
+  static Future<void> updateStatus(String status) async {
+    if (_android) {
+      await _channel.invokeMethod<void>('updateStatus', {'status': status});
     }
   }
 
   static Future<void> stop() async {
-    try {
-      await _channel.invokeMethod('stop');
-    } on MissingPluginException {
-      // No native implementation available — ignore.
-    } on PlatformException {
-      // Non-fatal.
+    if (_android) {
+      await _channel
+          .invokeMethod<void>('stop')
+          .timeout(const Duration(seconds: 15));
     }
   }
 }

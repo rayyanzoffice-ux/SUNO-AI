@@ -5,185 +5,228 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme/app_theme.dart';
 
-class MapPreviewCard extends StatelessWidget {
+class MapPreviewCard extends StatefulWidget {
   const MapPreviewCard({
     this.latitude,
     this.longitude,
     this.locationText,
     super.key,
   });
-
   final double? latitude;
   final double? longitude;
   final String? locationText;
 
-  Future<void> _openExternalMap() async {
-    if (latitude == null || longitude == null) return;
-    final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+  @override
+  State<MapPreviewCard> createState() => _MapPreviewCardState();
+}
+
+class _MapPreviewCardState extends State<MapPreviewCard> {
+  bool _tileFailed = false;
+  int _reload = 0;
+
+  bool get _hasCoordinates =>
+      widget.latitude != null &&
+      widget.longitude != null &&
+      widget.latitude!.isFinite &&
+      widget.longitude!.isFinite &&
+      widget.latitude!.abs() <= 90 &&
+      widget.longitude!.abs() <= 180;
+
+  @override
+  void didUpdateWidget(MapPreviewCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.latitude != widget.latitude ||
+        oldWidget.longitude != widget.longitude) {
+      _tileFailed = false;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final hasCoords = latitude != null && longitude != null;
-    return GestureDetector(
-      onTap: hasCoords ? _openExternalMap : null,
-      child: Container(
-        height: 200,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: const Color(0xFFEAF3EC),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: hasCoords
-            ? _RealMap(
-                latitude: latitude!,
-                longitude: longitude!,
-                locationText: locationText,
-                onOpenExternal: _openExternalMap,
-              )
-            : _NoLocationPlaceholder(locationText: locationText),
+  Future<void> _openMap() async {
+    if (!_hasCoordinates) return;
+    try {
+      final opened = await launchUrl(
+        Uri.https('www.google.com', '/maps/search/', {
+          'api': '1',
+          'query': '${widget.latitude},${widget.longitude}',
+        }),
+        mode: LaunchMode.externalApplication,
+      );
+      if (opened) return;
+    } catch (_) {
+      /* The platform can refuse an external activity launch. */
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Could not open Maps. Check your browser or map app.'),
       ),
     );
   }
-}
 
-class _RealMap extends StatelessWidget {
-  const _RealMap({
-    required this.latitude,
-    required this.longitude,
-    this.locationText,
-    required this.onOpenExternal,
-  });
-
-  final double latitude;
-  final double longitude;
-  final String? locationText;
-  final VoidCallback onOpenExternal;
+  Future<void> _openAttribution() async {
+    try {
+      if (await launchUrl(
+        Uri.parse('https://www.openstreetmap.org/copyright'),
+      )) {
+        return;
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Could not open map attribution. Check your browser.'),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final point = LatLng(latitude, longitude);
-    return Stack(
-      children: [
-        FlutterMap(
-          options: MapOptions(
-            initialCenter: point,
-            initialZoom: 15,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.none,
-            ),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.suno_ai',
-            ),
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: point,
-                  width: 42,
-                  height: 42,
-                  child: const Icon(
-                    Icons.location_on_rounded,
-                    color: AppColors.emergency,
-                    size: 42,
+    final coordinates = _hasCoordinates
+        ? '${widget.latitude!.toStringAsFixed(5)}, ${widget.longitude!.toStringAsFixed(5)}'
+        : 'Location unavailable';
+    return Container(
+      height: 240,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF3EC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: !_hasCoordinates
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.location_off_rounded,
+                    color: AppColors.textMuted,
+                    size: 36,
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        Positioned(
-          left: 14,
-          right: 14,
-          bottom: 12,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .94),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
+                  const SizedBox(height: 10),
+                  Text(
+                    widget.locationText ?? coordinates,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          : Column(
               children: [
-                const Icon(Icons.near_me_rounded,
-                    color: AppColors.purple, size: 20),
-                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    locationText ??
-                        '${latitude.toStringAsFixed(4)}, '
-                        '${longitude.toStringAsFixed(4)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      height: 1.35,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: onOpenExternal,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.purple.withValues(alpha: .1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.open_in_new_rounded,
-                            color: AppColors.purple, size: 14),
-                        SizedBox(width: 4),
-                        Text(
-                          'OPEN',
-                          style: TextStyle(
-                            color: AppColors.purple,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
+                  child: Stack(
+                    children: [
+                      FlutterMap(
+                        key: ValueKey(
+                          '${widget.latitude},${widget.longitude}:$_reload',
+                        ),
+                        options: MapOptions(
+                          initialCenter: LatLng(
+                            widget.latitude!,
+                            widget.longitude!,
+                          ),
+                          initialZoom: 15,
+                          interactionOptions: const InteractionOptions(
+                            flags:
+                                InteractiveFlag.all & ~InteractiveFlag.rotate,
                           ),
                         ),
-                      ],
-                    ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.example.suno_ai',
+                            errorTileCallback: (_, _, _) {
+                              if (_tileFailed) return;
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) setState(() => _tileFailed = true);
+                              });
+                            },
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: LatLng(
+                                  widget.latitude!,
+                                  widget.longitude!,
+                                ),
+                                width: 42,
+                                height: 42,
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: AppColors.emergency,
+                                  size: 42,
+                                ),
+                              ),
+                            ],
+                          ),
+                          RichAttributionWidget(
+                            attributions: [
+                              TextSourceAttribution(
+                                'OpenStreetMap contributors',
+                                onTap: _openAttribution,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      if (_tileFailed)
+                        Positioned(
+                          top: 6,
+                          left: 8,
+                          right: 8,
+                          child: Material(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Row(
+                              children: [
+                                const Expanded(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: Text(
+                                      'Map tiles unavailable. Coordinates are still usable.',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(() {
+                                    _tileFailed = false;
+                                    _reload++;
+                                  }),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.locationText ?? coordinates,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _openMap,
+                        icon: const Icon(Icons.open_in_new, size: 16),
+                        label: const Text('OPEN'),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ],
     );
   }
-}
-
-class _NoLocationPlaceholder extends StatelessWidget {
-  const _NoLocationPlaceholder({this.locationText});
-  final String? locationText;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.location_off_rounded,
-                color: AppColors.textMuted, size: 36),
-            const SizedBox(height: 10),
-            Text(
-              locationText ?? 'Location unavailable',
-              style: const TextStyle(
-                  color: AppColors.textMuted, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
 }

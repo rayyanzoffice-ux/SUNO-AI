@@ -1,18 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import '../../backend/audio/microphone_capture.dart';
-import '../../backend/detection/live_detection_repository.dart';
-import '../../backend/detection/suno_audio_classifier.dart';
 import '../../backend/location/location_service.dart';
-import '../../backend/ml/yamnet_stage.dart';
-import '../../backend/services/foreground_service_bridge.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
-import '../../services/detection_notification_service.dart';
+import '../../models/incident.dart';
+import '../../services/monitoring_service.dart';
 import '../../services/suno_runtime_service.dart';
+import '../../widgets/map_preview_card.dart';
 import '../../widgets/primary_action_button.dart';
 import '../../widgets/silent_sos_sheet.dart';
 import '../../widgets/status_chip.dart';
@@ -29,569 +24,310 @@ class MonitoringScreen extends StatefulWidget {
   State<MonitoringScreen> createState() => _MonitoringScreenState();
 }
 
-class _MonitoringScreenState extends State<MonitoringScreen>
-    with WidgetsBindingObserver {
-  bool detecting = false;
+class _MonitoringScreenState extends State<MonitoringScreen> {
   late DetectionScenario selectedScenario;
-
-  bool _liveMode = false;
-  bool _liveStarting = false;
-  bool _liveActive = false;
-  String? _liveError;
-  bool _isInBackground = false;
-
-  LiveDetectionRepository? _liveRepo;
-  YamNetStage? _yamnet;
-  MicrophoneCapture? _microphone;
-  StreamSubscription<dynamic>? _levelSub;
-  final List<double> _liveLevels = [];
-
-  SunoRuntimeService get _runtime =>
-      widget.runtime ?? SunoRuntimeService.instance;
+  late final SunoRuntimeService _runtime;
+  late final MonitoringService _monitoring;
+  bool detecting = false;
+  bool _navigating = false;
+  String? _message;
+  String? _previousIncident;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    _runtime = widget.runtime ?? SunoRuntimeService.instance;
+    _monitoring = widget.runtime == null
+        ? MonitoringService.instance
+        : MonitoringService(_runtime);
     selectedScenario = widget.scenario;
+    _previousIncident = _runtime.currentIncident?.id;
+    _runtime.addListener(_onRuntimeChanged);
+    _monitoring.addListener(_rebuild);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _runtime.refreshLocation();
+      if (_runtime.hasPendingSafetyCheck) {
+        _openIncident(_runtime.currentIncident!);
+      }
+    });
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _isInBackground =
-        state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached;
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  void _onRuntimeChanged() {
+    if (!mounted) return;
+    _rebuild();
+    final incident = _runtime.currentIncident;
+    if (incident != null && incident.id != _previousIncident) {
+      _previousIncident = incident.id;
+      if (!detecting) _openIncident(incident);
+    }
+  }
+
+  void _openIncident(Incident incident) {
+    if (_navigating || !mounted || ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    _navigating = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(
+        context,
+        incident.status == IncidentStatus.safetyCheck
+            ? AppRoutes.safetyCheck
+            : AppRoutes.emergencyAlert,
+        arguments: incident.id,
+      );
+    });
   }
 
   Future<void> _simulate() async {
-    setState(() => detecting = true);
-    final result = await _runtime.runDetection(selectedScenario);
-    if (!mounted) return;
-    if (result.riskLevel == RiskLevel.low) {
-      setState(() => detecting = false);
-      return;
-    }
-    await _runtime.recordDetection(result);
-    if (!mounted) return;
-    final route = result.riskLevel == RiskLevel.medium
-        ? AppRoutes.safetyCheck
-        : AppRoutes.emergencyAlert;
-    Navigator.pushReplacementNamed(context, route);
-  }
-
-  Future<void> _enableLiveMode() async {
+    if (detecting) return;
     setState(() {
-      _liveMode = true;
-      _liveStarting = true;
-      _liveError = null;
+      detecting = true;
+      _message = null;
     });
-
-    MicrophoneCapture? microphone;
-    YamNetStage? yamnet;
     try {
-      microphone = MicrophoneCapture();
-      yamnet = await YamNetStage.load();
-      final classifier = await SunoAudioClassifier.load();
-      final repo = LiveDetectionRepository(
-        yamnet: yamnet,
-        classifier: classifier,
-        microphone: microphone,
-        locationService: LocationService(),
-        onDetection: _onLiveDetection,
-      );
-
-      await repo.startMonitoring();
-      await ForegroundServiceBridge.start();
-
-      if (!mounted) {
-        await repo.stopMonitoring();
-        yamnet.close();
-        await microphone.dispose();
-        return;
-      }
-
-      // Separate subscription purely for the waveform visualization — the
-      // ML pipeline consumes the same broadcast stream independently inside
-      // LiveDetectionRepository, so this never interferes with detection.
-      _levelSub = microphone.waveforms.listen((frame) {
-        if (!mounted) return;
-        setState(() {
-          _liveLevels.add(frame.rmsAmplitude);
-          if (_liveLevels.length > 23) _liveLevels.removeAt(0);
-        });
-      });
-
-      setState(() {
-        _yamnet = yamnet;
-        _microphone = microphone;
-        _liveRepo = repo;
-        _liveStarting = false;
-        _liveActive = true;
-      });
-    } on MicrophonePermissionException catch (e) {
-      yamnet?.close();
-      await microphone?.dispose();
+      final result = await _runtime.runDetection(selectedScenario);
       if (!mounted) return;
-      setState(() {
-        _liveStarting = false;
-        _liveActive = false;
-        _liveMode = false;
-        _liveError = e.message;
-      });
-    } catch (e) {
-      yamnet?.close();
-      await microphone?.dispose();
-      if (!mounted) return;
-      setState(() {
-        _liveStarting = false;
-        _liveActive = false;
-        _liveMode = false;
-        _liveError = 'Live Mode failed to start: $e';
-      });
-    }
-  }
-
-  Future<void> _disableLiveMode() async {
-    final repo = _liveRepo;
-    final microphone = _microphone;
-    final yamnet = _yamnet;
-    _liveRepo = null;
-    _microphone = null;
-    _yamnet = null;
-
-    await _levelSub?.cancel();
-    _levelSub = null;
-    await repo?.stopMonitoring();
-    yamnet?.close();
-    await microphone?.dispose();
-    await ForegroundServiceBridge.stop();
-
-    if (!mounted) return;
-    setState(() {
-      _liveActive = false;
-      _liveMode = false;
-      _liveLevels.clear();
-    });
-  }
-
-  void _onLiveDetection(DetectionResult result) {
-    if (result.riskLevel == RiskLevel.low) return;
-
-    final isCritical = result.riskLevel == RiskLevel.critical;
-
-    if (_isInBackground) {
-      _runtime.recordDetection(result).then((_) {
-        showFullScreenDetectionNotification(
-          title: isCritical ? 'Emergency Detected' : 'Possible Danger',
-          body: isCritical
-              ? '${result.eventType} — alerts sent to your contacts'
-              : '${result.eventType} detected — tap to check',
-          isCritical: isCritical,
+      if (result.riskLevel == RiskLevel.low) {
+        setState(
+          () => _message = 'Low-risk simulation complete. No alert was sent.',
         );
-      }).catchError((Object e) {
-        // ignore: avoid_print
-        print('[SUNO] Background detection error (non-fatal): $e');
-      });
-      return;
+      } else {
+        final incident = await _runtime.recordDetection(result);
+        if (mounted && incident != null) _openIncident(incident);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message = 'Simulation could not finish. Please retry.');
+      }
+    } finally {
+      if (mounted) setState(() => detecting = false);
     }
-
-    if (!mounted) return;
-    final route = isCritical
-        ? AppRoutes.emergencyAlert
-        : AppRoutes.safetyCheck;
-    _runtime.recordDetection(result).then((_) async {
-      if (!mounted) return;
-      await _disableLiveMode();
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, route);
-    }).catchError((Object e) async {
-      // ignore: avoid_print
-      print('[SUNO] recordDetection error (non-fatal): $e');
-      if (!mounted) return;
-      await _disableLiveMode();
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, route);
-    });
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    if (_liveActive) {
-      _levelSub?.cancel();
-      _liveRepo?.stopMonitoring();
-      _yamnet?.close();
-      _microphone?.dispose();
-      ForegroundServiceBridge.stop();
-    }
+    _runtime.removeListener(_onRuntimeChanged);
+    _monitoring.removeListener(_rebuild);
+    if (widget.runtime != null) _monitoring.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Monitoring'),
-      actions: const [
-        Padding(
-          padding: EdgeInsets.only(right: 20),
-          child: Icon(
-            Icons.lock_outline_rounded,
-            size: 20,
-            color: AppColors.safe,
-          ),
-        ),
-      ],
-    ),
-    body: SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight - 26),
-            child: IntrinsicHeight(
-              child: Column(
-                children: [
-                  const SizedBox(height: 4),
-                  _ModeToggle(
-                    liveMode: _liveMode,
-                    liveStarting: _liveStarting,
-                    onDemoSelected: _liveMode ? _disableLiveMode : null,
-                    onLiveSelected: _liveMode ? null : _enableLiveMode,
-                  ),
-                  if (_liveError != null) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.emergency.withValues(alpha: .08),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        _liveError!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.emergency,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onLongPress: () => showSilentSosSheet(context),
-                    child: Container(
-                      width: 132,
-                      height: 132,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.safe.withValues(alpha: .09),
-                        border: Border.all(
-                          color: AppColors.safe.withValues(alpha: .25),
-                          width: 8,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.safe.withValues(alpha: .18),
-                            blurRadius: 30,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.mic_rounded,
-                        color: AppColors.safe,
-                        size: 58,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  Text(
-                    _liveMode ? 'SUNO is Listening Live' : 'SUNO is Active',
-                    style: const TextStyle(
-                      color: AppColors.safe,
-                      fontSize: 29,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _liveMode
-                        ? 'Real microphone, motion, and location — processed on this device'
-                        : 'Listening privately on this device',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textMuted),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Long-press the mic for Silent SOS',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
-                  ),
-                  const SizedBox(height: 18),
-                  _Waveform(levels: _liveMode ? _liveLevels : null),
-                  const SizedBox(height: 24),
-                  if (!_liveMode) ...[
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: DetectionScenario.values.map((scenario) {
-                        final selected = selectedScenario == scenario;
-                        return ChoiceChip(
-                          label: Text(_scenarioLabel(scenario)),
-                          selected: selected,
-                          onSelected: detecting
-                              ? null
-                              : (_) => setState(
-                                  () => selectedScenario = scenario,
-                                ),
-                          selectedColor: AppColors.purple.withValues(
-                            alpha: .14,
-                          ),
-                          checkmarkColor: AppColors.purple,
-                          labelStyle: TextStyle(
-                            color: selected
-                                ? AppColors.purple
-                                : AppColors.text,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          side: BorderSide(
-                            color: selected
-                                ? AppColors.purple
-                                : AppColors.border,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 18),
-                  ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: StatusChip(
-                          label: 'Sound',
-                          value: _liveMode
-                              ? (_liveActive ? 'Listening' : 'Starting…')
-                              : 'Normal',
-                          color: AppColors.safe,
-                          icon: Icons.graphic_eq_rounded,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: StatusChip(
-                          label: 'Motion',
-                          value: _liveMode ? 'Sensing' : 'Stable',
-                          color: AppColors.safe,
-                          icon: Icons.screen_rotation_alt_rounded,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: StatusChip(
-                          label: 'Location',
-                          value: _liveMode ? 'GPS' : 'Demo',
-                          color: AppColors.safe,
-                          icon: Icons.wifi_rounded,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  if (detecting)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        'Analyzing ${_scenarioLabel(selectedScenario).toLowerCase()} risk…',
-                        style: const TextStyle(
-                          color: AppColors.emergency,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  if (!_liveMode)
-                    OutlinedButton.icon(
-                      onPressed: detecting ? null : _simulate,
-                      icon: const Icon(Icons.science_outlined, size: 18),
-                      label: Text(
-                        detecting ? 'Analyzing…' : 'Demo: Simulate Distress',
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textMuted,
-                        backgroundColor: Colors.white,
-                        side: const BorderSide(color: AppColors.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 11,
-                        ),
-                        textStyle: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  const SizedBox(height: 5),
-                  PrimaryActionButton(
-                    label: 'STOP MONITORING',
-                    outlined: true,
-                    color: AppColors.emergency,
-                    icon: Icons.stop_circle_outlined,
-                    onPressed: detecting
-                        ? null
-                        : () async {
-                            if (_liveMode) await _disableLiveMode();
-                            if (!context.mounted) return;
-                            Navigator.popUntil(
-                              context,
-                              ModalRoute.withName(AppRoutes.home),
-                            );
-                          },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-
-  static String _scenarioLabel(DetectionScenario scenario) =>
-      switch (scenario) {
-        DetectionScenario.low => 'LOW',
-        DetectionScenario.medium => 'MEDIUM',
-        DetectionScenario.critical => 'CRITICAL',
-      };
-}
-
-class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({
-    required this.liveMode,
-    required this.liveStarting,
-    required this.onDemoSelected,
-    required this.onLiveSelected,
-  });
-
-  final bool liveMode;
-  final bool liveStarting;
-  final VoidCallback? onDemoSelected;
-  final VoidCallback? onLiveSelected;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: const Color(0xFFEDEFF5),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: _ToggleSegment(
-            label: 'Demo Mode',
-            selected: !liveMode,
-            onTap: onDemoSelected,
-          ),
-        ),
-        Expanded(
-          child: _ToggleSegment(
-            label: liveStarting ? 'Starting…' : 'Live Mode',
-            selected: liveMode,
-            onTap: onLiveSelected,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _ToggleSegment extends StatelessWidget {
-  const _ToggleSegment({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    borderRadius: BorderRadius.circular(12),
-    onTap: onTap,
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: selected ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: selected
-            ? const [BoxShadow(color: Colors.black12, blurRadius: 5)]
-            : null,
-      ),
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: selected ? AppColors.text : AppColors.textMuted,
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-        ),
-      ),
-    ),
-  );
-}
-
-class _Waveform extends StatelessWidget {
-  const _Waveform({this.levels});
-
-  /// Real microphone amplitude levels (0..1) when in Live Mode, most recent
-  /// last. Null falls back to the static Demo Mode animation.
-  final List<double>? levels;
+  String get _locationStatus => _runtime.locating
+      ? 'Locating…'
+      : switch (_runtime.locationService.status) {
+          LocationStatus.ready => 'GPS ready',
+          LocationStatus.denied => 'Permission denied',
+          LocationStatus.disabled => 'GPS disabled',
+          LocationStatus.timedOut => 'GPS timed out — retry',
+          _ => 'Unavailable',
+        };
 
   @override
   Widget build(BuildContext context) {
-    const barCount = 23;
-    const demoHeights = [8.0, 14.0, 22.0, 32.0, 18.0, 12.0];
-    final realLevels = levels;
-
-    return SizedBox(
-      height: 38,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(barCount, (i) {
-          double height;
-          double alpha;
-          if (realLevels != null && realLevels.isNotEmpty) {
-            // Right-align real samples so the most recent value is the
-            // rightmost bar, matching a left-to-right time axis.
-            final offset = barCount - realLevels.length;
-            if (i < offset) {
-              height = 6.0;
-              alpha = .25;
-            } else {
-              final amplitude = realLevels[i - offset];
-              height =
-                  6.0 + (amplitude * 32.0).clamp(0.0, 32.0).toDouble();
-              alpha = .35 + (amplitude * .5).clamp(0.0, .5).toDouble();
-            }
-          } else {
-            height = demoHeights[i % demoHeights.length];
-            alpha = .35 + (i % 3) * .2;
-          }
-          return Container(
-            width: 3,
-            height: height,
-            margin: const EdgeInsets.symmetric(horizontal: 2.5),
-            decoration: BoxDecoration(
-              color: AppColors.safe.withValues(alpha: alpha),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          );
-        }),
+    final live = _monitoring.liveMode;
+    final busy = detecting || _monitoring.starting;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Monitoring')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Demo Mode'),
+                      selected: !live,
+                      onSelected: busy ? null : (_) => _monitoring.selectDemo(),
+                    ),
+                  ),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: Text(
+                        _monitoring.starting ? 'Starting…' : 'Live Mode',
+                      ),
+                      selected: live,
+                      onSelected: busy ? null : (_) => _monitoring.start(),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onLongPress: () => showSilentSosSheet(context),
+                child: CircleAvatar(
+                  radius: 58,
+                  backgroundColor: AppColors.safe.withValues(alpha: .1),
+                  child: Icon(
+                    live ? Icons.mic_rounded : Icons.science_outlined,
+                    size: 56,
+                    color: AppColors.safe,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                live
+                    ? (_monitoring.active
+                          ? 'SUNO is Listening Live'
+                          : 'Live monitoring paused')
+                    : 'Demo Mode',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.safe,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                live ? 'Audio is processed only on this device.' : 'Simulated danger • Real GPS and contact alerts\nThe microphone is off in Demo mode.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Long-press the icon for Silent SOS',
+                style: TextStyle(fontSize: 11),
+              ),
+              if (_monitoring.error != null ||
+                  _runtime.operationError != null ||
+                  _message != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    _message ?? _monitoring.error ?? _runtime.operationError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.warning),
+                  ),
+                ),
+              if (live && _monitoring.active)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: SizedBox(
+                    height: 38,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(23, (index) {
+                        final offset = 23 - _monitoring.levels.length;
+                        final amplitude = index < offset
+                            ? 0.0
+                            : _monitoring.levels[index - offset];
+                        return Container(
+                          width: 3,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          height: 6 + amplitude.clamp(0, 1) * 32,
+                          color: AppColors.safe,
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              if (!live)
+                Wrap(
+                  spacing: 8,
+                  children: DetectionScenario.values
+                      .map(
+                        (scenario) => ChoiceChip(
+                          label: Text(scenario.name.toUpperCase()),
+                          selected: selectedScenario == scenario,
+                          onSelected: busy
+                              ? null
+                              : (_) =>
+                                    setState(() => selectedScenario = scenario),
+                        ),
+                      )
+                      .toList(),
+                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatusChip(
+                      label: 'Sound',
+                      value: live && _monitoring.active
+                          ? 'Listening'
+                          : 'Mic off',
+                      color: AppColors.safe,
+                      icon: Icons.graphic_eq,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: StatusChip(
+                      label: 'Location',
+                      value: _locationStatus,
+                      color: _runtime.location == null
+                          ? AppColors.warning
+                          : AppColors.safe,
+                      icon: Icons.location_on,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Current location',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: busy || _runtime.locating
+                        ? null
+                        : () => _runtime.refreshLocation(),
+                    child: const Text('Refresh GPS'),
+                  ),
+                ],
+              ),
+              MapPreviewCard(
+                latitude: _runtime.location?.latitude,
+                longitude: _runtime.location?.longitude,
+                locationText: _runtime.location?.description ?? _locationStatus,
+              ),
+              const SizedBox(height: 16),
+              if (!live)
+                OutlinedButton.icon(
+                  onPressed: busy ? null : _simulate,
+                  icon: const Icon(Icons.science_outlined),
+                  label: Text(
+                    detecting
+                        ? 'Preparing simulation…'
+                        : 'Demo: Simulate Distress',
+                  ),
+                ),
+              if (live && !_monitoring.active)
+                PrimaryActionButton(
+                  label: 'START LIVE MONITORING',
+                  onPressed: busy ? null : _monitoring.start,
+                ),
+              const SizedBox(height: 10),
+              PrimaryActionButton(
+                label: 'STOP MONITORING',
+                outlined: true,
+                color: AppColors.emergency,
+                onPressed: detecting
+                    ? null
+                    : () async {
+                        await _monitoring.stop();
+                        if (!context.mounted) return;
+                        Navigator.popUntil(context, (route) => route.isFirst);
+                      },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
-

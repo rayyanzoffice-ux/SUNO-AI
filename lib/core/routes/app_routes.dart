@@ -20,8 +20,12 @@ abstract final class AppRoutes {
   static final routes = <String, WidgetBuilder>{
     home: (_) => const HomeScreen(),
     monitoring: (_) => const MonitoringScreen(),
-    safetyCheck: (_) => const SafetyCheckScreen(),
-    emergencyAlert: (_) => const EmergencyAlertScreen(),
+    safetyCheck: (context) => SafetyCheckScreen(
+      incidentId: ModalRoute.of(context)?.settings.arguments as String?,
+    ),
+    emergencyAlert: (context) => EmergencyAlertScreen(
+      incidentId: ModalRoute.of(context)?.settings.arguments as String?,
+    ),
     history: (_) => const HistoryScreen(),
     contactsSetup: (_) => const ContactsSetupScreen(),
   };

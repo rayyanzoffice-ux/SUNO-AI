@@ -7,8 +7,6 @@ extension RiskLevelContract on RiskLevel {
     for (final level in RiskLevel.values) {
       if (level.wireValue == value) return level;
     }
-    // Never downgrade an unrecognized risk level to "low" — that would
-    // mask a real emergency as safe. Fail loudly in every build mode.
     throw FormatException('Unknown RiskLevel wire value: $value');
   }
 }
@@ -24,6 +22,7 @@ class DetectionResult {
   final double? longitude;
   final String? locationText;
   final DateTime detectedAt;
+  final bool isSimulated;
 
   const DetectionResult({
     required this.eventType,
@@ -36,6 +35,7 @@ class DetectionResult {
     this.longitude,
     this.locationText,
     required this.detectedAt,
+    this.isSimulated = false,
   });
 
   DetectionResult copyWith({
@@ -49,6 +49,7 @@ class DetectionResult {
     double? longitude,
     String? locationText,
     DateTime? detectedAt,
+    bool? isSimulated,
   }) => DetectionResult(
     eventType: eventType ?? this.eventType,
     confidence: confidence ?? this.confidence,
@@ -60,6 +61,7 @@ class DetectionResult {
     longitude: longitude ?? this.longitude,
     locationText: locationText ?? this.locationText,
     detectedAt: detectedAt ?? this.detectedAt,
+    isSimulated: isSimulated ?? this.isSimulated,
   );
 
   factory DetectionResult.fromJson(Map<String, Object?> json) =>
@@ -78,6 +80,7 @@ class DetectionResult {
         detectedAt: json['detectedAt'] == null
             ? DateTime.now()
             : DateTime.parse(json['detectedAt']! as String),
+        isSimulated: json['isSimulated'] == true,
       );
 
   Map<String, Object?> toJson({String? status}) => {
@@ -92,5 +95,6 @@ class DetectionResult {
     'longitude': longitude,
     'status': status,
     'detectedAt': detectedAt.toIso8601String(),
+    'isSimulated': isSimulated,
   };
 }

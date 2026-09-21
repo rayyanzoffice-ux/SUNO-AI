@@ -35,8 +35,8 @@ class ContinuousAudioDetector {
     required this.classifier,
     this.sustainFrames = 3,
     this.cooldownFrames = 6,
-    void Function(AudioEvent)? onEvent,
-  }) : _onEvent = onEvent;
+    this._onEvent,
+  });
 
   final YamNetStage yamnet;
   final SunoAudioClassifier classifier;
@@ -53,8 +53,9 @@ class ContinuousAudioDetector {
     if (embeddings.isEmpty) return;
 
     // Average embeddings across all frames in this window.
-    final classification =
-        classifier.classifyEmbedding(embeddings.first.embedding);
+    final classification = classifier.classifyEmbedding(
+      embeddings.first.embedding,
+    );
 
     _recentLabels.add(classification.label);
     _recentConfidences.add(classification.confidence);
@@ -74,19 +75,21 @@ class ContinuousAudioDetector {
     final dominantLabel = _recentLabels.first;
     if (!_recentLabels.every((l) => l == dominantLabel)) return;
 
-    final avgConf = _recentConfidences.reduce((a, b) => a + b) /
-        _recentConfidences.length;
+    final avgConf =
+        _recentConfidences.reduce((a, b) => a + b) / _recentConfidences.length;
     if (avgConf < classifier.confidenceThreshold) return;
 
-    _cooldownRemaining = cooldownFrames;
+    _cooldownRemaining = dominantLabel == 'ambient_safe' ? 0 : cooldownFrames;
     _recentLabels.clear();
     _recentConfidences.clear();
 
-    _onEvent?.call(AudioEvent(
-      label: dominantLabel,
-      confidence: avgConf,
-      detectedAt: waveform.capturedAt,
-    ));
+    _onEvent?.call(
+      AudioEvent(
+        label: dominantLabel,
+        confidence: avgConf,
+        detectedAt: waveform.capturedAt,
+      ),
+    );
   }
 
   void reset() {

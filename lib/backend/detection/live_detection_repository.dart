@@ -1,176 +1,168 @@
 import 'dart:async';
 
+import 'package:sensors_plus/sensors_plus.dart';
+
 import '../../models/detection_result.dart';
 import '../audio/microphone_capture.dart';
-import '../detection/suno_audio_classifier.dart';
 import '../location/location_service.dart';
 import '../ml/continuous_audio_detector.dart';
 import '../ml/yamnet_stage.dart';
 import '../motion/impact_stillness_detector.dart';
 import '../risk/risk_engine.dart';
 import 'detection_repository.dart';
+import 'suno_audio_classifier.dart';
 
-/// Real on-device detection repository.
-///
-/// Pipeline: Microphone → AudioPreprocessor → YAMNet → SUNO Classifier →
-///           ContinuousAudioDetector + ImpactStillnessDetector →
-///           RiskEngine → DetectionResult.
-///
-/// Call [startMonitoring] to begin, [stopMonitoring] to release resources.
-/// [onDetection] fires whenever a stable, non-zero-risk event is produced.
 class LiveDetectionRepository implements DetectionRepository {
   LiveDetectionRepository({
     required this.yamnet,
     required this.classifier,
     required this.microphone,
     required this.locationService,
+    required this.onError,
+    required this._onDetection,
+    LocationSnapshot? initialLocation,
+    this._motionEvents,
     RiskEngine? riskEngine,
-    required void Function(DetectionResult) onDetection,
   }) : _riskEngine = riskEngine ?? const RiskEngine(),
-       _onDetection = onDetection;
+       _lastLocation = initialLocation;
 
   final YamNetStage yamnet;
   final SunoAudioClassifier classifier;
   final MicrophoneCapture microphone;
   final LocationService locationService;
+  final void Function(Object) onError;
   final RiskEngine _riskEngine;
+  final Stream<UserAccelerometerEvent>? _motionEvents;
   final void Function(DetectionResult) _onDetection;
-
   ContinuousAudioDetector? _audioDetector;
   ImpactStillnessDetector? _motionDetector;
   StreamSubscription<dynamic>? _waveSub;
   Timer? _locationRefresh;
-
-  bool _impactDetected = false;
-  bool _stillnessDetected = false;
+  MotionResult? _motion;
   LocationSnapshot? _lastLocation;
+  Completer<DetectionResult>? _nextDetection;
+  bool _monitoring = false;
 
   Future<void> startMonitoring() async {
-    // Refresh location every 30 seconds without blocking inference.
-    _locationRefresh = Timer.periodic(const Duration(seconds: 30), (_) async {
-      _lastLocation = await locationService.currentLocation();
-    });
-    // Initial location fetch (non-blocking).
-    locationService.currentLocation().then((loc) => _lastLocation = loc);
+    if (_monitoring) return;
+    _monitoring = true;
+    try {
+      _locationRefresh = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => _refreshLocation(),
+      );
+      _motionDetector = ImpactStillnessDetector(
+        events: _motionEvents,
+        onResult: (result) => _motion = result,
+        onError: onError,
+      )..start();
+      _audioDetector = ContinuousAudioDetector(
+        yamnet: yamnet,
+        classifier: classifier,
+        onEvent: _onAudioEvent,
+      );
+      _waveSub = microphone.waveforms.listen((frame) {
+        if (!_monitoring) return;
+        try {
+          _audioDetector?.process(frame);
+        } catch (error) {
+          onError(error);
+        }
+      }, onError: onError);
+      await microphone.start();
+    } catch (_) {
+      await stopMonitoring();
+      rethrow;
+    }
+  }
 
-    _motionDetector = ImpactStillnessDetector(
-      onResult: (r) {
-        _impactDetected = r.impactDetected;
-        _stillnessDetected = r.stillnessDetected;
-      },
-    )..start();
-
-    _audioDetector = ContinuousAudioDetector(
-      yamnet: yamnet,
-      classifier: classifier,
-      onEvent: _onAudioEvent,
+  Future<void> _refreshLocation() async {
+    final position = await locationService.currentLocation(
+      requestPermission: false,
     );
-
-    await microphone.start();
-    _waveSub = microphone.waveforms.listen((frame) {
-      _audioDetector?.process(frame);
-    });
+    if (_monitoring) _lastLocation = position;
   }
 
   Future<void> stopMonitoring() async {
+    _monitoring = false;
     _locationRefresh?.cancel();
     _locationRefresh = null;
-    await _waveSub?.cancel();
+    final waveSub = _waveSub;
+    final motionDetector = _motionDetector;
+    final next = _nextDetection;
     _waveSub = null;
-    await microphone.stop();
-    _motionDetector?.stop();
+    _motionDetector = null;
+    _nextDetection = null;
     _audioDetector?.reset();
-    _impactDetected = false;
-    _stillnessDetected = false;
+    _audioDetector = null;
+    _motion = null;
+    if (next != null && !next.isCompleted) {
+      next.completeError(StateError('Monitoring stopped before detection.'));
+    }
+    try {
+      await waveSub?.cancel();
+    } finally {
+      try {
+        await motionDetector?.stop();
+      } finally {
+        await microphone.stop();
+      }
+    }
   }
 
   void _onAudioEvent(AudioEvent event) {
-    final impact = _impactDetected;
-    final stillness = _stillnessDetected;
-    // Reset motion flags after consuming them.
-    _impactDetected = false;
-    _stillnessDetected = false;
-
+    final motion = _motion;
+    final age = motion == null
+        ? null
+        : event.detectedAt.difference(motion.capturedAt);
+    final fresh =
+        age != null && !age.isNegative && age <= const Duration(seconds: 5);
+    final impact = fresh && motion!.impactDetected;
+    final stillness = fresh && motion!.stillnessDetected;
+    _motion = null;
     final assessment = _riskEngine.evaluateDetection(
       detectedClass: event.label,
       confidence: event.confidence,
       impactDetected: impact,
       stillnessDetected: stillness,
     );
-
     if (assessment.riskScore == 0) return;
-
-    final loc = _lastLocation;
+    final location = _lastLocation;
+    final recentLocation =
+        location != null &&
+        event.detectedAt.difference(location.capturedAt).abs() <=
+            const Duration(minutes: 1);
     final result = DetectionResult(
-      eventType: _eventTypeFor(event.label),
+      eventType: switch (event.label) {
+        'distress_voice' => 'Distress Sound',
+        'alarm_siren' => 'Emergency Alarm',
+        'breaking_crash' => 'Impact / Breaking Sound',
+        _ => 'Ambient Sound',
+      },
       confidence: event.confidence,
       impactDetected: impact,
       stillnessDetected: stillness,
       riskScore: assessment.riskScore,
       riskLevel: assessment.riskLevel,
-      latitude: loc?.latitude,
-      longitude: loc?.longitude,
-      locationText: loc != null
-          ? '${loc.latitude.toStringAsFixed(4)}, '
-            '${loc.longitude.toStringAsFixed(4)}'
-          : null,
+      latitude: recentLocation ? location.latitude : null,
+      longitude: recentLocation ? location.longitude : null,
+      locationText: recentLocation ? location.description : null,
       detectedAt: event.detectedAt,
     );
-
+    final next = _nextDetection;
+    if (next != null && !next.isCompleted) next.complete(result);
+    _nextDetection = null;
     _onDetection(result);
   }
 
   @override
   Future<DetectionResult> detect() {
-    final completer = Completer<DetectionResult>();
-    void handler(DetectionResult r) {
-      if (!completer.isCompleted) completer.complete(r);
+    if (!_monitoring) {
+      throw StateError('Start monitoring before requesting a detection.');
     }
-
-    final detector = ContinuousAudioDetector(
-      yamnet: yamnet,
-      classifier: classifier,
-      onEvent: (e) {
-        final loc = _lastLocation;
-        final a = _riskEngine.evaluateDetection(
-          detectedClass: e.label,
-          confidence: e.confidence,
-          impactDetected: false,
-          stillnessDetected: false,
-        );
-        if (a.riskScore > 0) {
-          handler(DetectionResult(
-            eventType: _eventTypeFor(e.label),
-            confidence: e.confidence,
-            impactDetected: false,
-            stillnessDetected: false,
-            riskScore: a.riskScore,
-            riskLevel: a.riskLevel,
-            latitude: loc?.latitude,
-            longitude: loc?.longitude,
-            locationText: loc != null
-                ? '${loc.latitude.toStringAsFixed(4)}, '
-                  '${loc.longitude.toStringAsFixed(4)}'
-                : null,
-            detectedAt: e.detectedAt,
-          ));
-        }
-      },
-    );
-
-    StreamSubscription<dynamic>? sub;
-    sub = microphone.waveforms.listen((frame) {
-      detector.process(frame);
-      if (completer.isCompleted) sub?.cancel();
+    final next = _nextDetection ??= Completer<DetectionResult>();
+    return next.future.timeout(const Duration(seconds: 30)).whenComplete(() {
+      if (identical(_nextDetection, next)) _nextDetection = null;
     });
-
-    return completer.future;
   }
-
-  static String _eventTypeFor(String label) => switch (label) {
-    'distress_voice' => 'Distress Sound',
-    'alarm_siren' => 'Emergency Alarm',
-    'breaking_crash' => 'Impact / Breaking Sound',
-    _ => 'Ambient Sound',
-  };
 }

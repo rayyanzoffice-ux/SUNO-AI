@@ -7,10 +7,9 @@ cd SUNO-AI
 flutter pub get
 ```
 
-New packages added in the latest build:
+Use Flutter stable with Dart 3.13.1 or newer within Dart 3.x, Java 17, and the Android SDK required by Flutter. Local verification uses Flutter 3.47.5 / Dart 3.13.4; CI follows Flutter stable. Run `flutter doctor -v` before building. Use `flutter pub get --enforce-lockfile` for repeatable dependency resolution.
 
-- `flutter_local_notifications` — shows system notifications for foreground FCM messages on Android.
-- `url_launcher` — opens incident locations in Google Maps.
+`flutter_local_notifications` supplies Android notification channels and foreground notifications; `url_launcher` opens incident coordinates externally. Demo uses neither microphone capture nor model inference.
 
 ---
 
@@ -51,7 +50,9 @@ If the file is around 411 bytes or `file` says XML/text, the download failed and
 <uses-permission android:name="android.permission.WAKE_LOCK"/>
 ```
 
-On Android 10+ the app requests location in two stages: foreground location first, then `ACCESS_BACKGROUND_LOCATION` after the user has already granted foreground access. Do not deny the second prompt if you want location attached to alerts when the app is in the background.
+Demo requests foreground location, never microphone permission. Live requests microphone permission while the app is visible before starting capture. Location refreshes during Live do not repeatedly request permission. Android also requires `FOREGROUND_SERVICE_LOCATION`; the service declares `microphone|location|shortService`. Android 14+ uses a bounded short service for Demo countdown/dispatch without microphone access.
+
+Enable GPS and notification permission on both test phones. Denied, disabled, or timed-out location must show unavailable instead of invented coordinates; alerts can still be attempted. Notification sound, vibration, full-screen display and background behavior depend on Android settings and device restrictions. The retained engine supports ordinary screen navigation/task removal while its service runs, but cannot guarantee survival after force-stop, process death, reboot or OEM termination.
 
 ---
 
@@ -64,17 +65,9 @@ On Android 10+ the app requests location in two stages: foreground location firs
 4. Download `google-services.json`
 5. Place it at `android/app/google-services.json`
 
-### 4b. Apply the google-services Gradle plugin
+### 4b. Verify the google-services Gradle plugin
 
-In `android/build.gradle.kts`, add to the plugins block:
-```kotlin
-id("com.google.gms.google-services") version "4.4.2" apply false
-```
-
-In `android/app/build.gradle.kts`, add at the very end:
-```kotlin
-apply(plugin = "com.google.gms.google-services")
-```
+The plugin is already declared in `android/settings.gradle.kts` and applied in the `plugins` block of `android/app/build.gradle.kts`. Do not add duplicate declarations; supply `android/app/google-services.json` for your Firebase project.
 
 ### 4c. Enable FCM
 Firebase console → Your project → Cloud Messaging → Enable
@@ -86,8 +79,7 @@ Firebase console → Your project → Cloud Messaging → Enable
 No API key needed. The map tiles are served by OpenStreetMap's free tile
 server. Requires the `INTERNET` permission already added to AndroidManifest.
 
-Tapping the map preview card or the **OPEN** button launches the location in
-Google Maps via `url_launcher`.
+The map supports pan and zoom; the explicit **OPEN** button launches the saved coordinates externally via `url_launcher`. Tile errors offer Retry while preserving the coordinates. Location is captured at alert time, not continuously tracked on the recipient's phone. OpenStreetMap attribution is included.
 
 ---
 
@@ -98,33 +90,27 @@ The app cannot send FCM directly to another phone. It sends alert metadata to
 with server credentials.
 
 ```bash
-npm install -g supabase
-supabase login
-supabase init
-supabase functions deploy send-alert
+npx supabase login
+npx supabase init
+npx supabase functions deploy send-alert --no-verify-jwt
 ```
+
+This prototype authenticates requests with `X-SUNO-Relay-Key`, not a Supabase user JWT. The deployment flag disables the gateway's JWT requirement; the function still rejects requests without the matching relay key. Configure that secret before testing.
 
 Set these Supabase secrets from your Firebase service account JSON:
 
 ```bash
-supabase secrets set FIREBASE_PROJECT_ID="suno-ai-c5463"
-supabase secrets set FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@suno-ai-c5463.iam.gserviceaccount.com"
-supabase secrets set FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-supabase secrets set SUNO_RELAY_AUTH_KEY="use-a-random-demo-only-value"
+npx supabase secrets set FIREBASE_PROJECT_ID="suno-ai-c5463"
+npx supabase secrets set FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@suno-ai-c5463.iam.gserviceaccount.com"
+npx supabase secrets set FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+npx supabase secrets set SUNO_RELAY_AUTH_KEY="use-a-random-demo-only-value"
 ```
 
-The production Supabase function URL is already baked into
-`lib/core/config/app_config.dart`, so a plain `flutter run` or
-`flutter build apk --release` will use it automatically. You only need to
-override it at compile time if you are deploying against a different Supabase
-project.
+The default relay URL is in `lib/core/config/app_config.dart`. Override `SUNO_ALERT_RELAY_URL` when using a different project. The reviewed relay source must be deployed separately; local edits do not update the hosted endpoint.
 
-The relay also accepts the `SUNO_RELAY_AUTH_KEY` if set. Provide it to
-the app with `--dart-define=SUNO_RELAY_AUTH_KEY="..."`; never commit the value.
-An APK-embedded key can be extracted, so this is temporary hackathon abuse
-resistance, not production-grade user authentication.
+`SUNO_RELAY_AUTH_KEY` is REQUIRED on the relay and in the app build. Missing server configuration fails closed; missing client configuration produces a visible failure. Supply the matching key using `--dart-define=SUNO_RELAY_AUTH_KEY="..."` and never commit it. An APK-embedded key can be extracted, so this is prototype abuse resistance, not production-grade user authentication. Keep Firebase private credentials server-side.
 
-### Building with overrides (only if using a different Supabase project)
+### Building with relay configuration
 
 ```bash
 flutter run \
@@ -142,8 +128,8 @@ flutter build apk --release \
 
 > **Important:** If you fork this project and change the Supabase project,
 > update `AppConfig.alertRelayUrl` or always build with `--dart-define`.
-> Building without either will fall back to the original production URL and
-> push alerts will silently fail for your Firebase project.
+> Building without either will fall back to the original project URL. Alerts
+> may fail; check the saved incident's delivery status and relay configuration.
 
 Trusted contacts only receive push alerts if their saved contact record includes
 that phone's FCM token. The contact setup screen has an optional FCM token
@@ -151,16 +137,15 @@ field for hackathon testing.
 
 ### Two-phone test flow
 
-1. Install/run SUNO on the contact phone.
-2. Read the console line: `[SUNO FCM] This device token: ...`.
-3. Copy that token into the sender phone's Trusted contacts → FCM token field.
-4. On the sender phone, tap the contact's **⋮ → Test reachability**. A silent
-   FCM ping is sent; if delivery succeeds, the contact status changes to
-   **Verified reachable**.
-5. Trigger a critical alert; the sender posts event/risk/location metadata to
-   Supabase, and Supabase sends FCM to the contact phone.
-6. On the contact phone, tap a response button; the response is relayed back
-   to the sender and shown on the sender's Emergency Alert screen.
+1. Install SUNO on two consenting Android test phones and allow notifications.
+2. On the contact phone, open **Trusted Contacts**, refresh the device token if needed and copy it using the screen's copy control. Tokens are not logged.
+3. Save that token in the sender phone's contact record. The sender also needs its own registered token for responses.
+4. **Test FCM acceptance** sends a silent test. **FCM test accepted** is not proof of device receipt/display; verify a visible alert separately.
+5. In **Demo Mode**, check real GPS, select **CRITICAL**, and simulate distress. Confirm the same coordinates on the saved sender incident and received alert; pan/zoom and open the map externally.
+6. Respond on the contact phone and verify that only the matching incident changes on the sender. Reopen both apps and check history.
+7. Repeat medium safe, medium timeout without opening the safety notification, immediate escalation, Silent SOS, no contacts, expired token, offline tiles/relay, denied permissions and repeated taps. Test notifications foreground/background/cold-start and Live screen-off/task removal/reopening/explicit stop on the actual evaluation devices.
+
+Passing automated tests alone does not establish demo readiness. Relay deployment and the two-phone acceptance checks are separate release gates.
 
 No raw audio is sent — only incident metadata and location coordinates.
 
@@ -181,14 +166,11 @@ sender. The recipient app sends:
 }
 ```
 
-The sender's phone receives a data-only FCM, and the app updates the Emergency
-Alert screen with the contact's response.
+Alerts and responses use notification-plus-data FCM messages. The response updates its explicit incident ID and can open that incident when tapped. FCM acceptance does not prove the sender saw the response.
 
-### Contact reachability testing
+### Contact token testing
 
-The Edge Function accepts `{ "test": true, "contactTokens": ["..."] }` to
-send a silent data-only ping. This is used from **Trusted contacts → Test
-reachability** to verify a contact's FCM token before a real emergency.
+The Edge Function accepts `{ "payload": {"type": "test"}, "test": true, "contactTokens": ["<valid test token>"] }` for a silent data-only test. **Trusted Contacts → Test FCM acceptance** records relay acceptance, not verified reachability. Requests require the matching relay auth key; the client batches recipients within the relay's ten-token and 16 KiB request limits.
 
 ---
 
@@ -199,9 +181,13 @@ cloning the repo and placing `google-services.json`:
 
 ```bash
 cd SUNO-AI
-flutter pub get
-flutter build apk --release
+flutter pub get --enforce-lockfile
+flutter analyze
+flutter test
+flutter build apk --release --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
+
+Use Java 17 and the TFLite Java-target alignment step already present in `.github/workflows/build-apk.yml` if your environment reports a Java/Kotlin target mismatch. Do not disable validation or change model files to work around build errors.
 
 The release APK will be at:
 
@@ -212,18 +198,10 @@ build/app/outputs/flutter-apk/app-release.apk
 To install and run on a connected device or emulator instead of building an APK:
 
 ```bash
-flutter run
+flutter run --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
 
-The production Supabase Edge Function URL is already baked into
-`lib/core/config/app_config.dart`, so no `--dart-define` is required for the
-official relay. Only use the override if you are deploying against a different
-Supabase project:
-
-```bash
-flutter build apk --release \
-  --dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"
-```
+The default URL is already configured, but the matching relay key is still required. For a different Supabase project, also pass `--dart-define=SUNO_ALERT_RELAY_URL="https://YOUR_PROJECT_REF.functions.supabase.co/send-alert"`.
 
 ---
 
@@ -234,7 +212,7 @@ cd SUNO-AI
 git add -A
 git status          # verify what's staged
 git commit -m "feat: describe your change"
-git push origin feature/day2-integration
+git push origin feat/integration
 ```
 
 ---

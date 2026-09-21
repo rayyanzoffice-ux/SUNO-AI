@@ -1,7 +1,17 @@
-import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart' as handler;
+import 'dart:async';
 
-/// Location snapshot attached to a detection event.
+import 'package:geolocator/geolocator.dart';
+
+enum LocationStatus {
+  idle,
+  locating,
+  ready,
+  denied,
+  disabled,
+  timedOut,
+  unavailable,
+}
+
 class LocationSnapshot {
   const LocationSnapshot({
     required this.latitude,
@@ -14,51 +24,65 @@ class LocationSnapshot {
   final double longitude;
   final String? locationText;
   final DateTime capturedAt;
+
+  String get description =>
+      locationText ??
+      '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
 }
 
-/// Provides a single best-effort location fix. Returns null when permission
-/// is denied or the device cannot produce a fix — never returns fixed demo
-/// coordinates in live mode.
 class LocationService {
-  Future<LocationSnapshot?> currentLocation() async {
-    bool serviceEnabled;
+  LocationStatus status = LocationStatus.idle;
+
+  Future<bool> hasPermission() async {
     try {
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final permission = await Geolocator.checkPermission();
+      return permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse;
     } catch (_) {
-      return null;
+      return false;
     }
-    if (!serviceEnabled) return null;
+  }
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      return null;
-    }
-
-    // Android requires background location to be requested as a separate,
-    // second prompt after foreground location has already been granted.
-    if (permission == LocationPermission.whileInUse) {
-      final backgroundStatus =
-          await handler.Permission.locationAlways.request();
-      if (backgroundStatus.isGranted) {
-        permission = await Geolocator.checkPermission();
-      }
-    }
-
+  Future<LocationSnapshot?> currentLocation({
+    bool requestPermission = true,
+  }) async {
+    status = LocationStatus.locating;
     try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        status = LocationStatus.disabled;
+        return null;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied && requestPermission) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        status = LocationStatus.denied;
+        return null;
+      }
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
+      if (!position.latitude.isFinite ||
+          !position.longitude.isFinite ||
+          position.latitude.abs() > 90 ||
+          position.longitude.abs() > 180) {
+        status = LocationStatus.unavailable;
+        return null;
+      }
+      status = LocationStatus.ready;
       return LocationSnapshot(
         latitude: position.latitude,
         longitude: position.longitude,
-        capturedAt: DateTime.now(),
+        capturedAt: position.timestamp,
       );
+    } on TimeoutException {
+      status = LocationStatus.timedOut;
+      return null;
     } catch (_) {
+      status = LocationStatus.unavailable;
       return null;
     }
   }

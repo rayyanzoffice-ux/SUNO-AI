@@ -4,10 +4,7 @@ import '../audio/audio_waveform.dart';
 
 /// A single 1024-dimensional YAMNet embedding for one audio frame.
 class YamNetEmbedding {
-  const YamNetEmbedding({
-    required this.embedding,
-    required this.frameIndex,
-  });
+  const YamNetEmbedding({required this.embedding, required this.frameIndex});
 
   final List<double> embedding;
   final int frameIndex;
@@ -24,8 +21,7 @@ class YamNetStage {
   static const _expectedInputLength = 15360;
   static const _embeddingSize = 1024;
 
-  YamNetStage._({required Interpreter interpreter})
-    : _interpreter = interpreter;
+  YamNetStage._({required this._interpreter});
 
   final Interpreter _interpreter;
   bool _closed = false;
@@ -90,10 +86,9 @@ class YamNetStage {
       if (row is! List || row.length != _embeddingSize) {
         throw StateError('Unexpected embedding row shape at frame $fi.');
       }
-      frames.add(YamNetEmbedding(
-        embedding: List<double>.from(row),
-        frameIndex: fi,
-      ));
+      frames.add(
+        YamNetEmbedding(embedding: List<double>.from(row), frameIndex: fi),
+      );
     }
     return frames;
   }
@@ -105,13 +100,17 @@ class YamNetStage {
   }
 
   static Object _buildBuffer(List<int> shape) {
-    final safeShape = shape.map((dimension) => dimension < 0 ? 1 : dimension).toList();
+    final safeShape = shape
+        .map((dimension) => dimension < 0 ? 1 : dimension)
+        .toList();
     if (safeShape.length == 1) {
       return List<double>.filled(safeShape[0], 0.0);
     }
     if (safeShape.length == 2) {
       return List<List<double>>.generate(
-        safeShape[0], (_) => List<double>.filled(safeShape[1], 0.0));
+        safeShape[0],
+        (_) => List<double>.filled(safeShape[1], 0.0),
+      );
     }
     return List<double>.filled(safeShape.reduce((a, b) => a * b), 0.0);
   }

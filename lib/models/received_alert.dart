@@ -9,6 +9,7 @@ class ReceivedAlert {
     this.senderToken,
     this.latitude,
     this.longitude,
+    this.isSimulated = false,
   });
 
   final String? incidentId;
@@ -20,6 +21,7 @@ class ReceivedAlert {
   final String? senderToken;
   final String? latitude;
   final String? longitude;
+  final bool isSimulated;
 
   factory ReceivedAlert.fromData(Map<String, dynamic> data) {
     String? value(String key) {
@@ -37,6 +39,7 @@ class ReceivedAlert {
       senderToken: value('senderToken'),
       latitude: value('latitude'),
       longitude: value('longitude'),
+      isSimulated: value('isSimulated') == 'true',
     );
   }
 }

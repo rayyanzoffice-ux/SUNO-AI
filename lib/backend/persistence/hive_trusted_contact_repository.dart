@@ -40,9 +40,7 @@ class HiveTrustedContactRepository implements TrustedContactRepository {
   @override
   Future<List<TrustedContact>> getAll() async {
     return contactBox.values
-        .map((raw) => TrustedContact.fromJson(
-              Map<String, Object?>.from(raw as Map),
-            ))
+        .map((raw) => TrustedContact.fromJson(Map<String, Object?>.from(raw)))
         .toList();
   }
 }

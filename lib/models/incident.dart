@@ -1,3 +1,4 @@
+import 'alert_dispatch_result.dart';
 import 'detection_result.dart';
 
 enum IncidentStatus {
@@ -23,7 +24,7 @@ extension IncidentStatusContract on IncidentStatus {
 }
 
 class Incident {
-  Incident({
+  const Incident({
     required this.id,
     required this.detectionResult,
     required this.status,
@@ -31,17 +32,40 @@ class Incident {
     required this.updatedAt,
     this.contactResponseText,
     this.origin = 'self',
+    this.safetyCheckDeadline,
+    this.dispatchResult,
+    this.senderToken,
   });
 
   final String id;
   final DetectionResult detectionResult;
-  IncidentStatus status;
+  final IncidentStatus status;
   final DateTime createdAt;
-  DateTime updatedAt;
-  String? contactResponseText;
-
-  /// 'self' for locally-triggered incidents, or a display name for received alerts.
-  String origin;
+  final DateTime updatedAt;
+  final String? contactResponseText;
+  final String origin;
+  final DateTime? safetyCheckDeadline;
+  final AlertDispatchResult? dispatchResult;
+  final String? senderToken;
 
   bool get isReceived => origin != 'self';
+
+  Incident copyWith({
+    DetectionResult? detectionResult,
+    IncidentStatus? status,
+    DateTime? updatedAt,
+    String? contactResponseText,
+    AlertDispatchResult? dispatchResult,
+  }) => Incident(
+    id: id,
+    detectionResult: detectionResult ?? this.detectionResult,
+    status: status ?? this.status,
+    createdAt: createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    contactResponseText: contactResponseText ?? this.contactResponseText,
+    origin: origin,
+    safetyCheckDeadline: safetyCheckDeadline,
+    dispatchResult: dispatchResult ?? this.dispatchResult,
+    senderToken: senderToken,
+  );
 }

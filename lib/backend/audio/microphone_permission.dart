@@ -8,11 +8,15 @@ enum MicPermissionStatus { granted, denied, permanentlyDenied }
 class MicrophonePermission {
   const MicrophonePermission._();
 
-  static Future<MicPermissionStatus> ensureGranted() async {
+  static Future<MicPermissionStatus> ensureGranted({
+    bool requestPermission = true,
+  }) async {
     final status = await Permission.microphone.status;
     if (status.isGranted) return MicPermissionStatus.granted;
 
-    final result = await Permission.microphone.request();
+    final result = requestPermission
+        ? await Permission.microphone.request()
+        : status;
     if (result.isGranted) return MicPermissionStatus.granted;
     if (result.isPermanentlyDenied) {
       return MicPermissionStatus.permanentlyDenied;

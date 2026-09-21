@@ -2,14 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../backend/safety/safety_check_engine.dart';
+import '../../models/incident.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
 
 class SafetyCheckScreen extends StatefulWidget {
-  const SafetyCheckScreen({super.key});
+  const SafetyCheckScreen({super.key, this.incidentId});
+  final String? incidentId;
   @override
   State<SafetyCheckScreen> createState() => _SafetyCheckScreenState();
 }
@@ -20,62 +21,71 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
   Timer? _timer;
   bool _completed = false;
 
+  late final String? _incidentId;
+
   @override
   void initState() {
     super.initState();
-    _startIfIncidentExists();
+    _incidentId =
+        widget.incidentId ?? SunoRuntimeService.instance.currentIncident?.id;
+    SunoRuntimeService.instance.addListener(_refresh);
+    _timer = Timer.periodic(
+      const Duration(milliseconds: 200),
+      (_) => _refresh(),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
 
-  Future<void> _startIfIncidentExists() async {
-    if (SunoRuntimeService.instance.currentIncident == null) {
-      if (mounted) {
-        Navigator.of(context)
-            .pushNamedAndRemoveUntil(AppRoutes.home, (_) => false);
-      }
+  void _refresh() {
+    if (!mounted || _completed) return;
+    final incident = _incidentId == null
+        ? null
+        : SunoRuntimeService.instance.incidentById(_incidentId);
+    if (incident == null || incident.status != IncidentStatus.safetyCheck) {
+      _completed = true;
+      _timer?.cancel();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(
+          context,
+          incident == null
+              ? AppRoutes.home
+              : incident.status == IncidentStatus.cancelled
+              ? AppRoutes.monitoring
+              : AppRoutes.emergencyAlert,
+          arguments: incident?.id,
+        );
+      });
       return;
     }
-    _startTimer();
-    await _runBackendCheck();
-  }
-
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || _completed) return;
-      setState(() => _seconds = _seconds > 0 ? _seconds - 1 : 0);
-    });
-  }
-
-  Future<void> _runBackendCheck() async {
-    final result = await SunoRuntimeService.instance.startSafetyCheck();
-    if (_completed || !mounted) return;
-    _completed = true;
-    _timer?.cancel();
-    await SunoRuntimeService.instance.applySafetyCheckResult(result);
-    if (!mounted) return;
-    Navigator.pushReplacementNamed(
-      context,
-      result.outcome == SafetyCheckOutcome.userConfirmedSafe
-          ? AppRoutes.monitoring
-          : AppRoutes.emergencyAlert,
+    final deadline =
+        incident.safetyCheckDeadline ??
+        incident.createdAt.add(const Duration(seconds: 10));
+    setState(
+      () =>
+          _seconds = (deadline.difference(DateTime.now()).inMilliseconds / 1000)
+              .ceil()
+              .clamp(0, _totalSeconds)
+              .toInt(),
     );
   }
 
   void _emergency() {
-    if (_completed) return;
-    _timer?.cancel();
-    SunoRuntimeService.instance.escalateSafetyCheck();
+    if (!_completed && _incidentId != null) {
+      SunoRuntimeService.instance.escalateSafetyCheck(_incidentId);
+    }
   }
 
   void _safe() {
-    if (_completed) return;
-    _timer?.cancel();
-    SunoRuntimeService.instance.confirmSafe();
+    if (!_completed && _incidentId != null) {
+      SunoRuntimeService.instance.confirmSafe(_incidentId);
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    if (!_completed) SunoRuntimeService.instance.cancelSafetyCheck();
+    SunoRuntimeService.instance.removeListener(_refresh);
     super.dispose();
   }
 
@@ -98,8 +108,11 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                       color: AppColors.warning.withValues(alpha: .1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.warning_amber_rounded,
-                        size: 54, color: AppColors.warning),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      size: 54,
+                      color: AppColors.warning,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -116,9 +129,10 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                   const Text(
                     'Are you safe?',
                     style: TextStyle(
-                        color: AppColors.text,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900),
+                      color: AppColors.text,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 34),
                   SizedBox(
@@ -138,28 +152,40 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                         Text(
                           '$_seconds',
                           style: const TextStyle(
-                              fontSize: 44,
-                              color: AppColors.text,
-                              fontWeight: FontWeight.w900),
+                            fontSize: 44,
+                            color: AppColors.text,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
-                    'Alert activates automatically when time runs out',
+                  Text(
+                    SunoRuntimeService.instance.safetyCheckNeedsRetry
+                        ? SunoRuntimeService.instance.operationError!
+                        : 'Alert activates automatically when time runs out',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: TextStyle(
+                      color: SunoRuntimeService.instance.safetyCheckNeedsRetry
+                          ? AppColors.emergency
+                          : AppColors.textMuted,
+                      fontSize: 13,
+                    ),
                   ),
                   const Spacer(),
                   PrimaryActionButton(
-                    label: 'I AM SAFE',
+                    label: SunoRuntimeService.instance.safetyCheckNeedsRetry
+                        ? 'RETRY: I AM SAFE'
+                        : 'I AM SAFE',
                     color: AppColors.safe,
                     onPressed: _safe,
                   ),
                   const SizedBox(height: 12),
                   PrimaryActionButton(
-                    label: "CAN'T RESPOND",
+                    label: SunoRuntimeService.instance.safetyCheckNeedsRetry
+                        ? 'RETRY EMERGENCY ALERT'
+                        : "CAN'T RESPOND",
                     color: AppColors.emergency,
                     onPressed: _emergency,
                   ),

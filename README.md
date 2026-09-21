@@ -16,11 +16,11 @@ SUNO is an Android-first Flutter prototype that uses on-device audio AI to detec
 - **Silent SOS** manual trigger for situations where the user cannot make a sound.
 - **Incident history** persisted locally with Hive, with swipe-to-dismiss and clear-all support.
 - **Map preview** of incident location using OpenStreetMap, with one-tap open in Google Maps.
-- **Contact reachability testing** — send a silent FCM test message and mark contacts as verified when delivery succeeds.
+- **Contact token testing** — send a silent test and record FCM acceptance. Acceptance does not prove the other phone displayed or received a notification.
 
 ## On-device ML pipeline
 
-1. **Microphone capture** — 16 kHz mono PCM.
+1. **Microphone capture (Live only)** — 44.1 kHz mono PCM, continuously resampled to 16 kHz for inference.
 2. **YAMNet** (pretrained TF Lite, ~16 MB) converts audio into 1,024-dimensional embeddings.
 3. **SUNO classifier head** (custom TF Lite, ~1.2 MB) classifies each embedding into one of four classes:
    - `ambient_safe`
@@ -57,7 +57,7 @@ lib/
 └── widgets/               # Reusable UI components
 ```
 
-`SunoRuntimeService` is the central coordinator. It is framework-free and wired to either in-memory or Hive-backed repositories, making the UI testable without a real database.
+`SunoRuntimeService` is a Flutter `ChangeNotifier` coordinating persisted incidents, per-incident responses, dispatch results, and safety deadlines independently of screens. Repositories can be injected for tests. `MonitoringService` owns the Live audio pipeline; Android uses a single retained Flutter engine rather than a second Hive-writing runtime. Background FCM callbacks write an atomic inbox that the main runtime drains.
 
 ## Tech stack
 
@@ -80,23 +80,22 @@ Quick start after setup:
 ```bash
 git clone https://github.com/rayyanzoffice-ux/SUNO-AI.git
 cd SUNO-AI
-git checkout feature/day2-integration
-flutter pub get
-flutter run
+git checkout feat/integration
+flutter pub get --enforce-lockfile
+flutter run --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
 
 ## Demo flow
 
-1. Open SUNO.
-2. Tap **Start Monitoring**.
-3. SUNO listens in the background with a foreground service notification.
-4. On a detected distress/impact event:
-   - **Medium risk** → Safety Check countdown (tap *I AM SAFE* to cancel).
-   - **Critical risk** → Emergency Alert is triggered immediately.
-5. Emergency Alert shows event type, risk score, and location.
-6. Trusted contacts with a saved FCM token receive a push notification and can respond back to the sender.
-7. The sender sees the contact's response on the Emergency Alert screen.
-8. Incident is saved to local history.
+1. Configure the relay and consenting test contacts, then open **Start Monitoring → Demo Mode**.
+2. Allow GPS and check the location preview. Demo never listens or loads inference models.
+3. Select **LOW**, **MEDIUM**, or **CRITICAL** and press **Demo: Simulate Distress**. Only the danger input is simulated; GPS, storage, countdown and contact sends are real.
+4. Low creates no incident. Medium starts a persisted ten-second safety deadline immediately; **I AM SAFE** cancels and **CAN'T RESPOND** escalates. Timeout does not depend on keeping the safety screen open. Critical dispatches immediately.
+5. The alert stores one location snapshot, used in the contact payload and maps. Pan/zoom the map or use **OPEN** externally; this is location at alert time, not continuous remote tracking.
+6. Check the saved FCM acceptance/partial-failure result. On the other phone, visibly verify the notification and send a response; the sender updates the referenced incident, not an unrelated active alert.
+7. Reopen history to verify persistence. Separately test **Silent SOS** and **Live Mode**, which alone activates microphone capture and on-device inference.
+
+Source checks do not establish device readiness. Before a regional demo, deploy the reviewed relay separately and verify two consenting Android phones: GPS/map opening, medium safe/timeout, critical, SOS, response routing, offline/denied-permission recovery and foreground/background/cold-start notifications. Live task removal, screen-off operation, reopening and explicit stop require checks on the actual devices. Force-stop, process death, reboot and arbitrary OEM restrictions are not covered by a background-survival guarantee.
 
 ## Privacy
 

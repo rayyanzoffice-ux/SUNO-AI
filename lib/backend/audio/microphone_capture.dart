@@ -60,15 +60,16 @@ class MicrophoneCapture {
   Future<void> start() async {
     if (_active) return;
 
-    final permission = await MicrophonePermission.ensureGranted();
+    final permission = await MicrophonePermission.ensureGranted(
+      requestPermission: false,
+    );
     if (permission != MicPermissionStatus.granted) {
       throw MicrophonePermissionException(
         permission == MicPermissionStatus.permanentlyDenied
             ? 'Microphone permission is permanently denied. Enable it '
-              'from system Settings to use Live Mode.'
+                  'from system Settings to use Live Mode.'
             : 'Microphone permission is required for Live Mode.',
-        permanentlyDenied:
-            permission == MicPermissionStatus.permanentlyDenied,
+        permanentlyDenied: permission == MicPermissionStatus.permanentlyDenied,
       );
     }
 
@@ -97,6 +98,17 @@ class MicrophoneCapture {
           final ctrl = _controller;
           if (ctrl != null && !ctrl.isClosed) ctrl.addError(err);
         },
+        onDone: () {
+          final ctrl = _controller;
+          if (_active && ctrl != null && !ctrl.isClosed) {
+            ctrl.addError(
+              const MicrophoneCaptureException(
+                'Microphone stream ended unexpectedly.',
+              ),
+            );
+          }
+          _active = false;
+        },
       );
     } catch (e) {
       _active = false;
@@ -105,18 +117,32 @@ class MicrophoneCapture {
   }
 
   Future<void> stop() async {
+    final subscription = _rawSub;
+    final wasActive = _active;
     _active = false;
-    await _rawSub?.cancel();
     _rawSub = null;
-    await _recorder.stop();
-    _preprocessor.reset();
+    try {
+      await subscription?.cancel();
+    } finally {
+      try {
+        if (wasActive || subscription != null) await _recorder.stop();
+      } finally {
+        _preprocessor.reset();
+      }
+    }
   }
 
   Future<void> dispose() async {
-    await stop();
-    await _controller?.close();
-    _controller = null;
-    _recorder.dispose();
+    try {
+      await stop();
+    } finally {
+      try {
+        await _recorder.dispose();
+      } finally {
+        final controller = _controller;
+        _controller = null;
+        await controller?.close();
+      }
+    }
   }
 }
-

@@ -16,6 +16,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   int _filter = 0;
   List<Incident> _incidents = const [];
   bool _loading = true;
+  bool _clearing = false;
+  String? _error;
 
   SunoRuntimeService get _runtime =>
       widget.runtimeService ?? SunoRuntimeService.instance;
@@ -27,60 +29,93 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _load() async {
-    final data = await _runtime.getIncidentHistory();
-    if (!mounted) return;
-    setState(() {
-      _incidents = data;
-      _loading = false;
-    });
+    try {
+      final data = await _runtime.getIncidentHistory();
+      if (mounted) {
+        setState(() {
+          _incidents = data;
+          _error = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not load history. Please retry.');
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
-  Future<void> _remove(String id) async {
-    await _runtime.removeIncident(id);
-    if (!mounted) return;
-    setState(() => _incidents.removeWhere((i) => i.id == id));
+  Future<bool> _remove(String id) async {
+    try {
+      await _runtime.removeIncident(id);
+      return true;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not delete the incident. Please retry.'),
+          ),
+        );
+      }
+      return false;
+    }
   }
 
   Future<void> _clearAll() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear all history?'),
-        content: const Text(
-            'This permanently deletes every incident from this device.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCEL'),
+    if (_clearing) return;
+    setState(() => _clearing = true);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Clear all history?'),
+          content: const Text(
+            'This permanently deletes every incident from this device.',
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('CLEAR ALL'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('CLEAR ALL'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      await _runtime.clearIncidentHistory();
+      if (!mounted) return;
+      setState(() => _incidents = []);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not clear history. Finish any active safety action, then retry.',
+            ),
           ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    await _runtime.clearIncidentHistory();
-    if (!mounted) return;
-    setState(() => _incidents = []);
+        );
+      }
+      await _load();
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final filtered = switch (_filter) {
-      1 => _incidents
-          .where((i) => i.status != IncidentStatus.cancelled)
-          .toList(),
-      2 => _incidents
-          .where((i) => i.status == IncidentStatus.cancelled)
-          .toList(),
+      1 =>
+        _incidents.where((i) => i.status != IncidentStatus.cancelled).toList(),
+      2 =>
+        _incidents.where((i) => i.status == IncidentStatus.cancelled).toList(),
       _ => _incidents,
     };
 
@@ -92,7 +127,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
               tooltip: 'Clear all history',
-              onPressed: _clearAll,
+              onPressed: _clearing ? null : _clearAll,
             ),
         ],
       ),
@@ -102,12 +137,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Your recent safety activity',
-                  style: TextStyle(color: AppColors.textMuted)),
+              const Text(
+                'Your recent safety activity',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
+              if (_error != null) ...[
+                Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.emergency),
+                ),
+                TextButton(onPressed: _load, child: const Text('RETRY')),
+              ],
               const SizedBox(height: 18),
               _FilterBar(
-                  selected: _filter,
-                  onSelected: (i) => setState(() => _filter = i)),
+                selected: _filter,
+                onSelected: (i) => setState(() => _filter = i),
+              ),
               const SizedBox(height: 22),
               Text(
                 '${filtered.length} INCIDENTS',
@@ -122,17 +167,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
-                        child: Text(_emptyState(),
-                            style: const TextStyle(
-                                color: AppColors.textMuted,
-                                fontWeight: FontWeight.w600)))
+                        child: Text(
+                          _emptyState(),
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
                     : ListView.separated(
                         itemCount: filtered.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 11),
+                        separatorBuilder: (_, _) => const SizedBox(height: 11),
                         itemBuilder: (_, i) => Dismissible(
                           key: ValueKey(filtered[i].id),
-                          direction: DismissDirection.endToStart,
+                          direction:
+                              _clearing ||
+                                  _runtime.isDispatching(filtered[i].id) ||
+                                  filtered[i].status ==
+                                      IncidentStatus.safetyCheck
+                              ? DismissDirection.none
+                              : DismissDirection.endToStart,
                           background: Container(
                             alignment: Alignment.centerRight,
                             padding: const EdgeInsets.only(right: 20),
@@ -140,10 +194,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               color: AppColors.emergency,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: const Icon(Icons.delete_outline,
-                                color: Colors.white),
+                            child: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.white,
+                            ),
                           ),
-                          onDismissed: (_) => _remove(filtered[i].id),
+                          confirmDismiss: (_) => _remove(filtered[i].id),
+                          onDismissed: (_) => setState(() {
+                            final id = filtered[i].id;
+                            _incidents = _incidents
+                                .where((incident) => incident.id != id)
+                                .toList();
+                          }),
                           child: _HistoryCard.from(filtered[i]),
                         ),
                       ),
@@ -156,10 +218,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _emptyState() => switch (_filter) {
-        1 => 'No alert incidents',
-        2 => 'No canceled incidents',
-        _ => 'No incidents yet',
-      };
+    1 => 'No alert incidents',
+    2 => 'No canceled incidents',
+    _ => 'No incidents yet',
+  };
 }
 
 class _FilterBar extends StatelessWidget {
@@ -169,44 +231,42 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEDEFF5),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: List.generate(3, (i) {
-            const labels = ['All', 'Alerts', 'Canceled'];
-            return Expanded(
-              child: InkWell(
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFEDEFF5),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      children: List.generate(3, (i) {
+        const labels = ['All', 'Alerts', 'Canceled'];
+        return Expanded(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => onSelected(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: selected == i ? Colors.white : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-                onTap: () => onSelected(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selected == i ? Colors.white : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: selected == i
-                        ? const [BoxShadow(color: Colors.black12, blurRadius: 5)]
-                        : null,
-                  ),
-                  child: Text(
-                    labels[i],
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: selected == i
-                          ? AppColors.text
-                          : AppColors.textMuted,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                boxShadow: selected == i
+                    ? const [BoxShadow(color: Colors.black12, blurRadius: 5)]
+                    : null,
+              ),
+              child: Text(
+                labels[i],
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: selected == i ? AppColors.text : AppColors.textMuted,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            );
-          }),
-        ),
-      );
+            ),
+          ),
+        );
+      }),
+    ),
+  );
 }
 
 class _HistoryCard extends StatelessWidget {
@@ -255,27 +315,27 @@ class _HistoryCard extends StatelessWidget {
   }
 
   static String _statusFor(IncidentStatus s) => switch (s) {
-        IncidentStatus.contactChecking => 'Contact checking',
-        IncidentStatus.resolved => 'Resolved — confirmed safe',
-        IncidentStatus.cancelled => 'User confirmed safe',
-        IncidentStatus.alertTriggered => 'Escalation needed',
-        IncidentStatus.contactNotified => 'Contact notified',
-        IncidentStatus.safetyCheck => 'Safety check shown',
-        IncidentStatus.monitoring => 'Monitoring',
-      };
+    IncidentStatus.contactChecking => 'Contact checking',
+    IncidentStatus.resolved => 'Resolved — confirmed safe',
+    IncidentStatus.cancelled => 'User confirmed safe',
+    IncidentStatus.alertTriggered => 'Escalation needed',
+    IncidentStatus.contactNotified => 'FCM accepted alert',
+    IncidentStatus.safetyCheck => 'Safety check pending',
+    IncidentStatus.monitoring => 'Monitoring',
+  };
 
   static Color _colorFor(IncidentStatus s) => switch (s) {
-        IncidentStatus.cancelled || IncidentStatus.resolved => AppColors.safe,
-        IncidentStatus.safetyCheck => AppColors.warning,
-        IncidentStatus.monitoring => AppColors.indigo,
-        _ => AppColors.emergency,
-      };
+    IncidentStatus.cancelled || IncidentStatus.resolved => AppColors.safe,
+    IncidentStatus.safetyCheck => AppColors.warning,
+    IncidentStatus.monitoring => AppColors.indigo,
+    _ => AppColors.emergency,
+  };
 
   static IconData _iconFor(IncidentStatus s, bool isReceived) {
     if (isReceived) return Icons.download_rounded;
     return switch (s) {
-      IncidentStatus.cancelled || IncidentStatus.resolved =>
-        Icons.check_rounded,
+      IncidentStatus.cancelled ||
+      IncidentStatus.resolved => Icons.check_rounded,
       IncidentStatus.safetyCheck => Icons.shield_outlined,
       IncidentStatus.monitoring => Icons.hearing_outlined,
       _ => Icons.notifications_active_outlined,
@@ -292,76 +352,114 @@ class _HistoryCard extends StatelessWidget {
       return 'Yesterday · $clock';
     }
     const months = [
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[t.month - 1]} ${t.day} · $clock';
   }
 
   @override
   Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    child: Padding(
+      padding: const EdgeInsets.all(15),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(children: [
-                      Expanded(
-                          child: Text(title,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800))),
-                      Text(score,
-                          style: TextStyle(
-                              color: color, fontWeight: FontWeight.w900)),
-                    ]),
-                    if (origin != null) ...[
-                      const SizedBox(height: 2),
-                      Text('from $origin',
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.indigo,
-                              fontWeight: FontWeight.w600)),
-                    ],
-                    const SizedBox(height: 4),
-                    Text(event,
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColors.textMuted)),
-                    const SizedBox(height: 9),
-                    Row(children: [
-                      Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                              color: color, shape: BoxShape.circle)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                          child: Text(status,
-                              style: TextStyle(
-                                  color: color,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700))),
-                      Text(time,
-                          style: const TextStyle(
-                              color: AppColors.textMuted, fontSize: 11)),
-                    ]),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    Text(
+                      score,
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
+                if (origin != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'from $origin',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.indigo,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Text(
+                  event,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      time,
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
