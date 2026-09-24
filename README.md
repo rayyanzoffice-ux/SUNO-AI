@@ -85,6 +85,12 @@ flutter pub get --enforce-lockfile
 flutter run --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
 
+## Hackathon judges: install the APK
+
+Download [SUNO-final-apk.zip from successful build #33](https://github.com/rayyanzoffice-ux/SUNO-AI/actions/runs/36032438405), unzip it, and install `SUNO-final.apk` on an Android phone.
+
+For a quick review, open **Start Monitoring → Demo Mode** and choose **LOW**. Demo does not use the microphone. Live Mode requires microphone permission. Demo medium timeouts and critical alerts can attempt real contact notifications, so only test those with consenting contacts configured. Push notification checks require the project's Firebase and relay setup.
+
 ## Demo flow
 
 1. Configure the relay and consenting test contacts, then open **Start Monitoring → Demo Mode**.
