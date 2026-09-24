@@ -36,6 +36,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
   bool starting = false;
   bool active = false;
   String? error;
+  String? motionWarning;
   final List<double> levels = [];
   bool _ownsService = false;
   bool _nativeInterrupted = false;
@@ -77,6 +78,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
     starting = true;
     _nativeInterrupted = false;
     error = null;
+    motionWarning = null;
     _changed();
     MicrophoneCapture? microphone;
     YamNetStage? yamnet;
@@ -112,6 +114,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
         initialLocation: runtime.location,
         onDetection: _onDetection,
         onError: _onError,
+        onMotionError: _onMotionError,
       );
       await repo.startMonitoring();
       if (generation != _generation) return;
@@ -165,8 +168,13 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _onError(Object _) {
-    error = 'Monitoring stopped because a sensor or audio processor failed. Please restart Live mode.';
+    error = 'Audio monitoring stopped because the audio processor failed. Please restart Live mode.';
     unawaited(stop());
+  }
+
+  void _onMotionError(Object _) {
+    motionWarning = 'Motion sensor unavailable. Audio monitoring is still active.';
+    _changed();
   }
 
   Future<void> _onServiceStopped() async {
@@ -328,6 +336,8 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> selectDemo() async {
     await stop();
     liveMode = false;
+    error = null;
+    motionWarning = null;
     _changed();
   }
 

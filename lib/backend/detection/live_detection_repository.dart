@@ -20,6 +20,7 @@ class LiveDetectionRepository implements DetectionRepository {
     required this.locationService,
     required this.onError,
     required this._onDetection,
+    this.onMotionError,
     LocationSnapshot? initialLocation,
     this._motionEvents,
     RiskEngine? riskEngine,
@@ -31,6 +32,7 @@ class LiveDetectionRepository implements DetectionRepository {
   final MicrophoneCapture microphone;
   final LocationService locationService;
   final void Function(Object) onError;
+  final void Function(Object)? onMotionError;
   final RiskEngine _riskEngine;
   final Stream<UserAccelerometerEvent>? _motionEvents;
   final void Function(DetectionResult) _onDetection;
@@ -51,11 +53,18 @@ class LiveDetectionRepository implements DetectionRepository {
         const Duration(seconds: 30),
         (_) => _refreshLocation(),
       );
-      _motionDetector = ImpactStillnessDetector(
-        events: _motionEvents,
-        onResult: (result) => _motion = result,
-        onError: onError,
-      )..start();
+      try {
+        _motionDetector = ImpactStillnessDetector(
+          events: _motionEvents,
+          onResult: (result) => _motion = result,
+          onError: _onMotionSensorError,
+        )..start();
+      } catch (error) {
+        // Sensor stream setup can fail synchronously on devices without a
+        // usable motion sensor. Keep the audio path available in that case.
+        _motionDetector = null;
+        onMotionError?.call(error);
+      }
       _audioDetector = ContinuousAudioDetector(
         yamnet: yamnet,
         classifier: classifier,
@@ -74,6 +83,16 @@ class LiveDetectionRepository implements DetectionRepository {
       await stopMonitoring();
       rethrow;
     }
+  }
+
+  void _onMotionSensorError(Object error) {
+    // Motion is an optional signal. Disable it after a sensor failure while
+    // leaving the audio pipeline running.
+    final detector = _motionDetector;
+    _motionDetector = null;
+    _motion = null;
+    unawaited(detector?.stop());
+    onMotionError?.call(error);
   }
 
   Future<void> _refreshLocation() async {

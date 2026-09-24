@@ -197,6 +197,52 @@ void main() {
       });
     });
   }
+
+  testWidgets('motion sensor failure leaves audio detection running', (
+    tester,
+  ) async {
+    final motion = StreamController<UserAccelerometerEvent>();
+    final microphone = _Microphone();
+    final detections = <DetectionResult>[];
+    final motionErrors = <Object>[];
+    final audioErrors = <Object>[];
+    final repository = LiveDetectionRepository(
+      yamnet: _Yamnet(),
+      classifier: _Classifier()..label = 'distress_voice',
+      microphone: microphone,
+      locationService: LocationService(),
+      motionEvents: motion.stream,
+      onMotionError: motionErrors.add,
+      onError: audioErrors.add,
+      onDetection: detections.add,
+    );
+    await repository.startMonitoring();
+
+    motion.addError(StateError('sensor unavailable'));
+    await tester.pump();
+    for (var i = 0; i < 3; i++) {
+      microphone.controller.add(
+        AudioWaveform(
+          samples: const [],
+          sampleRate: 16000,
+          capturedAt: DateTime.now(),
+        ),
+      );
+    }
+    await tester.pump();
+
+    expect(motionErrors, hasLength(1));
+    expect(audioErrors, isEmpty);
+    expect(detections, hasLength(1));
+    expect(detections.single.impactDetected, isFalse);
+    expect(detections.single.riskScore, 50);
+
+    await tester.runAsync(repository.stopMonitoring);
+    await tester.runAsync(() async {
+      await microphone.controller.close();
+      await motion.close();
+    });
+  });
 }
 
 class _Microphone extends Fake implements MicrophoneCapture {

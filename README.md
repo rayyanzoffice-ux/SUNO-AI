@@ -88,7 +88,7 @@ flutter run --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ## Demo flow
 
 1. Configure the relay and consenting test contacts, then open **Start Monitoring → Demo Mode**.
-2. Allow GPS and check the location preview. Demo never listens or loads inference models.
+2. Allow GPS. Demo never listens or loads inference models.
 3. Select **LOW**, **MEDIUM**, or **CRITICAL** and press **Demo: Simulate Distress**. Only the danger input is simulated; GPS, storage, countdown and contact sends are real.
 4. Low creates no incident. Medium starts a persisted ten-second safety deadline immediately; **I AM SAFE** cancels and **CAN'T RESPOND** escalates. Timeout does not depend on keeping the safety screen open. Critical dispatches immediately.
 5. The alert stores one location snapshot, used in the contact payload and maps. Pan/zoom the map or use **OPEN** externally; this is location at alert time, not continuous remote tracking.

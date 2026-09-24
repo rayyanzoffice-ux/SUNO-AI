@@ -57,6 +57,20 @@ void main() {
     expect(find.text('Trusted Contacts'), findsOneWidget);
   });
 
+  testWidgets('switching to Demo clears stale Live monitoring errors', (
+    tester,
+  ) async {
+    final monitoring = MonitoringService.instance;
+    monitoring.error = 'Old audio failure';
+    monitoring.motionWarning = 'Old motion warning';
+
+    await monitoring.selectDemo();
+
+    expect(monitoring.liveMode, isFalse);
+    expect(monitoring.error, isNull);
+    expect(monitoring.motionWarning, isNull);
+  });
+
   testWidgets('home can launch low demo without creating an incident', (
     tester,
   ) async {

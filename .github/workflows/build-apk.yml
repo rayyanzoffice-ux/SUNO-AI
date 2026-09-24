@@ -53,10 +53,15 @@ jobs:
       - name: Build release APK
         env:
           ORG_GRADLE_PROJECT_sunoTfliteJava17: 'true'
-        run: >-
-          flutter build apk --release
-          --dart-define=SUNO_ALERT_RELAY_URL=https://uxqthxlgcyybbrpmfevk.supabase.co/functions/v1/send-alert
-          --dart-define=SUNO_RELAY_AUTH_KEY=${{ secrets.SUNO_RELAY_AUTH_KEY }}
+          SUNO_RELAY_AUTH_KEY: ${{ secrets.SUNO_RELAY_AUTH_KEY }}
+        run: |
+          if [ -z "$SUNO_RELAY_AUTH_KEY" ]; then
+            echo "::error::GitHub Actions secret SUNO_RELAY_AUTH_KEY is not configured."
+            exit 1
+          fi
+          flutter build apk --release \
+          --dart-define=SUNO_ALERT_RELAY_URL=https://uxqthxlgcyybbrpmfevk.supabase.co/functions/v1/send-alert \
+          --dart-define="SUNO_RELAY_AUTH_KEY=$SUNO_RELAY_AUTH_KEY"
 
       - name: Prepare final APK
         run: cp build/app/outputs/flutter-apk/app-release.apk SUNO-final.apk
