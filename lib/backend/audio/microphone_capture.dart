@@ -94,9 +94,9 @@ class MicrophoneCapture {
             if (ctrl != null && !ctrl.isClosed) ctrl.add(frame);
           }
         },
-        onError: (Object err) {
+        onError: (Object err, StackTrace stack) {
           final ctrl = _controller;
-          if (ctrl != null && !ctrl.isClosed) ctrl.addError(err);
+          if (ctrl != null && !ctrl.isClosed) ctrl.addError(err, stack);
         },
         onDone: () {
           final ctrl = _controller;
