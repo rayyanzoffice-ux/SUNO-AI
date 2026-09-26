@@ -197,6 +197,23 @@ cd SUNO-AI
 flutter pub get
 flutter analyze
 flutter test
+```
+
+The `vibration` plugin's android module still pins `compileSdk 33`, while the androidx
+artifacts it depends on require 34+. Without a patch, `flutter build apk` fails with
+`:vibration is currently compiled against android-33`. CI fixes it automatically; for a
+local release build, run this first (macOS/Linux):
+
+```bash
+PUB_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
+find "$PUB_DIR" -path '*vibration*' -path '*/android/*' \
+  \( -name 'build.gradle' -o -name 'build.gradle.kts' \) \
+  -exec sed -i -E 's/(compileSdkVersion|compileSdk)([[:space:]]*=[[:space:]]*| )3[0-9]/\1\2 36/' {} +
+```
+
+Then build:
+
+```bash
 flutter build apk --release --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
 

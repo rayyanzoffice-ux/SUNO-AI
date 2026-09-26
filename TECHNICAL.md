@@ -468,7 +468,7 @@ Microphone (44100Hz PCM16)
           → LiveDetectionRepository (combine with impact/stillness from accelerometer)
             → RiskEngine (score 0–100)
               → SunoRuntimeService (decide: ignore / safety check / escalate)
-                → SafetyCheckEngine (10s countdown for medium risk)
+                → SafetyCheckEngine (45s countdown for medium risk)
                   → FcmAlertService → Supabase Edge Function → FCM API → Contact devices
                     → AlertReceivedScreen (contact responds)
                       → Supabase Edge Function (relay) → Sender's device
@@ -488,14 +488,15 @@ Microphone (44100Hz PCM16)
 2. Set up Java 17
 3. Set up Flutter stable channel
 4. `flutter pub get`
-5. **Gradle patch:** Modifies tflite_flutter's gradle file to target JVM 17 (required for compatibility)
-6. `flutter analyze` (static analysis)
-7. `flutter test` (unit/widget tests)
-8. **Build release APK:** `flutter build apk --release` with dart-defines:
+5. **Gradle patch (tflite):** Modifies tflite_flutter's gradle file to target JVM 17 (required for compatibility)
+6. **Gradle patch (vibration):** Raises the `vibration` plugin's android `compileSdk` from 33 to 36. The plugin pins android-33 while its own androidx dependencies require 34+, which fails `assembleRelease`. The same one-line patch is documented in `SETUP_INSTRUCTIONS.md` for local builds.
+7. `flutter analyze` (static analysis)
+8. `flutter test` (unit/widget tests)
+9. **Build release APK:** `flutter build apk --release` with dart-defines:
    - `SUNO_ALERT_RELAY_URL=<supabase-url>`
    - `SUNO_RELAY_AUTH_KEY=${{ secrets.SUNO_RELAY_AUTH_KEY }}`
-9. Rename output to `SUNO-final.apk`
-10. Upload artifact with 30-day retention
+10. Rename output to `SUNO-final.apk`
+11. Upload artifact with 30-day retention
 
 ---
 

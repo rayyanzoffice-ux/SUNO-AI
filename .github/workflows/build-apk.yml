@@ -44,6 +44,24 @@ jobs:
           sed -i 's/JavaVersion.VERSION_11/JavaVersion.VERSION_17/g' "$TFLITE_GRADLE"
           grep -n 'Compatibility' "$TFLITE_GRADLE"
 
+      - name: Align vibration plugin compileSdk
+        run: |
+          # The vibration plugin's android module pins compileSdk 33, but the
+          # androidx artifacts it depends on require 34+, which fails
+          # assembleRelease. Bump it for every matching plugin module.
+          matched=0
+          for f in $(find "$PUB_CACHE" -path '*vibration*' -path '*/android/*' \
+                       \( -name 'build.gradle' -o -name 'build.gradle.kts' \)); do
+            sed -i -E 's/(compileSdkVersion|compileSdk)([[:space:]]*=[[:space:]]*| )3[0-9]/\1\2 36/' "$f"
+            echo "--- $f"
+            grep -nE 'compileSdk' "$f"
+            matched=1
+          done
+          if [ "$matched" -ne 1 ]; then
+            echo "::error::No vibration plugin android build file found in \$PUB_CACHE."
+            exit 1
+          fi
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
