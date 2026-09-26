@@ -206,9 +206,11 @@ local release build, run this first (macOS/Linux):
 
 ```bash
 PUB_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
-find "$PUB_DIR" -path '*vibration*' -path '*/android/*' \
-  \( -name 'build.gradle' -o -name 'build.gradle.kts' \) \
+find "$PUB_DIR" -path '*vibration*' -name 'build.gradle*' -print \
+  -exec chmod u+w {} + \
   -exec sed -i -E 's/(compileSdkVersion|compileSdk)([[:space:]]*=[[:space:]]*| )3[0-9]/\1\2 36/' {} +
+# Confirm it landed — the line should now read 36:
+find "$PUB_DIR" -path '*vibration*' -name 'build.gradle*' -exec grep -n compileSdk {} +
 ```
 
 Then build:

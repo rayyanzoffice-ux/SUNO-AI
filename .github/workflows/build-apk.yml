@@ -46,21 +46,23 @@ jobs:
 
       - name: Align vibration plugin compileSdk
         run: |
-          # The vibration plugin's android module pins compileSdk 33, but the
-          # androidx artifacts it depends on require 34+, which fails
-          # assembleRelease. Bump it for every matching plugin module.
-          matched=0
-          for f in $(find "$PUB_CACHE" -path '*vibration*' -path '*/android/*' \
-                       \( -name 'build.gradle' -o -name 'build.gradle.kts' \)); do
+          set +e
+          echo "PUB_CACHE=$PUB_CACHE"
+          FILES="$(find "$PUB_CACHE" -path '*vibration*' -name 'build.gradle*' 2>/dev/null)"
+          if [ -z "$FILES" ]; then
+            echo "::error::No vibration gradle file found. Candidates:"
+            find "$PUB_CACHE" -maxdepth 4 -iname '*vibration*' 2>/dev/null | head -20
+            exit 1
+          fi
+          echo "$FILES" | wc -l
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            chmod u+w "$f"
             sed -i -E 's/(compileSdkVersion|compileSdk)([[:space:]]*=[[:space:]]*| )3[0-9]/\1\2 36/' "$f"
             echo "--- $f"
             grep -nE 'compileSdk' "$f"
-            matched=1
-          done
-          if [ "$matched" -ne 1 ]; then
-            echo "::error::No vibration plugin android build file found in \$PUB_CACHE."
-            exit 1
-          fi
+          done <<< "$FILES"
+          exit 0
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
