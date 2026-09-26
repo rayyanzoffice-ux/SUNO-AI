@@ -74,10 +74,23 @@ Firebase console → Your project → Cloud Messaging → Enable
 
 ---
 
-## 5. OpenStreetMap / flutter_map
+## 5. Map tiles / flutter_map
 
-No API key needed. The map tiles are served by OpenStreetMap's free tile
-server. Requires the `INTERNET` permission already added to AndroidManifest.
+The tile source is selected at build time:
+
+- `--dart-define=MAPTILER_KEY="<key>"` → MapTiler Streets v2 raster tiles, with
+  `MapTiler` added to the on-map attribution as their terms require.
+- No key → OpenStreetMap's public tile server. This is the development fallback
+  only: OSM's tile usage policy targets light, occasional use and rate-limits
+  app-shaped traffic, so many tiles loading at once from several phones can fail.
+  The in-app "Map tiles unavailable" banner and Retry stay working either way.
+
+Create a free MapTiler account, copy its default API key, and add it as the
+`MAPTILER_KEY` repository secret so CI passes it through. A key compiled into an
+APK can be extracted from the binary, so use a dedicated key and rotate it after
+demo day.
+
+Requires the `INTERNET` permission already added to AndroidManifest.
 
 The map supports pan and zoom; the explicit **OPEN** button launches the saved coordinates externally via `url_launcher`. Tile errors offer Retry while preserving the coordinates. Location is captured at alert time, not continuously tracked on the recipient's phone. OpenStreetMap attribution is included.
 

@@ -5,6 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme/app_theme.dart';
 
+/// MapTiler access token, passed at build time with
+/// `--dart-define=MAPTILER_KEY=...`. Left empty in debug runs and CI until the
+/// secret is configured, which falls back to the public OSM tile pool.
+const _maptilerKey = String.fromEnvironment('MAPTILER_KEY');
+
 class MapPreviewCard extends StatefulWidget {
   const MapPreviewCard({
     this.latitude,
@@ -31,6 +36,14 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
       widget.longitude!.isFinite &&
       widget.latitude!.abs() <= 90 &&
       widget.longitude!.abs() <= 180;
+
+  String get _tileUrlTemplate => _maptilerKey.isEmpty
+      ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+      : 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=$_maptilerKey';
+
+  String get _attributionLabel => _maptilerKey.isEmpty
+      ? 'OpenStreetMap contributors'
+      : 'OpenStreetMap contributors, MapTiler';
 
   @override
   void didUpdateWidget(MapPreviewCard oldWidget) {
@@ -132,7 +145,7 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
                         ),
                         children: [
                           TileLayer(
-                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            urlTemplate: _tileUrlTemplate,
                             userAgentPackageName: 'com.example.suno_ai',
                             errorTileCallback: (_, _, _) {
                               if (_tileFailed) return;
@@ -161,7 +174,7 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
                           RichAttributionWidget(
                             attributions: [
                               TextSourceAttribution(
-                                'OpenStreetMap contributors',
+                                _attributionLabel,
                                 onTap: _openAttribution,
                               ),
                             ],
