@@ -48,19 +48,19 @@ jobs:
         run: |
           set +e
           echo "PUB_CACHE=$PUB_CACHE"
-          FILES="$(find "$PUB_CACHE" -path '*vibration*' -name 'build.gradle*' 2>/dev/null)"
+          FILES="$(find "$PUB_CACHE" -path '*vibration*' -name 'build.gradle*' \
+                     -not -path '*/example/*' 2>/dev/null)"
           if [ -z "$FILES" ]; then
-            echo "::error::No vibration gradle file found. Candidates:"
+            echo "::error::No vibration module gradle file found. Candidates:"
             find "$PUB_CACHE" -maxdepth 4 -iname '*vibration*' 2>/dev/null | head -20
             exit 1
           fi
-          echo "$FILES" | wc -l
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             chmod u+w "$f"
             sed -i -E 's/(compileSdkVersion|compileSdk)([[:space:]]*=[[:space:]]*| )3[0-9]/\1\2 36/' "$f"
-            echo "--- $f"
-            grep -nE 'compileSdk' "$f"
+            echo "=== $f"
+            grep -n -A6 'android {' "$f"
           done <<< "$FILES"
           exit 0
 
