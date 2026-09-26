@@ -27,7 +27,7 @@ class SafetyCheckResult {
 class SafetyCheckEngine {
   SafetyCheckEngine({RiskEngine? riskEngine, Duration? countdownDuration})
     : _riskEngine = riskEngine ?? const RiskEngine(),
-      _countdownDuration = countdownDuration ?? const Duration(seconds: 10);
+      _countdownDuration = countdownDuration ?? const Duration(seconds: 45);
 
   final RiskEngine _riskEngine;
   final Duration _countdownDuration;

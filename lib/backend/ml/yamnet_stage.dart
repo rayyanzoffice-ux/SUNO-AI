@@ -13,17 +13,25 @@ class YamNetEmbedding {
 /// Wraps yamnet.tflite and converts a [AudioWaveform] into YAMNet embeddings.
 ///
 /// Model contract for the TF Hub lite model used by SUNO:
-///   Input  [0]: [15360] float32 waveform (16 kHz, 0.96 s)
-///   Output [0]: [N_frames, 521] class probabilities (not used here)
-///   Output [1]: [N_frames, 1024] embeddings  ← fed to SUNO classifier
+///   Input:  [15360] float32 waveform (16 kHz, 0.96 s)
+///   Output: [N_frames, 521] class probabilities (not used here)
+///   Output: [N_frames, 1024] embeddings  ← fed to SUNO classifier
+///   Output: [96, 64] internal log-mel spectrogram (not used here)
+///
+/// The embedding output is located by its 1024-wide last dimension at load time
+/// instead of by a fixed index, and it is the only output requested per run.
 class YamNetStage {
   static const _modelAsset = 'assets/ml/yamnet.tflite';
   static const _expectedInputLength = 15360;
   static const _embeddingSize = 1024;
 
-  YamNetStage._({required this._interpreter});
+  YamNetStage._({
+    required this._interpreter,
+    required this._embeddingOutputIndex,
+  });
 
   final Interpreter _interpreter;
+  final int _embeddingOutputIndex;
   bool _closed = false;
 
   static Future<YamNetStage> load() async {
@@ -39,8 +47,34 @@ class YamNetStage {
           'expected [$_expectedInputLength].',
         );
       }
+
+      // This model file exposes more than one output tensor (class scores,
+      // embeddings, and an internal log-mel spectrogram SUNO doesn't use).
+      // Find the 1024-wide embedding output by its shape instead of
+      // assuming a fixed index, and remember only that index so embed()
+      // never has to touch the other outputs.
+      final outputTensors = interpreter.getOutputTensors();
+      var embeddingIndex = -1;
+      for (var i = 0; i < outputTensors.length; i++) {
+        final shape = outputTensors[i].shape;
+        if (shape.isNotEmpty && shape.last == _embeddingSize) {
+          embeddingIndex = i;
+          break;
+        }
+      }
+      if (embeddingIndex == -1) {
+        throw FormatException(
+          'YAMNet model has no output tensor with a $_embeddingSize-wide '
+          'last dimension. Output shapes found: '
+          '${outputTensors.map((t) => t.shape).toList()}',
+        );
+      }
+
       success = true;
-      return YamNetStage._(interpreter: interpreter);
+      return YamNetStage._(
+        interpreter: interpreter,
+        embeddingOutputIndex: embeddingIndex,
+      );
     } finally {
       if (!success) interpreter.close();
     }
@@ -58,14 +92,20 @@ class YamNetStage {
     }
 
     final input = List<double>.from(waveform.samples);
-    final numOutputs = _interpreter.getOutputTensors().length;
-    final outputs = <int, Object>{};
-    for (var i = 0; i < numOutputs; i++) {
-      outputs[i] = _buildBuffer(_interpreter.getOutputTensor(i).shape);
-    }
-    _interpreter.runForMultipleInputs([input], outputs);
 
-    final embeddingTensor = outputs[1];
+    // Only request the one output tensor we actually use. Requesting every
+    // output (including the model's internal spectrogram tensor) fails here
+    // because TFLite can't statically resolve that tensor's shape ahead of
+    // time, even though SUNO never reads it.
+    final embeddingShape =
+        _interpreter.getOutputTensor(_embeddingOutputIndex).shape;
+    final outputBuffer = _buildBuffer(embeddingShape);
+    _interpreter.runForMultipleInputs(
+      [input],
+      {_embeddingOutputIndex: outputBuffer},
+    );
+
+    final embeddingTensor = outputBuffer;
     if (embeddingTensor is! List) {
       throw StateError('Unexpected YAMNet embedding tensor type.');
     }

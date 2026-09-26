@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 import '../../models/detection_result.dart';
@@ -75,16 +74,10 @@ class LiveDetectionRepository implements DetectionRepository {
         if (!_monitoring) return;
         try {
           _audioDetector?.process(frame);
-        } catch (error, stack) {
-          // TEMP DEBUG (Problem 1) — remove before shipping.
-          debugPrint('SUNO_DEBUG inference threw: $error\n$stack');
+        } catch (error) {
           onError(error);
         }
-      }, onError: (Object error, StackTrace stack) {
-        // TEMP DEBUG (Problem 1) — remove before shipping.
-        debugPrint('SUNO_DEBUG microphone stream error: $error\n$stack');
-        onError(error);
-      });
+      }, onError: onError);
       await microphone.start();
     } catch (_) {
       await stopMonitoring();

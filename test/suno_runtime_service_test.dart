@@ -227,7 +227,7 @@ void main() {
     );
   }
 
-  test('restored deadline is not restarted from ten seconds', () async {
+  test('restored deadline is not restarted from the full countdown', () async {
     final repository = InMemoryIncidentRepository();
     final now = DateTime.now();
     await repository.save(

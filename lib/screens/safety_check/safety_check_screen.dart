@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:vibration/vibration.dart';
 
 import '../../models/incident.dart';
 import '../../core/routes/app_routes.dart';
@@ -16,7 +17,7 @@ class SafetyCheckScreen extends StatefulWidget {
 }
 
 class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
-  static const _totalSeconds = 10;
+  static const _totalSeconds = 45;
   int _seconds = _totalSeconds;
   Timer? _timer;
   bool _completed = false;
@@ -34,6 +35,23 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
       (_) => _refresh(),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+    unawaited(_buzzOnce());
+  }
+
+  /// Vibrates once when this screen first appears, regardless of whether a
+  /// system notification was also shown. Covers the case where the app is
+  /// in the foreground and no notification fires, and matches the pattern
+  /// already used for SUNO's alert notifications elsewhere in the app.
+  Future<void> _buzzOnce() async {
+    try {
+      final hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator ?? false) {
+        await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 800]);
+      }
+    } catch (_) {
+      // The buzz is best-effort — a device or test environment without the
+      // vibration plugin must not break the safety countdown itself.
+    }
   }
 
   void _refresh() {
@@ -60,7 +78,7 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
     }
     final deadline =
         incident.safetyCheckDeadline ??
-        incident.createdAt.add(const Duration(seconds: 10));
+        incident.createdAt.add(const Duration(seconds: 45));
     setState(
       () =>
           _seconds = (deadline.difference(DateTime.now()).inMilliseconds / 1000)

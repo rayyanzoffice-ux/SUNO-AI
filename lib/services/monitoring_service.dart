@@ -132,8 +132,6 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
       transferred = true;
       active = true;
     } catch (startError, startStack) {
-      // TEMP DEBUG (Problem 1) — remove before shipping.
-      debugPrint('SUNO_DEBUG start() threw: $startError\n$startStack');
       if (generation == _generation) error = 'Live monitoring could not start. Check microphone permission and device support, then retry.';
     } finally {
       if (!transferred) {
@@ -169,9 +167,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void _onError(Object error_) {
-    // TEMP DEBUG (Problem 1) — remove before shipping.
-    debugPrint('SUNO_DEBUG audio onError: $error_');
+  void _onError(Object _) {
     error = 'Audio monitoring stopped because the audio processor failed. Please restart Live mode.';
     unawaited(stop());
   }

@@ -9,19 +9,19 @@ SUNO is an Android-first Flutter prototype that uses on-device audio AI to detec
 - **Real-time audio monitoring** using the device microphone.
 - **On-device sound classification** with YAMNet embeddings + a custom 4-class SUNO classifier.
 - **Risk scoring engine** that combines audio class confidence with motion sensors (impact / stillness).
-- **Safety Check countdown** for medium-risk events — user can confirm they are safe.
+- **Safety Check countdown** for medium-risk events — 45 seconds, buzzing the device when it appears whether or not a notification fired; the user can confirm they are safe.
 - **Emergency Alert** for critical risk, with location and event details.
 - **Trusted Contact notifications** via Firebase Cloud Messaging (FCM relay through Supabase Edge Functions).
 - **Two-way contact responses** — contacts who receive an alert can tap *I AM CHECKING ON THEM*, *THEY ARE SAFE*, or *UNABLE TO CONTACT*, and the response is relayed back to the sender's device.
 - **Silent SOS** manual trigger for situations where the user cannot make a sound.
 - **Incident history** persisted locally with Hive, with swipe-to-dismiss and clear-all support.
-- **Map preview** of incident location using OpenStreetMap, with one-tap open in Google Maps.
+- **Map preview** of incident location using MapTiler tiles when a `MAPTILER_KEY` is configured, falling back to OpenStreetMap tiles otherwise, with one-tap open in Google Maps.
 - **Contact token testing** — send a silent test and record FCM acceptance. Acceptance does not prove the other phone displayed or received a notification.
 
 ## On-device ML pipeline
 
 1. **Microphone capture (Live only)** — 44.1 kHz mono PCM, continuously resampled to 16 kHz for inference.
-2. **YAMNet** (pretrained TF Lite, ~16 MB) converts audio into 1,024-dimensional embeddings.
+2. **YAMNet** (pretrained TF Lite, ~16 MB) converts audio into 1,024-dimensional embeddings. The model also exposes class scores and an internal spectrogram output; SUNO locates the embedding output by shape at load time and requests only that output on each inference, because the unused spectrogram tensor's shape is not statically resolvable and asking for every output fails.
 3. **SUNO classifier head** (custom TF Lite, ~1.2 MB) classifies each embedding into one of four classes:
    - `ambient_safe`
    - `distress_voice`
@@ -67,8 +67,8 @@ lib/
 - Hive for local persistence
 - Firebase Core + Firebase Cloud Messaging
 - Supabase Edge Functions for the FCM relay
-- OpenStreetMap via `flutter_map`
-- `geolocator`, `sensors_plus`, `permission_handler`, `record`
+- `flutter_map` with MapTiler or OpenStreetMap tiles
+- `geolocator`, `sensors_plus`, `permission_handler`, `record`, `vibration`
 - `flutter_local_notifications`, `url_launcher`
 
 ## Setup
@@ -81,9 +81,13 @@ Quick start after setup:
 git clone https://github.com/rayyanzoffice-ux/SUNO-AI.git
 cd SUNO-AI
 git checkout feat/integration
-flutter pub get --enforce-lockfile
+flutter pub get
 flutter run --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
+
+`--enforce-lockfile` is deliberately not used here: `pubspec.lock` can lag a newly
+added dependency until it is regenerated with `flutter pub get` on a machine that
+has the Flutter SDK.
 
 ## Hackathon judges: install the APK
 
@@ -96,7 +100,7 @@ For a quick review, open **Start Monitoring → Demo Mode** and choose **LOW**. 
 1. Configure the relay and consenting test contacts, then open **Start Monitoring → Demo Mode**.
 2. Allow GPS. Demo never listens or loads inference models.
 3. Select **LOW**, **MEDIUM**, or **CRITICAL** and press **Demo: Simulate Distress**. Only the danger input is simulated; GPS, storage, countdown and contact sends are real.
-4. Low creates no incident. Medium starts a persisted ten-second safety deadline immediately; **I AM SAFE** cancels and **CAN'T RESPOND** escalates. Timeout does not depend on keeping the safety screen open. Critical dispatches immediately.
+4. Low creates no incident. Medium starts a persisted forty-five-second safety deadline immediately; **I AM SAFE** cancels and **CAN'T RESPOND** escalates. Timeout does not depend on keeping the safety screen open. Critical dispatches immediately.
 5. The alert stores one location snapshot, used in the contact payload and maps. Pan/zoom the map or use **OPEN** externally; this is location at alert time, not continuous remote tracking.
 6. Check the saved FCM acceptance/partial-failure result. On the other phone, visibly verify the notification and send a response; the sender updates the referenced incident, not an unrelated active alert.
 7. Reopen history to verify persistence. Separately test **Silent SOS** and **Live Mode**, which alone activates microphone capture and on-device inference.

@@ -7,7 +7,7 @@ cd SUNO-AI
 flutter pub get
 ```
 
-Use Flutter stable with Dart 3.13.1 or newer within Dart 3.x, Java 17, and the Android SDK required by Flutter. Local verification uses Flutter 3.47.5 / Dart 3.13.4; CI follows Flutter stable. Run `flutter doctor -v` before building. Use `flutter pub get --enforce-lockfile` for repeatable dependency resolution.
+Use Flutter stable with Dart 3.13.1 or newer within Dart 3.x, Java 17, and the Android SDK required by Flutter. Local verification uses Flutter 3.47.5 / Dart 3.13.4; CI follows Flutter stable. Run `flutter doctor -v` before building. Use `flutter pub get --enforce-lockfile` for repeatable dependency resolution once `pubspec.lock` includes every declared dependency — after adding `vibration`, run a plain `flutter pub get` and commit the refreshed lock first.
 
 `flutter_local_notifications` supplies Android notification channels and foreground notifications; `url_launcher` opens incident coordinates externally. Demo uses neither microphone capture nor model inference.
 
@@ -194,11 +194,15 @@ cloning the repo and placing `google-services.json`:
 
 ```bash
 cd SUNO-AI
-flutter pub get --enforce-lockfile
+flutter pub get
 flutter analyze
 flutter test
 flutter build apk --release --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
+
+`flutter pub get` refreshes `pubspec.lock` with the newly added `vibration`
+dependency. If the file changes, commit it — that is what makes
+`flutter pub get --enforce-lockfile` usable again for repeatable resolution.
 
 Use Java 17 and the TFLite Java-target alignment step already present in `.github/workflows/build-apk.yml` if your environment reports a Java/Kotlin target mismatch. Do not disable validation or change model files to work around build errors.
 

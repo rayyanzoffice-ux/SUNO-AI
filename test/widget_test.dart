@@ -156,7 +156,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Are you safe?'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 11));
+    await tester.pump(const Duration(seconds: 46));
     await tester.pumpAndSettle();
 
     expect(find.text('Emergency Alert Activated'), findsOneWidget);
