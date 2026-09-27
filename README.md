@@ -21,7 +21,7 @@ SUNO is an Android-first Flutter prototype that uses on-device audio AI to detec
 ## On-device ML pipeline
 
 1. **Microphone capture (Live only)** — 44.1 kHz mono PCM, continuously resampled to 16 kHz for inference.
-2. **YAMNet** (pretrained TF Lite, ~16 MB) converts audio into 1,024-dimensional embeddings. The model also exposes class scores and an internal spectrogram output; SUNO locates the embedding output by shape at load time and requests only that output on each inference, because the unused spectrogram tensor's shape is not statically resolvable and asking for every output fails.
+2. **YAMNet** (pretrained TF Lite, ~16 MB) converts audio into 1,024-dimensional embeddings. The model also exposes class scores and an internal spectrogram output; SUNO locates the embedding output by shape rather than by export order, and supplies a correctly sized buffer for all three on each run, because the TF Lite interpreter copies into every declared output whether or not it is read.
 3. **SUNO classifier head** (custom TF Lite, ~1.2 MB) classifies each embedding into one of four classes:
    - `ambient_safe`
    - `distress_voice`

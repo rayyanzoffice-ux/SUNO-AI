@@ -45,13 +45,6 @@ class LiveDetectionRepository implements DetectionRepository {
   Completer<DetectionResult>? _nextDetection;
   bool _monitoring = false;
 
-  /// DIAGNOSTIC BUILD ONLY: names the failing layer and the top stack frames
-  /// so the cause is readable from the on-screen banner on a phone with no adb.
-  static String _diagnostic(String source, Object error, StackTrace stack) {
-    final frames = stack.toString().split('\n').take(4).join('\n');
-    return '$source failed: $error\n$frames';
-  }
-
   Future<void> startMonitoring() async {
     if (_monitoring) return;
     _monitoring = true;
@@ -81,12 +74,10 @@ class LiveDetectionRepository implements DetectionRepository {
         if (!_monitoring) return;
         try {
           _audioDetector?.process(frame);
-        } catch (error, stack) {
-          onError(StateError(_diagnostic('inference frame', error, stack)));
+        } catch (error) {
+          onError(error);
         }
-      }, onError: (Object error, StackTrace stack) {
-        onError(StateError(_diagnostic('mic stream', error, stack)));
-      });
+      }, onError: onError);
       await microphone.start();
     } catch (_) {
       await stopMonitoring();

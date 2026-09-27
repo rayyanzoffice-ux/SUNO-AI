@@ -159,13 +159,16 @@ The audio ML pipeline is a **two-stage on-device inference system** with four pr
   - `[96, 64]` internal log-mel spectrogram (unused by SUNO)
 - Returns `YamNetEmbedding` objects containing the 1024-dimensional embedding per frame
 - Strictly validates input tensor shape
-- **Only the embedding output is requested per inference.** The spectrogram
-  output's shape is not statically resolvable before `invoke()` (TFLite reports
-  a `[1, 64]` placeholder but produces `[96, 64]`), so pre-allocating a buffer
-  for every output slot throws `Output object shape mismatch` on each call.
-  `load()` scans the output tensors once, records the index of the one whose
-  last dimension is `1024`, and `embed()` passes only that index to
-  `runForMultipleInputs`. Do not revert this to "request all outputs".
+- **Every declared output gets a buffer on each run.** `runForMultipleInputs()`
+  copies into all of the model's outputs and null-checks each entry of the map
+  handed to it, so requesting only the embedding crashes with `Null check
+  operator used on a null value`. The spectrogram slot is the awkward one:
+  TFLite resolves its real shape only once a run has happened. `load()`
+  therefore takes the shared frame count from an output that does report one,
+  falling back to YAMNet's standard 96 frames for a 0.96 s patch, and caches a
+  shape per output for `embed()` to allocate from.
+- `load()` locates the embedding output by its `1024`-wide last dimension
+  instead of assuming export order, and that slot keeps its own reported shape.
 
 ### Stage 3: SUNO Classifier (`SunoAudioClassifier`)
 
