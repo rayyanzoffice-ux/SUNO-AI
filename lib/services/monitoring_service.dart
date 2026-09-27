@@ -167,7 +167,10 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void _onError(Object _) {
+  void _onError(Object err) {
+    // Permanent diagnostic: the user-facing banner below is deliberately
+    // generic, so without this line the real cause is unrecoverable on device.
+    debugPrint('SUNO_DEBUG audio onError: $err');
     error = 'Audio monitoring stopped because the audio processor failed. Please restart Live mode.';
     unawaited(stop());
   }

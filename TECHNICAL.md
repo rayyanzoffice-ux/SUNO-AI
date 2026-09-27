@@ -488,15 +488,16 @@ Microphone (44100Hz PCM16)
 2. Set up Java 17
 3. Set up Flutter stable channel
 4. `flutter pub get`
-5. **Gradle patch (tflite):** Modifies tflite_flutter's gradle file to target JVM 17 (required for compatibility)
-6. **Gradle patch (vibration):** Raises the `vibration` plugin's android `compileSdk` from 33 to 36. The plugin pins android-33 while its own androidx dependencies require 34+, which fails `assembleRelease`. The same one-line patch is documented in `SETUP_INSTRUCTIONS.md` for local builds.
-7. `flutter analyze` (static analysis)
-8. `flutter test` (unit/widget tests)
-9. **Build release APK:** `flutter build apk --release` with dart-defines:
+5. **Lockfile artifact:** uploads the solver-generated `pubspec.lock` as `pubspec-lock`. There is no Flutter SDK in this working environment, so this is how the lockfile gets refreshed and committed after a dependency changes — a lockfile that omits a package listed in `pubspec.yaml` only bites whoever builds with `--enforce-lockfile`.
+6. **Gradle patch (tflite):** Modifies tflite_flutter's gradle file to target JVM 17 (required for compatibility)
+7. **Gradle patch (vibration):** Raises the `vibration` plugin's android `compileSdk` from 33 to 36. The plugin pins android-33 while its own androidx dependencies require 34+, which fails `assembleRelease`. The same one-line patch is documented in `SETUP_INSTRUCTIONS.md` for local builds.
+8. `flutter analyze` (static analysis)
+9. `flutter test` (unit/widget tests)
+10. **Build release APK:** `flutter build apk --release` with dart-defines:
    - `SUNO_ALERT_RELAY_URL=<supabase-url>`
    - `SUNO_RELAY_AUTH_KEY=${{ secrets.SUNO_RELAY_AUTH_KEY }}`
-10. Rename output to `SUNO-final.apk`
-11. Upload artifact with 30-day retention
+11. Rename output to `SUNO-final.apk`
+12. Upload artifact with 30-day retention
 
 ---
 
