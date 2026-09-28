@@ -153,22 +153,24 @@ The audio ML pipeline is a **two-stage on-device inference system** with four pr
 
 - **Model:** `yamnet.tflite` (~16MB)
 - **Input:** `[15360]` float32 waveform tensor
-- **Outputs:**
-  - `[N_frames, 521]` class probabilities (unused by SUNO)
-  - `[N_frames, 1024]` embedding vectors (used as input to Stage 3)
-  - `[96, 64]` internal log-mel spectrogram (unused by SUNO)
+- **Outputs**, identified by their last dimension: `521` class probabilities,
+  `1024` embeddings (Stage 3's input), and a `64`-bin internal log-mel
+  spectrogram. SUNO reads only the embedding.
 - Returns `YamNetEmbedding` objects containing the 1024-dimensional embedding per frame
 - Strictly validates input tensor shape
 - **Every declared output gets a buffer on each run.** `runForMultipleInputs()`
   copies into all of the model's outputs and null-checks each entry of the map
   handed to it, so requesting only the embedding crashes with `Null check
-  operator used on a null value`. The spectrogram slot is the awkward one:
-  TFLite resolves its real shape only once a run has happened. `load()`
-  therefore takes the shared frame count from an output that does report one,
-  falling back to YAMNet's standard 96 frames for a 0.96 s patch, and caches a
-  shape per output for `embed()` to allocate from.
+  operator used on a null value`.
+- **Output row counts are measured, not assumed.** The model file states shapes
+  that a real run then contradicts — the spectrogram reports one row before
+  running and returns 96 — and the outputs do not share a row count. The
+  rejection is raised *after* inference, so the true shapes are readable at
+  that moment: `embed()` runs with the declared shapes, and on `ArgumentError`
+  re-reads every output shape and runs once more. Steady-state frames use the
+  measured shapes and never take that path.
 - `load()` locates the embedding output by its `1024`-wide last dimension
-  instead of assuming export order, and that slot keeps its own reported shape.
+  instead of assuming export order.
 
 ### Stage 3: SUNO Classifier (`SunoAudioClassifier`)
 

@@ -14,21 +14,19 @@ class YamNetEmbedding {
 ///
 /// Model contract for the TF Hub lite model used by SUNO:
 ///   Input:  [15360] float32 waveform (16 kHz, 0.96 s)
-///   Output: [N_frames, 521] class probabilities (not used here)
-///   Output: [N_frames, 1024] embeddings  ← fed to SUNO classifier
-///   Output: [96, 64] internal log-mel spectrogram (not used here)
+///   Output: [_, 521]  class probabilities (not used here)
+///   Output: [_, 1024] embeddings  ← fed to SUNO classifier
+///   Output: [_, 64]   internal log-mel spectrogram (not used here)
 ///
-/// The embedding output is located by its 1024-wide last dimension at load time
-/// instead of by a fixed index. Every declared output still needs a buffer on
-/// each run, so their shapes are resolved once here and reused by [embed].
+/// The row counts are not something the model file states reliably: TFLite
+/// resolves some output shapes only while a run is executing. [embed]
+/// therefore measures them from a real run instead of assuming them. The
+/// embedding output is located by its 1024-wide last dimension rather than by
+/// export order, and every declared output needs a buffer on each run.
 class YamNetStage {
   static const _modelAsset = 'assets/ml/yamnet.tflite';
   static const _expectedInputLength = 15360;
   static const _embeddingSize = 1024;
-
-  /// Standard YAMNet patch size: 0.96 s at 16 kHz with a 10 ms frame step.
-  /// Used to size output buffers TFLite leaves unresolved before a run.
-  static const _spectrogramFrames = 96;
 
   YamNetStage._({
     required this._interpreter,
@@ -38,7 +36,7 @@ class YamNetStage {
 
   final Interpreter _interpreter;
   final int _embeddingOutputIndex;
-  final List<List<int>> _outputShapes;
+  List<List<int>> _outputShapes;
   bool _closed = false;
 
   static Future<YamNetStage> load() async {
@@ -76,20 +74,10 @@ class YamNetStage {
         );
       }
 
-      // Every frame-indexed output uses the same leading dimension. Take it
-      // from an output TFLite does resolve, and fall back to YAMNet's
-      // standard patch size for the spectrogram, which it leaves unresolved.
-      var frames = 0;
-      for (final tensor in outputTensors) {
-        final shape = tensor.shape;
-        if (shape.length == 2 && shape[0] > frames) frames = shape[0];
-      }
-      if (frames < _spectrogramFrames) frames = _spectrogramFrames;
+      // A starting point only: TFLite resolves some of these shapes while a
+      // run executes, so embed() re-measures them if a run rejects them.
       final outputShapes = <List<int>>[
-        for (var i = 0; i < outputTensors.length; i++)
-          i == embeddingIndex || outputTensors[i].shape.length != 2
-              ? outputTensors[i].shape.toList()
-              : [frames, outputTensors[i].shape[1]],
+        for (final tensor in outputTensors) tensor.shape.toList(),
       ];
 
       success = true;
@@ -115,18 +103,39 @@ class YamNetStage {
     }
 
     final input = List<double>.from(waveform.samples);
+    try {
+      return _run(input);
+    } on ArgumentError {
+      // Rejecting a buffer happens after inference, so this is the point where
+      // TFLite knows its real output shapes. Measure them and run again; later
+      // frames use the measured shapes and never reach this catch.
+      _measureOutputShapes();
+      return _run(input);
+    }
+  }
 
-    // runForMultipleInputs() copies into every output tensor the model
-    // declares and null-checks each map entry, so a partial map crashes even
-    // though SUNO only reads the embedding. The unused outputs still need a
-    // correctly sized buffer — hence the shapes resolved once in load().
+  /// One inference pass, with a buffer per output tensor.
+  ///
+  /// runForMultipleInputs() copies into every output the model declares and
+  /// null-checks each entry of the map, so SUNO's unused outputs still need a
+  /// correctly sized buffer even though only the embedding is read.
+  List<YamNetEmbedding> _run(List<double> input) {
     final outputs = <int, Object>{};
     for (var i = 0; i < _outputShapes.length; i++) {
       outputs[i] = _buildBuffer(_outputShapes[i]);
     }
     _interpreter.runForMultipleInputs([input], outputs);
+    return _embeddingsFrom(outputs[_embeddingOutputIndex]);
+  }
 
-    final embeddingTensor = outputs[_embeddingOutputIndex];
+  void _measureOutputShapes() {
+    _outputShapes = [
+      for (final tensor in _interpreter.getOutputTensors())
+        tensor.shape.toList(),
+    ];
+  }
+
+  static List<YamNetEmbedding> _embeddingsFrom(Object? embeddingTensor) {
     if (embeddingTensor is! List) {
       throw StateError('Unexpected YAMNet embedding tensor type.');
     }
