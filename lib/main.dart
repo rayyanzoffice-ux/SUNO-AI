@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -11,12 +12,15 @@ import 'app.dart';
 import 'backend/alerts/fcm_alert_service.dart';
 import 'backend/persistence/app_storage.dart';
 import 'backend/persistence/hive_incident_repository.dart';
+import 'backend/persistence/hive_profile_repository.dart';
 import 'backend/persistence/hive_trusted_contact_repository.dart';
+import 'core/navigation/alert_navigation.dart';
 import 'core/navigation/navigator_key.dart';
 import 'core/routes/app_routes.dart';
-import 'models/detection_result.dart';
 import 'models/incident.dart';
 import 'models/received_alert.dart';
+import 'screens/alert_received/alert_received_screen.dart';
+import 'services/alert_surfacing.dart';
 import 'services/detection_notification_service.dart';
 import 'services/monitoring_service.dart';
 import 'services/notification_inbox.dart';
@@ -25,13 +29,21 @@ import 'services/suno_runtime_service.dart';
 const _inboxPortName = 'suno_notification_inbox';
 final _inbox = NotificationInbox();
 final _pendingNavigation = <Map<String, String>>[];
+final _surfacedAlertIds = <String>{};
+int _navigationRetries = 0;
 Future<void> _draining = Future.value();
 ReceivePort? _inboxPort;
+
+/// Tagged log line so notification routing can be followed in `adb logcat`.
+void _log(String message) => debugPrint('[SUNO-NAV] $message');
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   DartPluginRegistrant.ensureInitialized();
   await Firebase.initializeApp();
+  final kind = message.data['type'];
+  final incidentId = message.data['incidentId'];
+  _log('bg handler type=$kind incident=$incidentId');
   if (message.data['type'] == 'test') return;
   await _inbox.add(Map<String, String>.from(message.data));
   IsolateNameServer.lookupPortByName(_inboxPortName)?.send(null);
@@ -48,7 +60,7 @@ Map<String, String>? _decodePayload(String? value) {
 
 void _onLocalNotificationTap(NotificationResponse response) {
   final data = _decodePayload(response.payload);
-  if (data != null) unawaited(_openPayload(data));
+  if (data != null) unawaited(_openPayload(data, source: 'local_tap'));
 }
 
 Future<void> _acceptPayload(Map<String, String> data) async {
@@ -69,8 +81,10 @@ Future<void> _acceptPayload(Map<String, String> data) async {
 
 Future<void> _drainInbox() {
   _draining = _draining.then((_) => _inbox.drain(_acceptPayload)).catchError((
-    Object _,
+    Object error,
+    StackTrace stack,
   ) {
+    _log('drain inbox FAILED: $error\n$stack');
     SunoRuntimeService.instance.reportError(
       'Some received alerts could not be restored. Reopen SUNO to retry.',
     );
@@ -78,7 +92,13 @@ Future<void> _drainInbox() {
   return _draining;
 }
 
-Future<void> _openPayload(Map<String, String> data) async {
+Future<void> _openPayload(
+  Map<String, String> data, {
+  String source = 'unknown',
+}) async {
+  final kind = data['type'];
+  final incidentId = data['incidentId'];
+  _log('open payload source=$source type=$kind incident=$incidentId');
   try {
     await _drainInbox();
     await _acceptPayload(data);
@@ -90,7 +110,8 @@ Future<void> _openPayload(Map<String, String> data) async {
       }
       _flushNavigation();
     }
-  } catch (_) {
+  } catch (error, stack) {
+    _log('open payload FAILED source=$source: $error\n$stack');
     SunoRuntimeService.instance.reportError(
       'Could not open this alert. Please reopen SUNO.',
     );
@@ -99,46 +120,87 @@ Future<void> _openPayload(Map<String, String> data) async {
 
 void _flushNavigation() {
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    final navigator = navigatorKey.currentState;
-    if (navigator == null || _pendingNavigation.isEmpty) return;
-    final data = _pendingNavigation.removeAt(0);
-    final incident = SunoRuntimeService.instance.incidentById(
-      data['incidentId'] ?? '',
-    );
-    if (incident == null) {
-      ScaffoldMessenger.maybeOf(navigator.context)?.showSnackBar(
-        const SnackBar(content: Text('This incident is no longer available.')),
-      );
-    } else if (incident.isReceived) {
-      final detection = incident.detectionResult;
-      navigator.pushNamed(
-        AppRoutes.alertReceived,
-        arguments: <String, String>{
-          'incidentId': incident.id,
-          'senderToken': incident.senderToken ?? '',
-          'eventType': detection.eventType,
-          'riskScore': '${detection.riskScore}',
-          'riskLevel': detection.riskLevel.wireValue,
-          'detectedAt': detection.detectedAt.toIso8601String(),
-          'isSimulated': '${detection.isSimulated}',
-          if (detection.latitude != null) 'latitude': '${detection.latitude}',
-          if (detection.longitude != null)
-            'longitude': '${detection.longitude}',
-          if (detection.locationText != null)
-            'locationText': detection.locationText!,
-        },
-      );
-    } else {
-      navigator.pushNamed(
-        incident.status == IncidentStatus.safetyCheck
-            ? AppRoutes.safetyCheck
-            : AppRoutes.emergencyAlert,
-        arguments: incident.id,
-      );
+    if (_pendingNavigation.isEmpty) {
+      _navigationRetries = 0;
+      return;
     }
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) {
+      _retryNavigationLater();
+      return;
+    }
+    _navigationRetries = 0;
+    _navigateToIncident(navigator, _pendingNavigation.removeAt(0));
     if (_pendingNavigation.isNotEmpty) _flushNavigation();
   });
   WidgetsBinding.instance.ensureVisualUpdate();
+}
+
+/// The navigator can be null for a moment while the Activity re-attaches to
+/// the persistent engine. Try again shortly instead of dropping the tap.
+void _retryNavigationLater() {
+  if (_navigationRetries >= 40) {
+    _log('gave up waiting for navigator, pending=${_pendingNavigation.length}');
+    return;
+  }
+  _navigationRetries++;
+  Future<void>.delayed(const Duration(milliseconds: 150), _flushNavigation);
+}
+
+void _navigateToIncident(NavigatorState navigator, Map<String, String> data) {
+  final id = data['incidentId'] ?? '';
+  final incident = SunoRuntimeService.instance.incidentById(id);
+  _log(
+    'navigate incident=$id found=${incident != null} received=${incident?.isReceived}',
+  );
+  if (incident == null) {
+    ScaffoldMessenger.maybeOf(navigator.context)?.showSnackBar(
+      const SnackBar(content: Text('This incident is no longer available.')),
+    );
+    return;
+  }
+  if (incident.isReceived) {
+    if (AlertReceivedScreen.visibleIncidentId.value == incident.id) {
+      _log('alert screen already visible for $id, not pushing again');
+      return;
+    }
+    _surfacedAlertIds.add(incident.id);
+    navigator.pushNamed(
+      AppRoutes.alertReceived,
+      arguments: alertReceivedArguments(incident),
+    );
+    return;
+  }
+  navigator.pushNamed(
+    incident.status == IncidentStatus.safetyCheck
+        ? AppRoutes.safetyCheck
+        : AppRoutes.emergencyAlert,
+    arguments: incident.id,
+  );
+}
+
+/// Opens the newest recent, unanswered, critical alert from a trusted contact.
+///
+/// Safety net for notification taps that Firebase never reports: the alert
+/// data is already stored, so we can show it whenever the app starts or
+/// resumes. Never interrupts the user's OWN safety check or alert dispatch.
+Future<void> _surfaceUnseenAlert() async {
+  try {
+    final runtime = SunoRuntimeService.instance;
+    if (runtime.hasPendingSafetyCheck || runtime.hasPendingDispatch) return;
+    final candidate = pickUnseenReceivedAlert(
+      runtime.knownIncidents,
+      now: DateTime.now(),
+      alreadySurfaced: _surfacedAlertIds,
+    );
+    if (candidate == null) return;
+    if (_pendingNavigation.any((p) => p['incidentId'] == candidate.id)) return;
+    _log('surfacing unseen alert ${candidate.id}');
+    _pendingNavigation.add(<String, String>{'incidentId': candidate.id});
+    _flushNavigation();
+  } catch (error, stack) {
+    _log('surface unseen alert FAILED: $error\n$stack');
+  }
 }
 
 Future<void> _handleForegroundMessage(RemoteMessage message) async {
@@ -167,18 +229,26 @@ Future<void> _handleForegroundMessage(RemoteMessage message) async {
       ),
       payload: Uri(queryParameters: data).query,
     );
-  } catch (_) {
+  } catch (error, stack) {
+    _log('foreground message FAILED: $error\n$stack');
     SunoRuntimeService.instance.reportError(
       'Could not process an incoming notification. Please reopen SUNO.',
     );
   }
 }
 
+Future<void> _onResumed() async {
+  await _drainInbox();
+  _flushNavigation();
+  await _surfaceUnseenAlert();
+}
+
 class _AppLifecycle extends WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_drainInbox().then((_) => _flushNavigation()));
+      _log('lifecycle resumed');
+      unawaited(_onResumed());
     }
   }
 }
@@ -193,8 +263,9 @@ Future<void> main() async {
     firebaseReady = true;
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     alertService = FcmAlertService(messaging: FirebaseMessaging.instance);
-  } catch (_) {
-    /* Local safety history remains available without Firebase. */
+  } catch (error, stack) {
+    // Local safety history remains available without Firebase.
+    _log('firebase init FAILED: $error\n$stack');
   }
 
   var notificationsReady = false;
@@ -209,10 +280,13 @@ Future<void> main() async {
     );
     await initDetectionNotificationChannel();
     notificationsReady = true;
-  } catch (_) {}
+  } catch (error, stack) {
+    _log('notification init FAILED: $error\n$stack');
+  }
   final runtime = SunoRuntimeService(
     incidentRepository: const HiveIncidentRepository(),
     trustedContactRepository: const HiveTrustedContactRepository(),
+    profileRepository: const HiveProfileRepository(),
     alertService: alertService,
   );
   SunoRuntimeService.instance = runtime;
@@ -239,9 +313,12 @@ Future<void> main() async {
       final launch = await sunoNotifications.getNotificationAppLaunchDetails();
       if (launch?.didNotificationLaunchApp == true) {
         final payload = _decodePayload(launch?.notificationResponse?.payload);
-        if (payload != null) await _openPayload(payload);
+        if (payload != null) {
+          await _openPayload(payload, source: 'local_launch');
+        }
       }
-    } catch (_) {
+    } catch (error, stack) {
+      _log('launch details FAILED: $error\n$stack');
       runtime.reportError(
         'Could not restore the tapped notification. Open incident history.',
       );
@@ -249,17 +326,28 @@ Future<void> main() async {
   }
   if (firebaseReady) {
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(
-      (message) => _openPayload(Map<String, String>.from(message.data)),
-    );
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      unawaited(
+        _openPayload(
+          Map<String, String>.from(message.data),
+          source: 'fcm_opened_app',
+        ),
+      );
+    });
     try {
       final initial = await FirebaseMessaging.instance
           .getInitialMessage()
           .timeout(const Duration(seconds: 8));
+      final initialId = initial == null ? null : initial.data['incidentId'];
+      _log('getInitialMessage -> $initialId');
       if (initial != null) {
-        await _openPayload(Map<String, String>.from(initial.data));
+        await _openPayload(
+          Map<String, String>.from(initial.data),
+          source: 'fcm_initial',
+        );
       }
-    } catch (_) {
+    } catch (error, stack) {
+      _log('getInitialMessage FAILED: $error\n$stack');
       runtime.reportError(
         'Could not restore the launch alert. Open incident history.',
       );
@@ -267,6 +355,7 @@ Future<void> main() async {
   }
   runApp(const SunoApp());
   _flushNavigation();
+  unawaited(_surfaceUnseenAlert());
   if (alertService != null) {
     unawaited(
       alertService.registerDevice().catchError((Object _) {
