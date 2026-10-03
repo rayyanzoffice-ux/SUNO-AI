@@ -72,6 +72,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
     if ((!isTest && payload.type !== undefined) ||
         (payload.senderToken !== undefined && !token(payload.senderToken)) ||
+        (payload.senderName !== undefined && !text(payload.senderName, 64)) ||
         (payload.isSimulated !== undefined && !['true', 'false'].includes(String(payload.isSimulated)))) {
       return json({ error: 'Invalid alert metadata' }, 400);
     }
@@ -79,9 +80,13 @@ export async function handleRequest(req: Request): Promise<Response> {
       if (!coordinate(payload.latitude, 90) || !coordinate(payload.longitude, 180)) return json({ error: 'Invalid coordinates' }, 400);
     }
     const tokens = [...new Set((body.contactTokens as string[]).map((value) => value.trim()))];
+    const senderName = typeof payload.senderName === 'string' ? payload.senderName.trim() : '';
+    const title = payload.isSimulated === 'true'
+      ? (senderName ? `SUNO simulated emergency — ${senderName}` : 'SUNO simulated emergency')
+      : (senderName ? `${senderName} may be in danger` : 'SUNO emergency alert');
     for (const recipient of tokens) deliveries.push({ token: recipient, message: {
       ...(isTest ? {} : { notification: {
-        title: payload.isSimulated === 'true' ? 'SUNO simulated emergency' : 'SUNO emergency alert',
+        title,
         body: `${payload.eventType} · Risk ${payload.riskScore}%`,
       } }),
       data: payload, android: isTest ? { priority: 'HIGH' } : android,

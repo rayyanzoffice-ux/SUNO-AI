@@ -57,6 +57,36 @@ void main() {
   );
 
   test(
+    'Hive round-trips senderName and still loads records written without it',
+    () async {
+      Hive.init(directory.path);
+      await Hive.openBox<Map>('incidents');
+      const repository = HiveIncidentRepository();
+      await repository.save(
+        _incident('named', DateTime(2026, 3), senderName: 'Ayan'),
+      );
+      await Hive.close();
+      await Hive.openBox<Map>('incidents');
+      expect((await repository.latest())!.senderName, 'Ayan');
+      final withoutName = Map<String, dynamic>.from(
+        Hive.box<Map>('incidents').get('named')!,
+      )..remove('senderName');
+      await Hive.box<Map>('incidents').put('legacy', withoutName);
+      await Hive.close();
+      await Hive.openBox<Map>('incidents');
+      final history = await repository.getAll();
+      expect(
+        history.singleWhere((incident) => incident.id == 'legacy').senderName,
+        isNull,
+      );
+      expect(
+        history.singleWhere((incident) => incident.id == 'named').senderName,
+        'Ayan',
+      );
+    },
+  );
+
+  test(
     'inbox preserves concurrent messages and consumes only after acceptance',
     () async {
       final inbox = NotificationInbox(directory: directory);
@@ -100,7 +130,7 @@ void main() {
   });
 }
 
-Incident _incident(String id, DateTime time) => Incident(
+Incident _incident(String id, DateTime time, {String? senderName}) => Incident(
   id: id,
   detectionResult: DetectionResult(
     eventType: 'Synthetic demo',
@@ -119,6 +149,7 @@ Incident _incident(String id, DateTime time) => Incident(
   updatedAt: time,
   safetyCheckDeadline: time.add(const Duration(seconds: 10)),
   senderToken: 'synthetic-sender',
+  senderName: senderName,
   dispatchResult: const AlertDispatchResult(
     success: false,
     attemptedCount: 2,
