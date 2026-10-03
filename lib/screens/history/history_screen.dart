@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/navigation/alert_navigation.dart';
+import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_format.dart';
+import '../../models/detection_result.dart';
 import '../../models/incident.dart';
 import '../../services/suno_runtime_service.dart';
 
@@ -105,6 +108,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Opens the detail screen for a critical incident. Does nothing for others.
+  void _openIncident(Incident incident) {
+    if (incident.detectionResult.riskLevel != RiskLevel.critical) return;
+    if (incident.isReceived) {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.alertReceived,
+        arguments: alertReceivedArguments(incident),
+      );
+      return;
+    }
+    Navigator.pushNamed(
+      context,
+      incident.status == IncidentStatus.safetyCheck
+          ? AppRoutes.safetyCheck
+          : AppRoutes.emergencyAlert,
+      arguments: incident.id,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -206,7 +229,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 .where((incident) => incident.id != id)
                                 .toList();
                           }),
-                          child: _HistoryCard.from(filtered[i]),
+                          child: _HistoryCard.from(
+                            filtered[i],
+                            onTap: filtered[i].detectionResult.riskLevel ==
+                                    RiskLevel.critical
+                                ? () => _openIncident(filtered[i])
+                                : null,
+                          ),
                         ),
                       ),
               ),
@@ -280,9 +309,10 @@ class _HistoryCard extends StatelessWidget {
     required this.icon,
     required this.id,
     this.origin,
+    this.onTap,
   });
 
-  factory _HistoryCard.from(Incident incident) {
+  factory _HistoryCard.from(Incident incident, {VoidCallback? onTap}) {
     final s = incident.status;
     return _HistoryCard(
       id: incident.id,
@@ -294,6 +324,7 @@ class _HistoryCard extends StatelessWidget {
       color: _colorFor(s),
       icon: _iconFor(s, incident.isReceived),
       origin: incident.isReceived ? incident.origin : null,
+      onTap: onTap,
     );
   }
 
@@ -302,6 +333,7 @@ class _HistoryCard extends StatelessWidget {
   final Color color;
   final IconData icon;
   final String? origin;
+  final VoidCallback? onTap;
 
   static String _titleFor(IncidentStatus s, bool isReceived) {
     if (isReceived) return 'Received alert';
@@ -370,95 +402,101 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(15),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(14),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: .1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: color),
             ),
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    Text(
-                      score,
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                if (origin != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'from $origin',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.indigo,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 4),
-                Text(
-                  event,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 9),
-                Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                    ),
+                      Text(
+                        score,
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (origin != null) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      time,
+                      'from $origin',
                       style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
+                        fontSize: 12,
+                        color: AppColors.indigo,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    event,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        time,
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
