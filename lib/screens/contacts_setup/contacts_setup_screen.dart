@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -17,6 +19,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
   final phone = TextEditingController();
   final relationship = TextEditingController();
   final fcmToken = TextEditingController();
+  final _myName = TextEditingController();
   final contacts = <TrustedContact>[];
   String? myFcmToken;
   bool loadingToken = true;
@@ -32,6 +35,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     super.initState();
     _loadContacts();
     _loadMyToken();
+    _loadMyName();
   }
 
   Future<void> _loadContacts() async {
@@ -73,6 +77,25 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
       );
     } finally {
       if (mounted) setState(() => loadingToken = false);
+    }
+  }
+
+  Future<void> _loadMyName() async {
+    try {
+      final saved = await SunoRuntimeService.instance.getMyName();
+      if (mounted && saved != null && _myName.text.isEmpty) {
+        _myName.text = saved;
+      }
+    } catch (_) {
+      _showError('Could not load your saved name.');
+    }
+  }
+
+  Future<void> _saveMyName() async {
+    try {
+      await SunoRuntimeService.instance.saveMyName(_myName.text);
+    } catch (_) {
+      _showError('Could not save your name. Please retry.');
     }
   }
 
@@ -294,6 +317,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     phone.dispose();
     relationship.dispose();
     fcmToken.dispose();
+    _myName.dispose();
     super.dispose();
   }
 
@@ -370,6 +394,23 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                       child: const Text('REFRESH MY TOKEN'),
                     ),
                   ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: _myName,
+                  textCapitalization: TextCapitalization.words,
+                  inputFormatters: [LengthLimitingTextInputFormatter(40)],
+                  onChanged: (_) => unawaited(_saveMyName()),
+                  decoration: const InputDecoration(
+                    labelText: 'Your name',
+                    helperText:
+                        'Shown to your trusted contacts when an alert reaches them.',
+                  ),
                 ),
               ),
             ),

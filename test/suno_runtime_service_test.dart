@@ -317,6 +317,93 @@ void main() {
     },
   );
 
+  test(
+    'received alerts keep the receiver\'s own label when the token matches',
+    () async {
+      final runtime = makeRuntime();
+      await runtime.acceptReceivedAlert(
+        ReceivedAlert.fromData({
+          'incidentId': 'matched',
+          'eventType': 'Distress Sound',
+          'riskLevel': 'critical',
+          'senderToken': 'test-token-a',
+          'senderName': 'Whoever The Sender Claimed',
+        }),
+      );
+      expect(runtime.incidentById('matched')?.senderName, 'Test contact');
+    },
+  );
+
+  test(
+    'an unknown token falls back to the sender name in the payload',
+    () async {
+      final runtime = makeRuntime();
+      await runtime.acceptReceivedAlert(
+        ReceivedAlert.fromData({
+          'incidentId': 'payload-name',
+          'eventType': 'Distress Sound',
+          'riskLevel': 'critical',
+          'senderToken': 'not-a-contact-token',
+          'senderName': 'Rayyan',
+        }),
+      );
+      expect(runtime.incidentById('payload-name')?.senderName, 'Rayyan');
+    },
+  );
+
+  test('an alert with no name anywhere stores null', () async {
+    final runtime = makeRuntime();
+    await runtime.acceptReceivedAlert(
+      ReceivedAlert.fromData({
+        'incidentId': 'nameless',
+        'eventType': 'Distress Sound',
+        'riskLevel': 'critical',
+      }),
+    );
+    expect(runtime.incidentById('nameless')?.senderName, isNull);
+  });
+
+  test('payload names are cleaned of control characters and capped', () async {
+    final runtime = makeRuntime();
+    await runtime.acceptReceivedAlert(
+      ReceivedAlert.fromData({
+        'incidentId': 'control',
+        'eventType': 'Distress Sound',
+        'senderName': 'Ayan\u0000\nKhan',
+      }),
+    );
+    expect(runtime.incidentById('control')?.senderName, 'Ayan Khan');
+    await runtime.acceptReceivedAlert(
+      ReceivedAlert.fromData({
+        'incidentId': 'lengthy',
+        'eventType': 'Distress Sound',
+        'senderName': 'a' * 200,
+      }),
+    );
+    expect(runtime.incidentById('lengthy')?.senderName?.length, 64);
+  });
+
+  test(
+    'outgoing alerts carry the saved name and omit the key when unset',
+    () async {
+      final alerts = FakeAlerts();
+      final runtime = makeRuntime(alerts: alerts);
+      final unnamed = (await runtime.recordDetection(
+        detection(RiskLevel.critical),
+      ))!;
+      await finishDispatch(runtime, unnamed.id);
+      expect(alerts.payloads.single.containsKey('senderName'), isFalse);
+
+      await runtime.saveMyName('Ayan');
+      expect(await runtime.getMyName(), 'Ayan');
+      final named = (await runtime.recordDetection(
+        detection(RiskLevel.critical),
+      ))!;
+      await finishDispatch(runtime, named.id);
+      expect(alerts.payloads.last['senderName'], 'Ayan');
+    },
+  );
+
   test('late response cannot reopen a resolved outgoing incident', () async {
     final runtime = makeRuntime();
     final incident = (await runtime.recordDetection(

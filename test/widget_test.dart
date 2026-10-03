@@ -57,6 +57,34 @@ void main() {
     expect(find.text('Trusted Contacts'), findsOneWidget);
   });
 
+  testWidgets('history icon badges the stored incident count', (tester) async {
+    await tester.pumpWidget(const SunoApp());
+    final runtime = SunoRuntimeService.instance;
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
+
+    final accepted = runtime.acceptReceivedAlert(
+      ReceivedAlert.fromData(<String, String>{
+        'incidentId': 'badge-1',
+        'eventType': 'Distress Sound',
+        'riskScore': '95',
+        'riskLevel': 'critical',
+        'detectedAt': DateTime(2026, 9, 21, 12).toIso8601String(),
+      }),
+    );
+    await tester.pump();
+    await accepted;
+    await tester.pump();
+    expect(find.text('1'), findsOneWidget);
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
+
+    final removed = runtime.removeIncident('badge-1');
+    await tester.pump();
+    await removed;
+    await tester.pump();
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
+    expect(find.text('1'), findsNothing);
+  });
+
   testWidgets('switching to Demo clears stale Live monitoring errors', (
     tester,
   ) async {
@@ -294,6 +322,135 @@ void main() {
     expect(await repository.getAll(), isEmpty);
   });
 
+  testWidgets('history re-opens a received critical alert with its details', (
+    tester,
+  ) async {
+    final runtime = SunoRuntimeService(
+      incidentRepository: InMemoryIncidentRepository(),
+      locationService: _UnavailableLocation(),
+    );
+    addTearDown(runtime.dispose);
+    await runtime.acceptReceivedAlert(
+      ReceivedAlert.fromData(<String, String>{
+        'incidentId': 'received-critical',
+        'eventType': 'Distress Sound',
+        'riskScore': '95',
+        'riskLevel': 'critical',
+        'detectedAt': DateTime(2026, 9, 21, 12).toIso8601String(),
+        'senderToken': 'synthetic-sender-token-12345',
+        'senderName': 'Ayan',
+        'latitude': '33.68442',
+        'longitude': '73.04792',
+        'locationText': 'Street 17, Gulberg',
+      }),
+    );
+    Map<String, String>? opened;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HistoryScreen(runtimeService: runtime),
+        routes: {
+          AppRoutes.alertReceived: (context) {
+            opened =
+                ModalRoute.of(context)!.settings.arguments!
+                    as Map<String, String>;
+            return const Scaffold(body: Text('Received alert detail'));
+          },
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Received alert'), findsOneWidget);
+
+    await tester.tap(find.text('Received alert'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Received alert detail'), findsOneWidget);
+    expect(opened?['incidentId'], 'received-critical');
+    expect(opened?['senderName'], 'Ayan');
+    expect(opened?['eventType'], 'Distress Sound');
+    expect(opened?['riskScore'], '95');
+    expect(opened?['riskLevel'], 'critical');
+    expect(opened?['latitude'], '33.68442');
+    expect(opened?['longitude'], '73.04792');
+    expect(opened?['locationText'], 'Street 17, Gulberg');
+  });
+
+  testWidgets('history keeps a non-critical received card inert', (
+    tester,
+  ) async {
+    final runtime = SunoRuntimeService(
+      incidentRepository: InMemoryIncidentRepository(),
+      locationService: _UnavailableLocation(),
+    );
+    addTearDown(runtime.dispose);
+    await runtime.acceptReceivedAlert(
+      ReceivedAlert.fromData(<String, String>{
+        'incidentId': 'received-medium',
+        'eventType': 'Ambient Sound',
+        'riskScore': '65',
+        'riskLevel': 'medium',
+        'detectedAt': DateTime(2026, 9, 21, 12).toIso8601String(),
+      }),
+    );
+    var openedDetail = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HistoryScreen(runtimeService: runtime),
+        routes: {
+          AppRoutes.alertReceived: (_) {
+            openedDetail = true;
+            return const Scaffold(body: Text('Received alert detail'));
+          },
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Received alert'));
+    await tester.pumpAndSettle();
+
+    expect(openedDetail, isFalse);
+    expect(find.text('Received alert detail'), findsNothing);
+    expect(find.text('Received alert'), findsOneWidget);
+  });
+
+  testWidgets('history opens an own critical alert on Emergency', (
+    tester,
+  ) async {
+    final repository = InMemoryIncidentRepository();
+    final runtime = SunoRuntimeService(
+      incidentRepository: repository,
+      locationService: _UnavailableLocation(),
+    );
+    addTearDown(runtime.dispose);
+    await repository.save(
+      _historyIncident(
+        id: 'own-critical',
+        eventType: 'Distress Sound + Impact',
+        riskScore: 95,
+        status: IncidentStatus.alertTriggered,
+        createdAt: DateTime(2026, 9, 21, 12),
+      ),
+    );
+    String? openedId;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HistoryScreen(runtimeService: runtime),
+        routes: {
+          AppRoutes.emergencyAlert: (context) {
+            openedId = ModalRoute.of(context)!.settings.arguments as String;
+            return const Scaffold(body: Text('Emergency detail opened'));
+          },
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Critical alert'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Emergency detail opened'), findsOneWidget);
+    expect(openedId, 'own-critical');
+  });
+
   testWidgets(
     'safety save failure stays actionable and retries the same incident',
     (tester) async {
@@ -346,16 +503,16 @@ void main() {
     await tester.tap(find.text('RETRY CONTACTS'));
     await tester.pumpAndSettle();
     final fields = find.byType(TextField);
-    await tester.enterText(fields.at(0), 'Test contact');
-    await tester.enterText(fields.at(2), 'Friend');
-    await tester.enterText(fields.at(3), 'synthetic-recipient-token-12345');
+    await tester.enterText(fields.at(1), 'Test contact');
+    await tester.enterText(fields.at(3), 'Friend');
+    await tester.enterText(fields.at(4), 'synthetic-recipient-token-12345');
     contacts.failSave = true;
     await tester.ensureVisible(find.text('SAVE CONTACT'));
     await tester.tap(find.text('SAVE CONTACT'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Your entries are still here'), findsOneWidget);
     expect(
-      tester.widget<TextField>(fields.at(0)).controller!.text,
+      tester.widget<TextField>(fields.at(1)).controller!.text,
       'Test contact',
     );
     contacts.failSave = false;
@@ -364,7 +521,7 @@ void main() {
     await tester.tap(find.text('SAVE CONTACT'));
     await tester.pumpAndSettle();
     expect((await contacts.getAll()).single.name, 'Test contact');
-    expect(tester.widget<TextField>(fields.at(0)).controller!.text, isEmpty);
+    expect(tester.widget<TextField>(fields.at(1)).controller!.text, isEmpty);
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byType(PopupMenuButton<String>));
@@ -462,6 +619,75 @@ void main() {
       }
     },
   );
+
+  Future<void> _pumpReceivedAlert(
+    WidgetTester tester,
+    Map<String, String> payload,
+  ) async {
+    await SunoRuntimeService.instance.acceptReceivedAlert(
+      ReceivedAlert.fromData(payload),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: AlertReceivedScreen(payload: payload)),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('received alert headlines the named sender', (tester) async {
+    await _pumpReceivedAlert(tester, <String, String>{
+      'incidentId': 'named-sender',
+      'eventType': 'Distress Sound',
+      'riskLevel': 'critical',
+      'riskScore': '95',
+      'detectedAt': DateTime.now().toIso8601String(),
+      'senderToken': 'synthetic-sender-token-12345',
+      'senderName': 'Ayan',
+    });
+    expect(find.text('Ayan may be in danger'), findsOneWidget);
+    expect(find.text('Your contact may be in danger'), findsNothing);
+  });
+
+  testWidgets('received alert keeps the generic headline without a name', (
+    tester,
+  ) async {
+    await _pumpReceivedAlert(tester, <String, String>{
+      'incidentId': 'unnamed-sender',
+      'eventType': 'Distress Sound',
+      'riskLevel': 'critical',
+      'riskScore': '95',
+      'detectedAt': DateTime.now().toIso8601String(),
+      'senderToken': 'synthetic-sender-token-12345',
+    });
+    expect(find.text('Your contact may be in danger'), findsOneWidget);
+  });
+
+  testWidgets('alert screen publishes and clears its visible incident id', (
+    tester,
+  ) async {
+    final payload = <String, String>{
+      'incidentId': 'visible-1',
+      'eventType': 'Distress Sound',
+      'riskLevel': 'critical',
+      'riskScore': '95',
+      'detectedAt': DateTime.now().toIso8601String(),
+      'senderToken': 'synthetic-sender-token-12345',
+    };
+    await _pumpReceivedAlert(tester, payload);
+    expect(AlertReceivedScreen.visibleIncidentId.value, 'visible-1');
+
+    // It is the home route here, so unmounting stands in for popping it.
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(AlertReceivedScreen.visibleIncidentId.value, isNull);
+
+    // A screen mounted for another incident re-registers the shared value.
+    await _pumpReceivedAlert(
+      tester,
+      <String, String>{...payload, 'incidentId': 'visible-2'},
+    );
+    expect(AlertReceivedScreen.visibleIncidentId.value, 'visible-2');
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(AlertReceivedScreen.visibleIncidentId.value, isNull);
+  });
 
   testWidgets(
     'Silent SOS retries failed storage and navigates with the saved ID',

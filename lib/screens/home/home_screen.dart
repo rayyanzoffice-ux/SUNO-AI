@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
 import '../../widgets/silent_sos_sheet.dart';
 import '../../widgets/suno_logo.dart';
@@ -17,9 +18,26 @@ class HomeScreen extends StatelessWidget {
       elevation: 0,
       scrolledUnderElevation: 0,
       actions: [
-        IconButton(
-          icon: const Icon(Icons.history_rounded, color: Colors.white70, size: 24),
-          onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
+        ListenableBuilder(
+          listenable: SunoRuntimeService.instance,
+          builder: (context, _) {
+            final count = SunoRuntimeService.instance.storedIncidentCount;
+            return IconButton(
+              icon: Badge(
+                isLabelVisible: count > 0,
+                label: Text(count > 99 ? '99+' : '$count'),
+                backgroundColor: AppColors.emergency,
+                alignment: AlignmentDirectional.topStart,
+                offset: const Offset(-4, -4),
+                child: const Icon(
+                  Icons.history_rounded,
+                  color: Colors.white70,
+                  size: 24,
+                ),
+              ),
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.history),
+            );
+          },
         ),
       ],
     ),

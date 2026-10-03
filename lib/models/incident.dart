@@ -35,6 +35,7 @@ class Incident {
     this.safetyCheckDeadline,
     this.dispatchResult,
     this.senderToken,
+    this.senderName,
   });
 
   final String id;
@@ -47,6 +48,7 @@ class Incident {
   final DateTime? safetyCheckDeadline;
   final AlertDispatchResult? dispatchResult;
   final String? senderToken;
+  final String? senderName;
 
   bool get isReceived => origin != 'self';
 
@@ -67,5 +69,6 @@ class Incident {
     safetyCheckDeadline: safetyCheckDeadline,
     dispatchResult: dispatchResult ?? this.dispatchResult,
     senderToken: senderToken,
+    senderName: senderName,
   );
 }
