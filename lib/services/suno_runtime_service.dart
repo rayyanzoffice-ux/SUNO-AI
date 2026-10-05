@@ -564,7 +564,7 @@ class SunoRuntimeService extends ChangeNotifier {
               'locationText': detection.locationText!,
             if (service.deviceToken != null)
               'senderToken': service.deviceToken!,
-            if (myName != null) 'senderName': myName,
+            'senderName': ?myName,
           },
         );
         if (sent < 0 || sent > attempted) {

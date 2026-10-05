@@ -68,13 +68,18 @@ void main() {
       await Hive.close();
       await Hive.openBox<Map>('incidents');
       expect((await repository.latest())!.senderName, 'Ayan');
-      final withoutName = Map<String, dynamic>.from(
-        Hive.box<Map>('incidents').get('named')!,
-      )..remove('senderName');
-      await Hive.box<Map>('incidents').put('legacy', withoutName);
+      final namedMap = Hive.box<Map>('incidents').get('named')!;
+      final legacy = Map<String, dynamic>.from(namedMap)
+        ..['id'] = 'legacy'
+        ..remove('senderName');
+      await Hive.box<Map>('incidents').put('legacy', legacy);
       await Hive.close();
       await Hive.openBox<Map>('incidents');
       final history = await repository.getAll();
+      expect(
+        history.map((incident) => incident.id),
+        containsAll(['named', 'legacy']),
+      );
       expect(
         history.singleWhere((incident) => incident.id == 'legacy').senderName,
         isNull,

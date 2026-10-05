@@ -72,7 +72,7 @@ void main() {
       }),
     );
     await tester.pump();
-    await accepted;
+    expect(await accepted, isNotNull);
     await tester.pump();
     expect(find.text('1'), findsOneWidget);
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
@@ -620,21 +620,25 @@ void main() {
     },
   );
 
-  Future<void> _pumpReceivedAlert(
+  Future<void> pumpReceivedAlert(
     WidgetTester tester,
     Map<String, String> payload,
   ) async {
-    await SunoRuntimeService.instance.acceptReceivedAlert(
+    final accepted = await SunoRuntimeService.instance.acceptReceivedAlert(
       ReceivedAlert.fromData(payload),
     );
+    expect(accepted, isNotNull);
     await tester.pumpWidget(
       MaterialApp(home: AlertReceivedScreen(payload: payload)),
     );
-    await tester.pumpAndSettle();
+    // MapPreviewCard mounts a live flutter_map, whose tile timers can hold
+    // pumpAndSettle out for its full 10-minute timeout.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
   }
 
   testWidgets('received alert headlines the named sender', (tester) async {
-    await _pumpReceivedAlert(tester, <String, String>{
+    await pumpReceivedAlert(tester, <String, String>{
       'incidentId': 'named-sender',
       'eventType': 'Distress Sound',
       'riskLevel': 'critical',
@@ -650,7 +654,7 @@ void main() {
   testWidgets('received alert keeps the generic headline without a name', (
     tester,
   ) async {
-    await _pumpReceivedAlert(tester, <String, String>{
+    await pumpReceivedAlert(tester, <String, String>{
       'incidentId': 'unnamed-sender',
       'eventType': 'Distress Sound',
       'riskLevel': 'critical',
@@ -672,7 +676,7 @@ void main() {
       'detectedAt': DateTime.now().toIso8601String(),
       'senderToken': 'synthetic-sender-token-12345',
     };
-    await _pumpReceivedAlert(tester, payload);
+    await pumpReceivedAlert(tester, payload);
     expect(AlertReceivedScreen.visibleIncidentId.value, 'visible-1');
 
     // It is the home route here, so unmounting stands in for popping it.
@@ -680,7 +684,7 @@ void main() {
     expect(AlertReceivedScreen.visibleIncidentId.value, isNull);
 
     // A screen mounted for another incident re-registers the shared value.
-    await _pumpReceivedAlert(
+    await pumpReceivedAlert(
       tester,
       <String, String>{...payload, 'incidentId': 'visible-2'},
     );
