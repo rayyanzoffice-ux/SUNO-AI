@@ -58,10 +58,12 @@ void main() {
   });
 
   testWidgets('history icon badges the stored incident count', (tester) async {
+    debugPrint('SUNO-TRACE badge: pumpWidget home');
     await tester.pumpWidget(const SunoApp());
     final runtime = SunoRuntimeService.instance;
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
 
+    debugPrint('SUNO-TRACE badge: accept');
     final accepted = runtime.acceptReceivedAlert(
       ReceivedAlert.fromData(<String, String>{
         'incidentId': 'badge-1',
@@ -71,19 +73,24 @@ void main() {
         'detectedAt': DateTime(2026, 9, 21, 12).toIso8601String(),
       }),
     );
+    debugPrint('SUNO-TRACE badge: pump');
     await tester.pump();
+    debugPrint('SUNO-TRACE badge: await accepted');
     expect(await accepted, isNotNull);
     await tester.pump();
     expect(find.text('1'), findsOneWidget);
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
 
+    debugPrint('SUNO-TRACE badge: remove');
     final removed = runtime.removeIncident('badge-1');
     await tester.pump();
+    debugPrint('SUNO-TRACE badge: await removed');
     await removed;
     await tester.pump();
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
     expect(find.text('1'), findsNothing);
-  });
+    debugPrint('SUNO-TRACE badge: reached end');
+  }, timeout: Timeout(Duration(seconds: 60)));
 
   testWidgets('switching to Demo clears stale Live monitoring errors', (
     tester,
@@ -624,15 +631,17 @@ void main() {
     WidgetTester tester,
     Map<String, String> payload,
   ) async {
-    final accepted = await SunoRuntimeService.instance.acceptReceivedAlert(
+    final accepted = SunoRuntimeService.instance.acceptReceivedAlert(
       ReceivedAlert.fromData(payload),
     );
-    expect(accepted, isNotNull);
+    debugPrint('SUNO-TRACE helper: await accepted');
+    // Pump before awaiting: under this binding's fake-async queue a bare
+    // await of the microtask chain can never be resumed.
+    await tester.pump();
+    expect(await accepted, isNotNull);
     await tester.pumpWidget(
       MaterialApp(home: AlertReceivedScreen(payload: payload)),
     );
-    // MapPreviewCard mounts a live flutter_map, whose tile timers can hold
-    // pumpAndSettle out for its full 10-minute timeout.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
   }
@@ -649,7 +658,7 @@ void main() {
     });
     expect(find.text('Ayan may be in danger'), findsOneWidget);
     expect(find.text('Your contact may be in danger'), findsNothing);
-  });
+  }, timeout: Timeout(Duration(seconds: 60)));
 
   testWidgets('received alert keeps the generic headline without a name', (
     tester,
@@ -663,7 +672,7 @@ void main() {
       'senderToken': 'synthetic-sender-token-12345',
     });
     expect(find.text('Your contact may be in danger'), findsOneWidget);
-  });
+  }, timeout: Timeout(Duration(seconds: 60)));
 
   testWidgets('alert screen publishes and clears its visible incident id', (
     tester,
@@ -691,7 +700,7 @@ void main() {
     expect(AlertReceivedScreen.visibleIncidentId.value, 'visible-2');
     await tester.pumpWidget(const SizedBox.shrink());
     expect(AlertReceivedScreen.visibleIncidentId.value, isNull);
-  });
+  }, timeout: Timeout(Duration(seconds: 60)));
 
   testWidgets(
     'Silent SOS retries failed storage and navigates with the saved ID',
