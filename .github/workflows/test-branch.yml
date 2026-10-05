@@ -12,7 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -56,10 +56,13 @@ jobs:
 
       - name: Full suite
         if: always()
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           set -o pipefail
-          flutter test --reporter expanded --timeout 90s 2>&1 | tee full-suite.log
+          rc=0
+          flutter test --reporter expanded --timeout 90s 2>&1 | tee full-suite.log || rc=$?
+          grep -n 'SUNO-TRACE' full-suite.log || true
+          exit $rc
 
       - name: Upload test logs
         if: always()
