@@ -7,6 +7,7 @@ class ReceivedAlert {
     required this.detectedAt,
     required this.location,
     this.senderToken,
+    this.senderName,
     this.latitude,
     this.longitude,
     this.isSimulated = false,
@@ -19,6 +20,7 @@ class ReceivedAlert {
   final String? detectedAt;
   final String? location;
   final String? senderToken;
+  final String? senderName;
   final String? latitude;
   final String? longitude;
   final bool isSimulated;
@@ -37,6 +39,7 @@ class ReceivedAlert {
       detectedAt: value('detectedAt'),
       location: value('location') ?? value('locationText'),
       senderToken: value('senderToken'),
+      senderName: value('senderName'),
       latitude: value('latitude'),
       longitude: value('longitude'),
       isSimulated: value('isSimulated') == 'true',

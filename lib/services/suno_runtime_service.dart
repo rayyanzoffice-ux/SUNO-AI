@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../backend/backend_exports.dart';
+import '../core/utils/display_name.dart';
 import '../models/alert_dispatch_result.dart';
 import '../models/detection_result.dart';
 import '../models/incident.dart';
@@ -18,6 +19,7 @@ class SunoRuntimeService extends ChangeNotifier {
     SafetyCheckEngine? safetyCheckEngine,
     IncidentRepository? incidentRepository,
     TrustedContactRepository? trustedContactRepository,
+    ProfileRepository? profileRepository,
     this._alertService,
     LocationService? locationService,
   }) : _detectionEngine = detectionEngine ?? DetectionEngine.instance,
@@ -25,6 +27,7 @@ class SunoRuntimeService extends ChangeNotifier {
        _incidents = incidentRepository ?? InMemoryIncidentRepository(),
        _contacts =
            trustedContactRepository ?? InMemoryTrustedContactRepository(),
+       _profile = profileRepository ?? InMemoryProfileRepository(),
        locationService = locationService ?? LocationService();
 
   static SunoRuntimeService instance = SunoRuntimeService();
@@ -32,6 +35,7 @@ class SunoRuntimeService extends ChangeNotifier {
   final SafetyCheckEngine _safetyCheckEngine;
   final IncidentRepository _incidents;
   final TrustedContactRepository _contacts;
+  final ProfileRepository _profile;
   final AlertService? _alertService;
   final LocationService locationService;
   final Map<String, Incident> _knownIncidents = {};
@@ -65,6 +69,13 @@ class SunoRuntimeService extends ChangeNotifier {
   Future<void> get safetyCheckCompleted => _safetyTask ?? Future.value();
   bool isDispatching(String id) => _dispatches.containsKey(id);
   Incident? incidentById(String id) => _knownIncidents[id];
+
+  /// Read-only view of every stored incident (own and received).
+  Iterable<Incident> get knownIncidents =>
+      List<Incident>.unmodifiable(_knownIncidents.values);
+
+  /// How many incidents are stored in History (own and received).
+  int get storedIncidentCount => _knownIncidents.length;
   String? get deviceToken => _alertService?.deviceToken;
 
   void _changed() {
@@ -343,6 +354,7 @@ class SunoRuntimeService extends ChangeNotifier {
       final score = (int.tryParse(alert.riskScore ?? '') ?? 100)
           .clamp(0, 100)
           .toInt();
+      final senderName = await _resolveSenderName(alert);
       final received = Incident(
         id: id,
         detectionResult: DetectionResult(
@@ -367,6 +379,7 @@ class SunoRuntimeService extends ChangeNotifier {
         updatedAt: now,
         origin: 'Trusted Contact',
         senderToken: alert.senderToken,
+        senderName: senderName,
       );
       await _incidents.save(received);
       _knownIncidents[id] = received;
@@ -405,6 +418,34 @@ class SunoRuntimeService extends ChangeNotifier {
   Future<TrustedContact> updateTrustedContact(TrustedContact contact) =>
       _contacts.update(contact);
   Future<void> removeTrustedContact(String id) => _contacts.remove(id);
+
+  /// The name this user shows to their trusted contacts, or `null`.
+  Future<String?> getMyName() => _profile.getDisplayName();
+
+  /// Saves the user's own display name (cleaned, max 40 chars). Empty clears it.
+  Future<void> saveMyName(String raw) =>
+      _profile.setDisplayName(cleanDisplayName(raw, maxLength: 40));
+
+  /// Picks the best name for the person who sent [alert].
+  ///
+  /// Priority: the receiver's own saved contact whose FCM token matches the
+  /// sender's token, then the name the sender put in the payload, else null.
+  /// Never throws: a storage failure just falls through to the next source.
+  Future<String?> _resolveSenderName(ReceivedAlert alert) async {
+    final token = alert.senderToken?.trim();
+    if (token != null && token.isNotEmpty) {
+      try {
+        final match = (await _contacts.getAll())
+            .where((contact) => contact.fcmToken?.trim() == token)
+            .firstOrNull;
+        final local = cleanDisplayName(match?.name, maxLength: 64);
+        if (local != null) return local;
+      } catch (error) {
+        debugPrint('SUNO sender-name lookup failed: $error');
+      }
+    }
+    return cleanDisplayName(alert.senderName, maxLength: 64);
+  }
 
   Future<bool> testContactNotification(TrustedContact contact) async {
     final service = _alertService;
@@ -500,6 +541,12 @@ class SunoRuntimeService extends ChangeNotifier {
         );
       } else {
         final detection = incident.detectionResult;
+        String? myName;
+        try {
+          myName = await _profile.getDisplayName();
+        } catch (error) {
+          debugPrint('SUNO could not read display name: $error');
+        }
         final sent = await service.sendAlert(
           contactTokens: tokens,
           payload: {
@@ -517,6 +564,7 @@ class SunoRuntimeService extends ChangeNotifier {
               'locationText': detection.locationText!,
             if (service.deviceToken != null)
               'senderToken': service.deviceToken!,
+            'senderName': ?myName,
           },
         );
         if (sent < 0 || sent > attempted) {

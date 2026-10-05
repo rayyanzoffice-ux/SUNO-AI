@@ -1,0 +1,75 @@
+name: Test branch (no APK)
+
+on:
+  push:
+    branches:
+      - 'fix/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        timeout-minutes: 5
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      # Each test step carries its own timeout-minutes. A killed step still
+      # leaves its tee-ed log on disk and the steps below are if: always(), so
+      # a slow or hanging test is attributed instead of eating the whole job.
+      - name: Persistence round-trip
+        timeout-minutes: 3
+        run: |
+          set -o pipefail
+          flutter test test/persistence_test.dart --reporter expanded \
+            2>&1 | tee failing-persistence.log
+
+      - name: History badge test
+        if: always()
+        timeout-minutes: 3
+        run: |
+          set -o pipefail
+          flutter test test/widget_test.dart --reporter expanded \
+            --plain-name 'history icon badges the stored incident count' \
+            2>&1 | tee failing-badge.log
+
+      - name: Named-sender headline test
+        if: always()
+        timeout-minutes: 3
+        run: |
+          set -o pipefail
+          flutter test test/widget_test.dart --reporter expanded \
+            --plain-name 'received alert headlines the named sender' \
+            2>&1 | tee failing-headline.log
+
+      - name: Full suite
+        if: always()
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded --timeout 90s 2>&1 | tee full-suite.log
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: '*.log'
+          if-no-files-found: ignore
+          retention-days: 7

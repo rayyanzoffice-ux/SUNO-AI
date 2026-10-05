@@ -14,6 +14,11 @@ class AlertReceivedScreen extends StatefulWidget {
 
   final Map<String, String> payload;
 
+  /// Incident id of the alert screen currently on screen, or null. Lets the
+  /// notification router avoid pushing a second copy of the same alert.
+  static final ValueNotifier<String?> visibleIncidentId =
+      ValueNotifier<String?>(null);
+
   @override
   State<AlertReceivedScreen> createState() => _AlertReceivedScreenState();
 }
@@ -34,6 +39,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
   @override
   void initState() {
     super.initState();
+    AlertReceivedScreen.visibleIncidentId.value = _incidentId;
     SunoRuntimeService.instance.addListener(_refresh);
   }
 
@@ -48,6 +54,14 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
   String get _locationText =>
       widget.payload['locationText'] ?? 'Location unavailable';
   String? get _senderToken => widget.payload['senderToken'];
+
+  /// Best available name for the person in danger, or null when unknown.
+  String? get _senderName {
+    final saved = _incident?.senderName?.trim();
+    if (saved != null && saved.isNotEmpty) return saved;
+    final fromPayload = widget.payload['senderName']?.trim();
+    return (fromPayload == null || fromPayload.isEmpty) ? null : fromPayload;
+  }
 
   double? get _latitude {
     final raw = widget.payload['latitude'];
@@ -79,10 +93,16 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
           'Sender token unavailable. Please contact them directly.',
         );
       }
+      String? myName;
+      try {
+        myName = await SunoRuntimeService.instance.getMyName();
+      } catch (error) {
+        debugPrint('SUNO could not read display name: $error');
+      }
       await SunoRuntimeService.instance.sendResponse(
         recipientToken: senderToken,
         incidentId: _incidentId,
-        responderName: 'Your contact',
+        responderName: myName ?? 'Your contact',
         status: statusWire,
         message: message,
       );
@@ -105,6 +125,9 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
 
   @override
   void dispose() {
+    if (AlertReceivedScreen.visibleIncidentId.value == _incidentId) {
+      AlertReceivedScreen.visibleIncidentId.value = null;
+    }
     SunoRuntimeService.instance.removeListener(_refresh);
     _scrollController.dispose();
     super.dispose();
@@ -162,7 +185,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                         ? 'This incident is unavailable'
                         : _incident!.status == IncidentStatus.resolved
                         ? 'Incident resolved'
-                        : 'Your contact may be in danger',
+                        : '${_senderName ?? 'Your contact'} may be in danger',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.text,

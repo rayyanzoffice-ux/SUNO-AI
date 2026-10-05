@@ -82,6 +82,23 @@ Deno.test('local relay validation and mocked upstream delivery', async (t) => {
       equal((await response.json()).sent, 1);
       equal((messages[0].data as Record<string, unknown>).eventType, 'Ambient Sound');
     });
+    await t.step('names the sender in the tray title and rejects unusable names', async () => {
+      messages.length = 0;
+      const named = await handleRequest(request({ contactTokens: [fakeToken],
+        payload: { ...payload, isSimulated: 'false', senderName: 'Ayan' } }));
+      equal(named.status, 200);
+      equal((messages[0].notification as Record<string, unknown>).title, 'Ayan may be in danger');
+      messages.length = 0;
+      const anonymous = await handleRequest(request({ contactTokens: [fakeToken],
+        payload: { ...payload, isSimulated: 'false' } }));
+      equal(anonymous.status, 200);
+      equal((messages[0].notification as Record<string, unknown>).title, 'SUNO emergency alert');
+      for (const invalid of ['x'.repeat(65), '']) {
+        equal((await handleRequest(request({ contactTokens: [fakeToken],
+          payload: { ...payload, senderName: invalid } }))).status, 400);
+      }
+      equal(messages.length, 1);
+    });
     await t.step('silent tests have no notification content', async () => {
       messages.length = 0;
       equal((await handleRequest(request({ contactTokens: [fakeToken], payload: { type: 'test' }, test: true }))).status, 200);
