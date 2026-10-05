@@ -205,4 +205,4 @@ function base64Url(input: string | ArrayBuffer): string {
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
-Deno.serve(handleRequest);
+if (import.meta.main) Deno.serve(handleRequest);
