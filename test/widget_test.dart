@@ -66,11 +66,9 @@ void main() {
       locationService: _UnavailableLocation(),
     );
     SunoRuntimeService.instance = runtime;
-    debugPrint('SUNO-TRACE badge: pumpWidget home');
     await tester.pumpWidget(const SunoApp());
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
 
-    debugPrint('SUNO-TRACE badge: accept');
     final accepted = runtime.acceptReceivedAlert(
       ReceivedAlert.fromData(<String, String>{
         'incidentId': 'badge-1',
@@ -80,23 +78,18 @@ void main() {
         'detectedAt': DateTime(2026, 9, 21, 12).toIso8601String(),
       }),
     );
-    debugPrint('SUNO-TRACE badge: pump');
     await tester.pump();
-    debugPrint('SUNO-TRACE badge: await accepted');
     expect(await accepted, isNotNull);
     await tester.pump();
     expect(find.text('1'), findsOneWidget);
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
 
-    debugPrint('SUNO-TRACE badge: remove');
     final removed = runtime.removeIncident('badge-1');
     await tester.pump();
-    debugPrint('SUNO-TRACE badge: await removed');
     await removed;
     await tester.pump();
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
     expect(find.text('1'), findsNothing);
-    debugPrint('SUNO-TRACE badge: reached end');
   }, timeout: Timeout(Duration(seconds: 60)));
 
   testWidgets('switching to Demo clears stale Live monitoring errors', (
@@ -647,11 +640,9 @@ void main() {
       locationService: _UnavailableLocation(),
     );
     SunoRuntimeService.instance = runtime;
-    debugPrint('SUNO-TRACE helper: await accepted');
     final accepted = await runtime.acceptReceivedAlert(
       ReceivedAlert.fromData(payload),
     );
-    debugPrint('SUNO-TRACE helper: accepted ok');
     expect(accepted, isNotNull);
     await tester.pumpWidget(
       MaterialApp(home: AlertReceivedScreen(payload: payload)),

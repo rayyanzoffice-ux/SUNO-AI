@@ -26,6 +26,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Analyze
+        timeout-minutes: 5
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
       # Each test step carries its own timeout-minutes. A killed step still
       # leaves its tee-ed log on disk and the steps below are if: always(), so
       # a slow or hanging test is attributed instead of eating the whole job.
@@ -59,10 +63,7 @@ jobs:
         timeout-minutes: 15
         run: |
           set -o pipefail
-          rc=0
-          flutter test --reporter expanded --timeout 90s 2>&1 | tee full-suite.log || rc=$?
-          grep -n 'SUNO-TRACE' full-suite.log || true
-          exit $rc
+          flutter test --reporter expanded --timeout 90s 2>&1 | tee full-suite.log
 
       - name: Upload test logs
         if: always()
