@@ -1,0 +1,54 @@
+name: Test branch (no APK)
+
+on:
+  push:
+    branches:
+      - 'fix/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Previously failing tests first
+        run: |
+          set -o pipefail
+          flutter test test/persistence_test.dart --reporter expanded --timeout 90s \
+            2>&1 | tee failing-1.log || true
+          flutter test test/widget_test.dart --reporter expanded --timeout 90s \
+            --plain-name 'history icon badges the stored incident count' \
+            2>&1 | tee failing-2.log || true
+          flutter test test/widget_test.dart --reporter expanded --timeout 90s \
+            --plain-name 'received alert headlines the named sender' \
+            2>&1 | tee failing-3.log || true
+
+      - name: Full suite
+        if: always()
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded --timeout 90s 2>&1 | tee full-suite.log
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: '*.log'
+          if-no-files-found: ignore
+          retention-days: 7
