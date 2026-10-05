@@ -58,9 +58,16 @@ void main() {
   });
 
   testWidgets('history icon badges the stored incident count', (tester) async {
+    SunoRuntimeService.instance.dispose();
+    // Constructed here, not in setUp: a Future built in setUp belongs to
+    // package:test's outer zone and cannot resume inside this fake-async body.
+    final runtime = SunoRuntimeService(
+      incidentRepository: InMemoryIncidentRepository(),
+      locationService: _UnavailableLocation(),
+    );
+    SunoRuntimeService.instance = runtime;
     debugPrint('SUNO-TRACE badge: pumpWidget home');
     await tester.pumpWidget(const SunoApp());
-    final runtime = SunoRuntimeService.instance;
     expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
 
     debugPrint('SUNO-TRACE badge: accept');
@@ -631,14 +638,21 @@ void main() {
     WidgetTester tester,
     Map<String, String> payload,
   ) async {
-    final accepted = SunoRuntimeService.instance.acceptReceivedAlert(
+    SunoRuntimeService.instance.dispose();
+    // Built here, not from setUp: a runtime created in setUp binds its futures
+    // to package:test's outer zone, and awaiting them never resumes inside a
+    // fake-async test body. Same idiom as the passing history tests.
+    final runtime = SunoRuntimeService(
+      incidentRepository: InMemoryIncidentRepository(),
+      locationService: _UnavailableLocation(),
+    );
+    SunoRuntimeService.instance = runtime;
+    debugPrint('SUNO-TRACE helper: await accepted');
+    final accepted = await runtime.acceptReceivedAlert(
       ReceivedAlert.fromData(payload),
     );
-    debugPrint('SUNO-TRACE helper: await accepted');
-    // Pump before awaiting: under this binding's fake-async queue a bare
-    // await of the microtask chain can never be resumed.
-    await tester.pump();
-    expect(await accepted, isNotNull);
+    debugPrint('SUNO-TRACE helper: accepted ok');
+    expect(accepted, isNotNull);
     await tester.pumpWidget(
       MaterialApp(home: AlertReceivedScreen(payload: payload)),
     );
