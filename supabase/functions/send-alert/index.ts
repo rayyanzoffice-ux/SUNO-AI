@@ -205,4 +205,6 @@ function base64Url(input: string | ArrayBuffer): string {
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
-if (import.meta.main) Deno.serve(handleRequest);
+// No `import.meta.main` guard: the dashboard compiles this without `import.meta` support (TS1343), so the
+// guard leaves the function booted with no server bound and every request hanging until the gateway times out.
+Deno.serve(handleRequest);
