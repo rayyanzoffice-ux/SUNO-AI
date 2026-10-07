@@ -99,6 +99,21 @@ Deno.test('local relay validation and mocked upstream delivery', async (t) => {
       }
       equal(messages.length, 1);
     });
+    await t.step('builds the banner in the sender language and falls back to English', async () => {
+      messages.length = 0;
+      const arabic = await handleRequest(request({ contactTokens: [fakeToken],
+        payload: { ...payload, isSimulated: 'false', senderName: 'Ayan', languageCode: 'ar' } }));
+      equal(arabic.status, 200);
+      const banner = messages[0].notification as Record<string, unknown>;
+      equal(banner.title, 'قد يكون Ayan في خطر');
+      equal(banner.body, 'صوت استغاثة · خطر 95%');
+      messages.length = 0;
+      const unsupported = await handleRequest(request({ contactTokens: [fakeToken],
+        payload: { ...payload, isSimulated: 'false', languageCode: 'pt' } }));
+      equal(unsupported.status, 200);
+      equal((messages[0].notification as Record<string, unknown>).title, 'SUNO emergency alert');
+      equal((messages[0].data as Record<string, unknown>).languageCode, 'pt');
+    });
     await t.step('silent tests have no notification content', async () => {
       messages.length = 0;
       equal((await handleRequest(request({ contactTokens: [fakeToken], payload: { type: 'test' }, test: true }))).status, 200);

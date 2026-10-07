@@ -8,6 +8,72 @@ const ALLOWED_EVENTS = new Set([
   'Ambient Sound', 'Live Detector Event', 'SUNO preflight',
 ]);
 const ALLOWED_RESPONSE_STATUSES = new Set(['contactChecking', 'resolved', 'alertTriggered']);
+const LANGUAGE_CODES = new Set(['en', 'zh', 'hi', 'es', 'fr', 'ur', 'ar', 'bn']);
+// Banner event labels mirror lib/l10n/app_<code>.arb exactly, so the notification and the
+// recipient's in-app History never show two different names for one event. The two entries
+// with no ARB key fall back to the raw wire string below.
+const EVENT_LABELS: Record<string, Record<string, string>> = {
+  en: {
+    'Distress Sound': 'Distress Sound', 'Emergency Alarm': 'Emergency Alarm',
+    'Impact / Breaking Sound': 'Impact / Breaking Sound', 'Ambient Sound': 'Ambient Sound',
+    'Possible Distress Sound': 'Possible Distress Sound',
+    'Distress Sound + Impact': 'Distress Sound + Impact', 'Manual Silent Alert': 'Manual Silent Alert',
+  },
+  zh: {
+    'Distress Sound': '求救声', 'Emergency Alarm': '紧急警报声',
+    'Impact / Breaking Sound': '撞击/破碎声', 'Ambient Sound': '环境声音',
+    'Possible Distress Sound': '疑似求救声', 'Distress Sound + Impact': '求救声 + 撞击',
+    'Manual Silent Alert': '手动静默警报',
+  },
+  hi: {
+    'Distress Sound': 'संकट की आवाज़', 'Emergency Alarm': 'आपातकालीन अलार्म',
+    'Impact / Breaking Sound': 'टक्कर / टूटने की आवाज़', 'Ambient Sound': 'आसपास की आवाज़',
+    'Possible Distress Sound': 'संभावित संकट की आवाज़',
+    'Distress Sound + Impact': 'संकट की आवाज़ + टक्कर', 'Manual Silent Alert': 'मैन्युअल साइलेंट अलर्ट',
+  },
+  es: {
+    'Distress Sound': 'Sonido de auxilio', 'Emergency Alarm': 'Alarma de emergencia',
+    'Impact / Breaking Sound': 'Impacto / sonido de rotura', 'Ambient Sound': 'Sonido ambiente',
+    'Possible Distress Sound': 'Posible sonido de auxilio',
+    'Distress Sound + Impact': 'Sonido de auxilio + impacto', 'Manual Silent Alert': 'Alerta silenciosa manual',
+  },
+  fr: {
+    'Distress Sound': 'Son de détresse', 'Emergency Alarm': 'Alarme d’urgence',
+    'Impact / Breaking Sound': 'Choc / bruit de bris', 'Ambient Sound': 'Son ambiant',
+    'Possible Distress Sound': 'Son de détresse possible',
+    'Distress Sound + Impact': 'Son de détresse + choc', 'Manual Silent Alert': 'Alerte silencieuse manuelle',
+  },
+  ur: {
+    'Distress Sound': 'پریشانی کی آواز', 'Emergency Alarm': 'ایمرجنسی الارم',
+    'Impact / Breaking Sound': 'ٹکراؤ / ٹوٹنے کی آواز', 'Ambient Sound': 'ماحول کی آواز',
+    'Possible Distress Sound': 'ممکنہ پریشانی کی آواز',
+    'Distress Sound + Impact': 'پریشانی کی آواز + ٹکراؤ', 'Manual Silent Alert': 'دستی خاموش الرٹ',
+  },
+  ar: {
+    'Distress Sound': 'صوت استغاثة', 'Emergency Alarm': 'إنذار طوارئ',
+    'Impact / Breaking Sound': 'صوت اصطدام / تحطّم', 'Ambient Sound': 'صوت محيط',
+    'Possible Distress Sound': 'صوت استغاثة محتمل',
+    'Distress Sound + Impact': 'صوت استغاثة + اصطدام', 'Manual Silent Alert': 'تنبيه صامت يدوي',
+  },
+  bn: {
+    'Distress Sound': 'বিপদের শব্দ', 'Emergency Alarm': 'জরুরি অ্যালার্ম',
+    'Impact / Breaking Sound': 'আঘাত / ভাঙার শব্দ', 'Ambient Sound': 'পরিবেশের শব্দ',
+    'Possible Distress Sound': 'সম্ভাব্য বিপদের শব্দ',
+    'Distress Sound + Impact': 'বিপদের শব্দ + আঘাত', 'Manual Silent Alert': 'ম্যানুয়াল নীরব সতর্কতা',
+  },
+};
+// %s is replaced with the sender's name by a function replacer, so a name containing
+// "$&" or "$1" cannot alter the text the way a string replacement would.
+const BANNERS: Record<string, { alert: string; alertNamed: string; simulated: string; simulatedNamed: string; risk: string }> = {
+  en: { alert: 'SUNO emergency alert', alertNamed: '%s may be in danger', simulated: 'SUNO simulated emergency', simulatedNamed: 'SUNO simulated emergency — %s', risk: 'Risk' },
+  zh: { alert: 'SUNO 紧急警报', alertNamed: '%s 可能处于危险中', simulated: 'SUNO 模拟紧急情况', simulatedNamed: 'SUNO 模拟紧急情况 — %s', risk: '风险' },
+  hi: { alert: 'SUNO आपातकालीन अलर्ट', alertNamed: '%s ख़तरे में हो सकते हैं', simulated: 'SUNO सिमुलेटेड आपातकाल', simulatedNamed: 'SUNO सिमुलेटेड आपातकाल — %s', risk: 'जोखिम' },
+  es: { alert: 'Alerta de emergencia SUNO', alertNamed: '%s puede estar en peligro', simulated: 'Emergencia simulada de SUNO', simulatedNamed: 'Emergencia simulada de SUNO — %s', risk: 'Riesgo' },
+  fr: { alert: 'Alerte d’urgence SUNO', alertNamed: '%s est peut-être en danger', simulated: 'Urgence simulée SUNO', simulatedNamed: 'Urgence simulée SUNO — %s', risk: 'Risque' },
+  ur: { alert: 'SUNO ایمرجنسی الرٹ', alertNamed: '%s خطر میں ہو سکتے ہیں', simulated: 'SUNO مشقی ایمرجنسی', simulatedNamed: 'SUNO مشقی ایمرجنسی — %s', risk: 'خطرہ' },
+  ar: { alert: 'تنبيه طوارئ من SUNO', alertNamed: 'قد يكون %s في خطر', simulated: 'حالة طوارئ تجريبية من SUNO', simulatedNamed: 'حالة طوارئ تجريبية من SUNO — %s', risk: 'خطر' },
+  bn: { alert: 'SUNO জরুরি সতর্কতা', alertNamed: '%s বিপদে থাকতে পারেন', simulated: 'SUNO অনুকরণ জরুরি অবস্থা', simulatedNamed: 'SUNO অনুকরণ জরুরি অবস্থা — %s', risk: 'ঝুঁকি' },
+};
 const encoder = new TextEncoder();
 
 type Delivery = { token: string; message: Record<string, unknown> };
@@ -81,13 +147,20 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
     const tokens = [...new Set((body.contactTokens as string[]).map((value) => value.trim()))];
     const senderName = typeof payload.senderName === 'string' ? payload.senderName.trim() : '';
-    const title = payload.isSimulated === 'true'
-      ? (senderName ? `SUNO simulated emergency — ${senderName}` : 'SUNO simulated emergency')
-      : (senderName ? `${senderName} may be in danger` : 'SUNO emergency alert');
+    // Never let a language problem block an alert: anything unrecognised, including an
+    // older app that sends no languageCode at all, silently falls back to English.
+    const language = LANGUAGE_CODES.has(String(payload.languageCode)) ? String(payload.languageCode) : 'en';
+    const banner = BANNERS[language];
+    const eventType = String(payload.eventType);
+    const event = EVENT_LABELS[language][eventType] ?? eventType;
+    const titleTemplate = payload.isSimulated === 'true'
+      ? (senderName ? banner.simulatedNamed : banner.simulated)
+      : (senderName ? banner.alertNamed : banner.alert);
+    const title = senderName ? titleTemplate.replaceAll('%s', () => senderName) : titleTemplate;
     for (const recipient of tokens) deliveries.push({ token: recipient, message: {
       ...(isTest ? {} : { notification: {
         title,
-        body: `${payload.eventType} · Risk ${payload.riskScore}%`,
+        body: `${event} · ${banner.risk} ${payload.riskScore}%`,
       } }),
       data: payload, android: isTest ? { priority: 'HIGH' } : android,
     } });
