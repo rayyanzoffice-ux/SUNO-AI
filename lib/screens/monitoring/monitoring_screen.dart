@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../backend/location/location_service.dart';
+import '../../core/l10n/l10n.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
@@ -29,7 +30,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
   late final MonitoringService _monitoring;
   bool detecting = false;
   bool _navigating = false;
-  String? _message;
+  _SimulationMessage? _message;
   String? _previousIncident;
 
   @override
@@ -93,21 +94,27 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
       final result = await _runtime.runDetection(selectedScenario);
       if (!mounted) return;
       if (result.riskLevel == RiskLevel.low) {
-        setState(
-          () => _message = 'Low-risk simulation complete. No alert was sent.',
-        );
+        setState(() => _message = _SimulationMessage.lowRiskDone);
       } else {
         final incident = await _runtime.recordDetection(result);
         if (mounted && incident != null) _openIncident(incident);
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _message = 'Simulation could not finish. Please retry.');
+        setState(() => _message = _SimulationMessage.failed);
       }
     } finally {
       if (mounted) setState(() => detecting = false);
     }
   }
+
+  /// Resolved while building, so switching language in Settings refreshes the
+  /// last simulation result instead of leaving it in the old wording.
+  String? _messageText(AppLocalizations l10n) => switch (_message) {
+    _SimulationMessage.lowRiskDone => l10n.monitoringLowRiskDone,
+    _SimulationMessage.failed => l10n.monitoringSimulationFailed,
+    null => null,
+  };
 
   @override
   void dispose() {
@@ -117,27 +124,28 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     super.dispose();
   }
 
-  String get _locationStatus => _runtime.locating
-      ? 'Locating…'
+  String _locationStatus(AppLocalizations l10n) => _runtime.locating
+      ? l10n.monitoringLocating
       : switch (_runtime.locationService.status) {
-          LocationStatus.ready => 'GPS ready',
-          LocationStatus.denied => 'Permission denied',
-          LocationStatus.disabled => 'GPS disabled',
-          LocationStatus.timedOut => 'GPS timed out — retry',
-          _ => 'Unavailable',
+          LocationStatus.ready => l10n.monitoringGpsReady,
+          LocationStatus.denied => l10n.monitoringPermissionDenied,
+          LocationStatus.disabled => l10n.monitoringGpsDisabled,
+          LocationStatus.timedOut => l10n.monitoringGpsTimedOut,
+          _ => l10n.commonUnavailable,
         };
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final live = _monitoring.liveMode;
     final busy = detecting || _monitoring.starting;
     final liveError = _monitoring.error ?? _runtime.operationError;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monitoring'),
+        title: Text(l10n.monitoringTitle),
         actions: const [
           Padding(
-            padding: EdgeInsets.only(right: 20),
+            padding: EdgeInsetsDirectional.only(end: 20),
             child: Icon(
               Icons.lock_outline_rounded,
               size: 20,
@@ -213,9 +221,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
               Text(
                 live
                     ? (_monitoring.active
-                          ? 'SUNO is Listening Live'
-                          : 'Live monitoring paused')
-                    : 'SUNO is Active',
+                          ? l10n.monitoringListeningLive
+                          : l10n.monitoringLivePaused)
+                    : l10n.monitoringActive,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 29,
@@ -226,21 +234,21 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
               const SizedBox(height: 6),
               Text(
                 live
-                    ? 'Real microphone and location — processed on this device'
-                    : 'Simulated danger • Real GPS and contact alerts\nThe microphone is off in Demo mode.',
+                    ? l10n.monitoringLiveSubtitle
+                    : l10n.monitoringDemoSubtitle,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textMuted),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Long-press the mic for Silent SOS',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+              Text(
+                l10n.monitoringSilentSosHint,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
               if (_message != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Text(
-                    _message!,
+                    _messageText(l10n)!,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.warning,
@@ -259,7 +267,7 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                   children: DetectionScenario.values
                       .map(
                         (scenario) => ChoiceChip(
-                          label: Text(_scenarioLabel(scenario)),
+                          label: Text(_scenarioLabel(l10n, scenario)),
                           selected: selectedScenario == scenario,
                           onSelected: busy
                               ? null
@@ -287,12 +295,12 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                 children: [
                   Expanded(
                     child: StatusChip(
-                      label: 'Sound',
+                      label: l10n.monitoringLabelSound,
                       value: live && _monitoring.active
-                          ? 'Listening'
+                          ? l10n.monitoringStatusListening
                           : live
-                          ? 'Starting…'
-                          : 'Normal',
+                          ? l10n.monitoringStatusStarting
+                          : l10n.monitoringStatusNormal,
                       color: AppColors.safe,
                       icon: Icons.graphic_eq_rounded,
                     ),
@@ -300,12 +308,12 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: StatusChip(
-                      label: 'Motion',
+                      label: l10n.monitoringLabelMotion,
                       value: live
                           ? (_monitoring.motionWarning == null
-                                ? 'Sensing'
-                                : 'Unavailable')
-                          : 'Stable',
+                                ? l10n.monitoringStatusSensing
+                                : l10n.commonUnavailable)
+                          : l10n.monitoringStatusStable,
                       color: _monitoring.motionWarning == null
                           ? AppColors.safe
                           : AppColors.warning,
@@ -315,8 +323,10 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: StatusChip(
-                      label: 'Location',
-                      value: live ? _locationStatus : 'Demo',
+                      label: l10n.commonLocation,
+                      value: live
+                          ? _locationStatus(l10n)
+                          : l10n.monitoringStatusDemo,
                       color: _runtime.location == null
                           ? AppColors.warning
                           : AppColors.safe,
@@ -330,7 +340,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: Text(
-                    'Analyzing ${_scenarioLabel(selectedScenario).toLowerCase()} risk…',
+                    l10n.monitoringAnalyzing(
+                      _levelWord(l10n, selectedScenario),
+                    ),
                     style: const TextStyle(
                       color: AppColors.emergency,
                       fontWeight: FontWeight.w700,
@@ -343,8 +355,8 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                   icon: const Icon(Icons.science_outlined, size: 18),
                   label: Text(
                     detecting
-                        ? 'Analyzing…'
-                        : 'Demo: Simulate Distress',
+                        ? l10n.monitoringAnalyzingShort
+                        : l10n.monitoringSimulateDistress,
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textMuted,
@@ -362,12 +374,12 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
                 ),
               if (live && !_monitoring.active)
                 PrimaryActionButton(
-                  label: 'START LIVE MONITORING',
+                  label: l10n.monitoringStartLive,
                   onPressed: busy ? null : _monitoring.start,
                 ),
               const SizedBox(height: 10),
               PrimaryActionButton(
-                label: 'STOP MONITORING',
+                label: l10n.monitoringStop,
                 outlined: true,
                 color: AppColors.emergency,
                 icon: Icons.stop_circle_outlined,
@@ -392,13 +404,29 @@ class _MonitoringScreenState extends State<MonitoringScreen> {
     );
   }
 
-  static String _scenarioLabel(DetectionScenario scenario) =>
-      switch (scenario) {
-        DetectionScenario.low => 'LOW',
-        DetectionScenario.medium => 'MEDIUM',
-        DetectionScenario.critical => 'CRITICAL',
-      };
+  static String _scenarioLabel(
+    AppLocalizations l10n,
+    DetectionScenario scenario,
+  ) => switch (scenario) {
+    DetectionScenario.low => l10n.monitoringChipLow,
+    DetectionScenario.medium => l10n.monitoringChipMedium,
+    DetectionScenario.critical => l10n.monitoringChipCritical,
+  };
+
+  /// The level word used inside a sentence, so the sentence keeps its own
+  /// casing instead of reusing the all-caps chip label.
+  static String _levelWord(
+    AppLocalizations l10n,
+    DetectionScenario scenario,
+  ) => switch (scenario) {
+    DetectionScenario.low => l10n.riskLevelLow,
+    DetectionScenario.medium => l10n.riskLevelMedium,
+    DetectionScenario.critical => l10n.riskLevelCritical,
+  };
 }
+
+/// Outcome of a demo run, shown as a single line under the status headline.
+enum _SimulationMessage { lowRiskDone, failed }
 
 class _ModeToggle extends StatelessWidget {
   const _ModeToggle({
@@ -424,14 +452,16 @@ class _ModeToggle extends StatelessWidget {
       children: [
         Expanded(
           child: _ToggleSegment(
-            label: 'Demo Mode',
+            label: context.l10n.monitoringDemoMode,
             selected: !liveMode,
             onTap: onDemoSelected,
           ),
         ),
         Expanded(
           child: _ToggleSegment(
-            label: liveStarting ? 'Starting…' : 'Live Mode',
+            label: liveStarting
+                ? context.l10n.monitoringStatusStarting
+                : context.l10n.monitoringLiveMode,
             selected: liveMode,
             onTap: onLiveSelected,
           ),
