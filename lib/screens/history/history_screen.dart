@@ -209,7 +209,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ? DismissDirection.none
                               : DismissDirection.endToStart,
                           background: Container(
-                            alignment: Alignment.centerEnd,
+                            alignment: AlignmentDirectional.centerEnd,
                             padding: const EdgeInsetsDirectional.only(end: 20),
                             decoration: BoxDecoration(
                               color: AppColors.emergency,
