@@ -63,6 +63,15 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
     );
   }
 
+  /// Stored, not looked up: translate only the two tokens this app writes, and
+  /// pass through any text a trusted contact typed themselves.
+  static String _responseText(AppLocalizations l10n, String raw) =>
+      switch (raw) {
+        'User confirmed safe' => l10n.historyStatusUserSafe,
+        'Safety check escalated' => l10n.statusSafetyCheckEscalated,
+        _ => raw,
+      };
+
   static String _levelLabel(AppLocalizations l10n, RiskLevel level) =>
       switch (level) {
         RiskLevel.low => l10n.riskLevelLow,
@@ -157,7 +166,10 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                incident.contactResponseText!,
+                                _responseText(
+                                  l10n,
+                                  incident.contactResponseText!,
+                                ),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   color: AppColors.safe,
