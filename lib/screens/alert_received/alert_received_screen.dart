@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/event_type_labels.dart';
+import '../../core/l10n/l10n.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_format.dart';
 import '../../models/detection_result.dart';
@@ -27,9 +29,12 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
   final ScrollController _scrollController = ScrollController();
   Incident? get _incident =>
       SunoRuntimeService.instance.incidentById(_incidentId);
-  String get _status => _incident == null
-      ? 'No response can be sent for this incident.'
-      : _incident?.contactResponseText ?? 'Alert received — response needed';
+
+  /// A stored response keeps the responder's language; only the defaults here
+  /// follow the local reader.
+  String _statusText(AppLocalizations l10n) => _incident == null
+      ? l10n.receivedNoResponse
+      : _incident?.contactResponseText ?? l10n.receivedResponseNeeded;
   bool _responding = false;
   bool get _canRespond =>
       !_responding &&
@@ -51,8 +56,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
   String get _eventType => widget.payload['eventType'] ?? 'Emergency';
   String get _riskScore => widget.payload['riskScore'] ?? '0';
   String get _riskLevel => widget.payload['riskLevel'] ?? 'critical';
-  String get _locationText =>
-      widget.payload['locationText'] ?? 'Location unavailable';
+  String? get _locationText => widget.payload['locationText'];
   String? get _senderToken => widget.payload['senderToken'];
 
   /// Best available name for the person in danger, or null when unknown.
@@ -85,13 +89,12 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
     String message,
   ) async {
     if (!_canRespond) return;
+    final l10n = context.l10n;
     setState(() => _responding = true);
     try {
       final senderToken = _senderToken;
       if (senderToken == null || senderToken.trim().isEmpty) {
-        throw StateError(
-          'Sender token unavailable. Please contact them directly.',
-        );
+        throw StateError(l10n.receivedSenderTokenMissing);
       }
       String? myName;
       try {
@@ -102,7 +105,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
       await SunoRuntimeService.instance.sendResponse(
         recipientToken: senderToken,
         incidentId: _incidentId,
-        responderName: myName ?? 'Your contact',
+        responderName: myName ?? l10n.receivedYourContact,
         status: statusWire,
         message: message,
       );
@@ -111,13 +114,14 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
         text,
         _incidentId,
       );
-      if (saved == null) throw StateError('The incident was removed.');
+      if (saved == null) throw StateError(l10n.receivedIncidentRemoved);
       if (!mounted) return;
       setState(() {});
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Response failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.receivedResponseFailed('$e'))),
+      );
     } finally {
       if (mounted) setState(() => _responding = false);
     }
@@ -135,10 +139,12 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final localeName = Localizations.localeOf(context).toLanguageTag();
     final time = _detectedAt?.toLocal();
     final displayTime = time == null
-        ? 'Time unavailable'
-        : '${time.year}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} · ${formatClock12Hour(time)}';
+        ? l10n.receivedTimeUnavailable
+        : formatIsoDayWithClock(time, localeName);
     final score = int.tryParse(_riskScore) ?? 0;
     final level = RiskLevel.values.firstWhere(
       (l) => l.wireValue == _riskLevel,
@@ -146,7 +152,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Safety alert')),
+      appBar: AppBar(title: Text(l10n.receivedTitle)),
       body: SafeArea(
         child: Scrollbar(
           controller: _scrollController,
@@ -169,10 +175,10 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Center(
+                Center(
                   child: Text(
-                    'Your contact',
-                    style: TextStyle(
+                    l10n.receivedYourContact,
+                    style: const TextStyle(
                       color: AppColors.textMuted,
                       fontWeight: FontWeight.w700,
                     ),
@@ -182,10 +188,12 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                 Center(
                   child: Text(
                     _incident == null
-                        ? 'This incident is unavailable'
+                        ? l10n.receivedIncidentUnavailable
                         : _incident!.status == IncidentStatus.resolved
-                        ? 'Incident resolved'
-                        : '${_senderName ?? 'Your contact'} may be in danger',
+                        ? l10n.receivedIncidentResolved
+                        : l10n.receivedMayBeInDanger(
+                            _senderName ?? l10n.receivedYourContact,
+                          ),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.text,
@@ -207,28 +215,39 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                     ),
                     child: Column(
                       children: [
-                        _line(Icons.hearing_rounded, 'Event', _eventType),
+                        _line(
+                          Icons.hearing_rounded,
+                          l10n.receivedEventLabel,
+                          localizedEventType(l10n, _eventType),
+                        ),
                         const Divider(height: 1),
-                        _line(Icons.schedule_rounded, 'Detected', displayTime),
+                        _line(
+                          Icons.schedule_rounded,
+                          l10n.receivedDetectedLabel,
+                          displayTime,
+                        ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 18),
                 if (widget.payload['isSimulated'] == 'true')
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: Text('DEMO ALERT — the danger was simulated.'),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(l10n.receivedDemoNotice),
                   ),
-                const Text(
-                  'Location at alert time',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                Text(
+                  l10n.receivedLocationHeading,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 9),
                 MapPreviewCard(
                   latitude: _latitude,
                   longitude: _longitude,
-                  locationText: _locationText,
+                  locationText: _locationText ?? l10n.commonLocationUnavailable,
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -239,7 +258,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
-                    _status,
+                    _statusText(l10n),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.warning,
@@ -250,30 +269,30 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                 ),
                 const SizedBox(height: 16),
                 PrimaryActionButton(
-                  label: 'I AM CHECKING ON THEM',
+                  label: l10n.receivedButtonChecking,
                   color: AppColors.warning,
                   icon: Icons.directions_run_rounded,
                   onPressed: !_canRespond
                       ? null
                       : () => _respond(
                           IncidentStatus.contactChecking,
-                          'Contact checking — help is on the way',
+                          l10n.receivedStatusChecking,
                           'contactChecking',
-                          'I am checking on them',
+                          l10n.receivedMessageChecking,
                         ),
                 ),
                 const SizedBox(height: 9),
                 PrimaryActionButton(
-                  label: 'THEY ARE SAFE',
+                  label: l10n.receivedButtonSafe,
                   color: AppColors.safe,
                   icon: Icons.check_circle_outline_rounded,
                   onPressed: !_canRespond
                       ? null
                       : () => _respond(
                           IncidentStatus.resolved,
-                          'Resolved — contact confirmed they are safe',
+                          l10n.receivedStatusResolved,
                           'resolved',
-                          'They are safe',
+                          l10n.receivedMessageSafe,
                         ),
                 ),
                 const SizedBox(height: 4),
@@ -283,11 +302,11 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                         ? null
                         : () => _respond(
                             IncidentStatus.alertTriggered,
-                            'Unable to contact — emergency remains active',
+                            l10n.receivedStatusUnable,
                             'alertTriggered',
-                            'Unable to contact',
+                            l10n.receivedMessageUnable,
                           ),
-                    child: const Text('UNABLE TO CONTACT'),
+                    child: Text(l10n.receivedButtonUnable),
                   ),
                 ),
               ],

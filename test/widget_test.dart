@@ -600,7 +600,7 @@ void main() {
       await tester.pump();
       await accepted;
       await tester.pumpWidget(
-        MaterialApp(home: AlertReceivedScreen(payload: payload)),
+        localizedTestApp(AlertReceivedScreen(payload: payload)),
       );
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('THEY ARE SAFE'));
@@ -659,7 +659,7 @@ void main() {
     );
     expect(accepted, isNotNull);
     await tester.pumpWidget(
-      MaterialApp(home: AlertReceivedScreen(payload: payload)),
+      localizedTestApp(AlertReceivedScreen(payload: payload)),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
