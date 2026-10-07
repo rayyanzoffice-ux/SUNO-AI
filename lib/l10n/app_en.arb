@@ -116,5 +116,53 @@
   "monitoringChipLow": "LOW",
   "monitoringChipMedium": "MEDIUM",
   "monitoringChipCritical": "CRITICAL",
-  "commonUnavailable": "Unavailable"
+  "commonUnavailable": "Unavailable",
+
+  "historyTitle": "Incident History",
+  "historySubtitle": "Your recent safety activity",
+  "historyIncidentCount": "{count, plural, =1{1 INCIDENT} other{{count} INCIDENTS}}",
+  "@historyIncidentCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "historyFilterAll": "All",
+  "historyFilterAlerts": "Alerts",
+  "historyFilterCanceled": "Canceled",
+  "historyEmptyAll": "No incidents yet",
+  "historyEmptyAlerts": "No alert incidents",
+  "historyEmptyCanceled": "No canceled incidents",
+  "historyClearAllTooltip": "Clear all history",
+  "historyClearDialogTitle": "Clear all history?",
+  "historyClearDialogBody": "This permanently deletes every incident from this device.",
+  "historyClearDialogConfirm": "CLEAR ALL",
+  "historyLoadFailed": "Could not load history. Please retry.",
+  "historyDeleteFailed": "Could not delete the incident. Please retry.",
+  "historyClearFailed": "Could not clear history. Finish any active safety action, then retry.",
+  "historyCardReceivedAlert": "Received alert",
+  "historyCardCanceledAlert": "Canceled alert",
+  "historyCardSafetyCheck": "Safety check",
+  "historyCardResolvedAlert": "Resolved alert",
+  "historyCardMonitoring": "Monitoring",
+  "historyCardCriticalAlert": "Critical alert",
+  "historyStatusContactChecking": "Contact checking",
+  "historyStatusResolved": "Resolved — confirmed safe",
+  "historyStatusUserSafe": "User confirmed safe",
+  "historyStatusEscalationNeeded": "Escalation needed",
+  "historyStatusFcmAccepted": "FCM accepted alert",
+  "historyStatusSafetyPending": "Safety check pending",
+  "historyStatusMonitoring": "Monitoring",
+  "historyTodayAt": "Today · {time}",
+  "@historyTodayAt": { "placeholders": { "time": { "type": "String" } } },
+  "historyYesterdayAt": "Yesterday · {time}",
+  "@historyYesterdayAt": { "placeholders": { "time": { "type": "String" } } },
+  "historyDateAt": "{date} · {time}",
+  "@historyDateAt": {
+    "placeholders": {
+      "date": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "historyFrom": "from {origin}",
+  "@historyFrom": { "placeholders": { "origin": { "type": "String" } } },
+  "commonRetry": "RETRY",
+  "commonCancel": "CANCEL"
 }
