@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/event_type_labels.dart';
+import '../../core/l10n/l10n.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/detection_result.dart';
@@ -25,39 +27,48 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
         widget.incidentId ?? SunoRuntimeService.instance.currentIncident?.id;
   }
 
-  String _dispatchSubtitle() {
+  String _dispatchSubtitle(AppLocalizations l10n) {
     final runtime = SunoRuntimeService.instance;
     final incident = _incidentId == null
         ? null
         : runtime.incidentById(_incidentId);
     if (incident?.status == IncidentStatus.cancelled) {
-      return 'You confirmed safe. This safety check is closed.';
+      return l10n.emergencyClosedSafe;
     }
     if (incident?.status == IncidentStatus.resolved) {
-      return 'A contact marked this incident as resolved.';
+      return l10n.emergencyContactResolved;
     }
     if (_incidentId != null && runtime.isDispatching(_incidentId)) {
-      return 'Sending alerts to your trusted contacts…';
+      return l10n.emergencySending;
     }
     final dispatch = incident?.dispatchResult;
     if (dispatch == null) {
-      return 'No confirmed delivery result. Check your contacts and retry if needed.';
+      return l10n.emergencyNoDeliveryResult;
     }
     if (dispatch.success) {
-      return 'FCM accepted ${dispatch.sentCount} of ${dispatch.attemptedCount} alerts. Awaiting a contact response.';
+      return l10n.emergencyDispatchAwaiting(
+        dispatch.sentCount,
+        dispatch.attemptedCount,
+      );
     }
     if (dispatch.partiallyDelivered) {
-      return 'FCM accepted ${dispatch.sentCount} of ${dispatch.attemptedCount} alerts. '
-          '${dispatch.failedCount} failed.';
+      return l10n.emergencyDispatchPartial(
+        dispatch.sentCount,
+        dispatch.attemptedCount,
+        dispatch.failedCount,
+      );
     }
-    return 'Alert saved locally — contacts could not be reached '
-        '(${dispatch.failedReason ?? 'unknown reason'}).';
+    return l10n.emergencySavedLocally(
+      dispatch.failedReason ?? l10n.emergencyUnknownReason,
+    );
   }
 
-  static String _levelLabel(RiskLevel level) {
-    final w = level.wireValue;
-    return '${w[0].toUpperCase()}${w.substring(1)}';
-  }
+  static String _levelLabel(AppLocalizations l10n, RiskLevel level) =>
+      switch (level) {
+        RiskLevel.low => l10n.riskLevelLow,
+        RiskLevel.medium => l10n.riskLevelMedium,
+        RiskLevel.critical => l10n.riskLevelCritical,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -67,15 +78,14 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
         child: ListenableBuilder(
           listenable: SunoRuntimeService.instance,
           builder: (context, _) {
+            final l10n = context.l10n;
             final runtime = SunoRuntimeService.instance;
             final incident = _incidentId == null
                 ? null
                 : runtime.incidentById(_incidentId);
             final result = incident?.detectionResult;
             if (incident == null) {
-              return const Center(
-                child: Text('This incident is no longer available.'),
-              );
+              return Center(child: Text(l10n.errorIncidentUnavailable));
             }
 
             return LayoutBuilder(
@@ -116,10 +126,10 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                         const SizedBox(height: 18),
                         Text(
                           incident.status == IncidentStatus.resolved
-                              ? 'Incident resolved'
+                              ? l10n.emergencyIncidentResolved
                               : incident.status == IncidentStatus.cancelled
-                              ? 'Safety check cancelled'
-                              : 'Emergency Alert Activated',
+                              ? l10n.emergencyCheckCancelled
+                              : l10n.emergencyAlertActivated,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: AppColors.emergency,
@@ -130,7 +140,7 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _dispatchSubtitle(),
+                          _dispatchSubtitle(l10n),
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: AppColors.textMuted),
                         ),
@@ -157,10 +167,10 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                             ),
                           ),
                         if (result?.isSimulated == true)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 12),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
                             child: Text(
-                              'DEMO: simulated danger, real contact notifications',
+                              l10n.emergencyDemoNote,
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -175,15 +185,13 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                               } catch (_) {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Could not retry. Please check connectivity.',
-                                    ),
+                                  SnackBar(
+                                    content: Text(l10n.emergencyRetryFailed),
                                   ),
                                 );
                               }
                             },
-                            child: const Text('RETRY ALERT TO ALL CONTACTS'),
+                            child: Text(l10n.emergencyRetryButton),
                           ),
                         const SizedBox(height: 22),
                         if (result != null)
@@ -197,32 +205,36 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                                 children: [
                                   _Detail(
                                     icon: Icons.hearing_rounded,
-                                    label: 'Event',
-                                    value: result.eventType,
+                                    label: l10n.emergencyLabelEvent,
+                                    value: localizedEventType(
+                                      l10n,
+                                      result.eventType,
+                                    ),
                                   ),
                                   const Divider(height: 1),
                                   _Detail(
                                     icon: Icons.speed_rounded,
-                                    label: 'Risk Score',
-                                    value:
-                                        '${result.riskScore}% '
-                                        '(${_levelLabel(result.riskLevel)})',
+                                    label: l10n.emergencyLabelRiskScore,
+                                    value: l10n.emergencyRiskValue(
+                                      result.riskScore,
+                                      _levelLabel(l10n, result.riskLevel),
+                                    ),
                                     critical: true,
                                   ),
                                   const Divider(height: 1),
                                   _Detail(
                                     icon: Icons.analytics_outlined,
-                                    label: 'Confidence',
+                                    label: l10n.emergencyLabelConfidence,
                                     value:
                                         '${(result.confidence * 100).round()}%',
                                   ),
                                   const Divider(height: 1),
                                   _Detail(
                                     icon: Icons.location_on_outlined,
-                                    label: 'Location',
+                                    label: l10n.commonLocation,
                                     value:
                                         result.locationText ??
-                                        'Location unavailable',
+                                        l10n.commonLocationUnavailable,
                                   ),
                                 ],
                               ),
@@ -230,9 +242,9 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                           ),
                         if (result != null) ...[
                           const SizedBox(height: 16),
-                          const Text(
-                            'Location at alert time',
-                            style: TextStyle(
+                          Text(
+                            l10n.emergencyLocationAtAlert,
+                            style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                             ),
@@ -245,23 +257,23 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                           ),
                         ],
                         const Spacer(),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           child: Wrap(
                             alignment: WrapAlignment.center,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             spacing: 7,
                             runSpacing: 4,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.verified_user_outlined,
                                 color: AppColors.safe,
                                 size: 18,
                               ),
                               Text(
-                                'In immediate danger, contact local emergency services.',
+                                l10n.emergencyLocalServicesNote,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: AppColors.textMuted,
                                   fontSize: 13,
                                 ),
@@ -272,7 +284,7 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                         TextButton(
                           onPressed: () =>
                               Navigator.pushNamed(context, AppRoutes.history),
-                          child: const Text('View incident history'),
+                          child: Text(l10n.emergencyViewHistory),
                         ),
                       ],
                     ),
