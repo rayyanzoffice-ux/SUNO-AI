@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
 
 import '../../models/incident.dart';
+import '../../core/l10n/l10n.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/suno_runtime_service.dart';
@@ -108,111 +109,118 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.canvas,
-    body: SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
-            child: IntrinsicHeight(
-              child: Column(
-                children: [
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: .1),
-                      shape: BoxShape.circle,
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final runtime = SunoRuntimeService.instance;
+    final needsRetry = runtime.safetyCheckNeedsRetry;
+    return Scaffold(
+      backgroundColor: AppColors.canvas,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - 48,
+              ),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: .1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.warning_amber_rounded,
+                        size: 54,
+                        color: AppColors.warning,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.warning_amber_rounded,
-                      size: 54,
-                      color: AppColors.warning,
+                    const SizedBox(height: 20),
+                    Text(
+                      l10n.safetyPossibleEmergency,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        height: 1.2,
+                        color: AppColors.emergency,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Possible emergency\ndetected',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 24,
-                      height: 1.2,
+                    const SizedBox(height: 10),
+                    Text(
+                      l10n.safetyAreYouSafe,
+                      style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 34),
+                    SizedBox(
+                      width: 130,
+                      height: 130,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox.expand(
+                            child: CircularProgressIndicator(
+                              value: _seconds / _totalSeconds,
+                              strokeWidth: 9,
+                              color: AppColors.warning,
+                              backgroundColor: AppColors.border,
+                            ),
+                          ),
+                          Text(
+                            '$_seconds',
+                            style: const TextStyle(
+                              fontSize: 44,
+                              color: AppColors.text,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      needsRetry
+                          ? runtime.operationError!
+                          : l10n.safetyAutoAlert,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: needsRetry
+                            ? AppColors.emergency
+                            : AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const Spacer(),
+                    PrimaryActionButton(
+                      label: needsRetry
+                          ? l10n.safetyRetryIAmSafe
+                          : l10n.safetyIAmSafe,
+                      color: AppColors.safe,
+                      onPressed: _safe,
+                    ),
+                    const SizedBox(height: 12),
+                    PrimaryActionButton(
+                      label: needsRetry
+                          ? l10n.safetyRetryAlert
+                          : l10n.safetyCantRespond,
                       color: AppColors.emergency,
-                      fontWeight: FontWeight.w800,
+                      onPressed: _emergency,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Are you safe?',
-                    style: TextStyle(
-                      color: AppColors.text,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 34),
-                  SizedBox(
-                    width: 130,
-                    height: 130,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox.expand(
-                          child: CircularProgressIndicator(
-                            value: _seconds / _totalSeconds,
-                            strokeWidth: 9,
-                            color: AppColors.warning,
-                            backgroundColor: AppColors.border,
-                          ),
-                        ),
-                        Text(
-                          '$_seconds',
-                          style: const TextStyle(
-                            fontSize: 44,
-                            color: AppColors.text,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    SunoRuntimeService.instance.safetyCheckNeedsRetry
-                        ? SunoRuntimeService.instance.operationError!
-                        : 'Alert activates automatically when time runs out',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: SunoRuntimeService.instance.safetyCheckNeedsRetry
-                          ? AppColors.emergency
-                          : AppColors.textMuted,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const Spacer(),
-                  PrimaryActionButton(
-                    label: SunoRuntimeService.instance.safetyCheckNeedsRetry
-                        ? 'RETRY: I AM SAFE'
-                        : 'I AM SAFE',
-                    color: AppColors.safe,
-                    onPressed: _safe,
-                  ),
-                  const SizedBox(height: 12),
-                  PrimaryActionButton(
-                    label: SunoRuntimeService.instance.safetyCheckNeedsRetry
-                        ? 'RETRY EMERGENCY ALERT'
-                        : "CAN'T RESPOND",
-                    color: AppColors.emergency,
-                    onPressed: _emergency,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
