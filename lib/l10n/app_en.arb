@@ -164,5 +164,68 @@
   "historyFrom": "from {origin}",
   "@historyFrom": { "placeholders": { "origin": { "type": "String" } } },
   "commonRetry": "RETRY",
-  "commonCancel": "CANCEL"
+  "commonCancel": "CANCEL",
+
+  "contactsTitle": "Trusted contacts",
+  "contactsHeading": "Your safety network",
+  "contactsIntro": "Contacts are stored locally on this device. Exchange FCM tokens between two phones so SUNO can route emergency push alerts to the trusted contact.",
+  "contactsMyFcmToken": "MY FCM TOKEN",
+  "contactsTokenLoading": "Getting token from Firebase...",
+  "contactsTokenUnavailableBody": "Token unavailable. Check internet, Firebase setup, and notification permission, then refresh below.",
+  "contactsCopyToken": "COPY MY FCM TOKEN",
+  "contactsRefreshToken": "REFRESH MY TOKEN",
+  "contactsYourName": "Your name",
+  "contactsYourNameHelper": "Shown to your trusted contacts when an alert reaches them.",
+  "contactsAddHeading": "Add a contact",
+  "contactsEditHeading": "Edit contact",
+  "contactsFieldName": "Name *",
+  "contactsFieldPhone": "Phone",
+  "contactsFieldPhoneHelper": "Optional — useful for a future call fallback.",
+  "contactsFieldRelationship": "Relationship *",
+  "contactsFieldToken": "FCM token (optional)",
+  "contactsFieldTokenHelper": "Needed only for real push alerts to this contact.",
+  "contactsSaveButton": "SAVE CONTACT",
+  "contactsUpdateButton": "UPDATE CONTACT",
+  "contactsCancelEdit": "CANCEL EDIT",
+  "contactsRetry": "RETRY CONTACTS",
+  "contactsMenuTest": "Test FCM acceptance",
+  "commonEdit": "Edit",
+  "commonDelete": "Delete",
+  "contactsDeleteDialogTitle": "Delete contact?",
+  "contactsDeleteDialogBody": "Remove {name} from your safety network?",
+  "@contactsDeleteDialogBody": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "contactsDeleteDialogConfirm": "DELETE",
+  "contactsStatusNotConfigured": "Not configured",
+  "contactsStatusVerified": "FCM test accepted",
+  "contactsStatusUnverified": "Token saved, unverified",
+  "contactsLastAcceptedTest": "Last accepted test: {when}",
+  "@contactsLastAcceptedTest": {
+    "placeholders": { "when": { "type": "String" } }
+  },
+  "contactsLoadFailed": "Could not load your saved contacts.",
+  "contactsTokenUnavailable": "Token unavailable. Check internet and allow notifications in Android Settings, then retry.",
+  "contactsMyNameLoadFailed": "Could not load your saved name.",
+  "contactsMyNameSaveFailed": "Could not save your name. Please retry.",
+  "contactsTokenCopied": "FCM token copied. Send it to your trusted contact.",
+  "contactsTokenCopyFailed": "Could not copy the token. Please retry.",
+  "contactsTokenTooShort": "Paste the full FCM token copied from the other phone.",
+  "contactsNameRelationshipRequired": "Name and relationship are required.",
+  "contactsSaved": "Trusted contact saved locally.",
+  "contactsUpdated": "Trusted contact updated.",
+  "contactsSaveFailed": "Could not save the contact. Your entries are still here; please retry.",
+  "contactsDeleteFailed": "Could not delete the contact. Please retry.",
+  "contactsTestAccepted": "FCM accepted the silent test for {name}. Verify visible alerts on both phones separately.",
+  "@contactsTestAccepted": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "contactsTestRejected": "{name} token rejected by FCM. Check the token.",
+  "@contactsTestRejected": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "contactsTestFailed": "Test failed: {error}",
+  "@contactsTestFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  }
 }
