@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/l10n/l10n.dart';
 import '../core/theme/app_theme.dart';
 import '../models/detection_result.dart';
 
@@ -10,15 +11,16 @@ class RiskBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final color = switch (level) {
       RiskLevel.low => AppColors.safe,
       RiskLevel.medium => AppColors.warning,
       RiskLevel.critical => AppColors.emergency,
     };
     final label = switch (level) {
-      RiskLevel.low => 'Low',
-      RiskLevel.medium => 'Medium',
-      RiskLevel.critical => 'Critical',
+      RiskLevel.low => l10n.riskLevelLow,
+      RiskLevel.medium => l10n.riskLevelMedium,
+      RiskLevel.critical => l10n.riskLevelCritical,
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -37,7 +39,7 @@ class RiskBadge extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '$score% $label',
+            l10n.riskBadgeValue(score, label),
             style: TextStyle(color: color, fontWeight: FontWeight.w900),
           ),
         ],

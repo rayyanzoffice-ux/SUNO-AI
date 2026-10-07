@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/l10n/l10n.dart';
 import '../core/theme/app_theme.dart';
 
 /// MapTiler access token, passed at build time with
@@ -41,9 +42,9 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
       ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
       : 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=$_maptilerKey';
 
-  String get _attributionLabel => _maptilerKey.isEmpty
-      ? 'OpenStreetMap contributors'
-      : 'OpenStreetMap contributors, MapTiler';
+  String _attributionLabel(AppLocalizations l10n) => _maptilerKey.isEmpty
+      ? l10n.mapAttributionOsm
+      : l10n.mapAttributionOsmMapTiler;
 
   @override
   void didUpdateWidget(MapPreviewCard oldWidget) {
@@ -70,9 +71,7 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Could not open Maps. Check your browser or map app.'),
-      ),
+      SnackBar(content: Text(context.l10n.mapOpenFailed)),
     );
   }
 
@@ -86,17 +85,16 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
     } catch (_) {}
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Could not open map attribution. Check your browser.'),
-      ),
+      SnackBar(content: Text(context.l10n.mapAttributionFailed)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final coordinates = _hasCoordinates
         ? '${widget.latitude!.toStringAsFixed(5)}, ${widget.longitude!.toStringAsFixed(5)}'
-        : 'Location unavailable';
+        : l10n.commonLocationUnavailable;
     return Container(
       height: 240,
       clipBehavior: Clip.antiAlias,
@@ -174,7 +172,7 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
                           RichAttributionWidget(
                             attributions: [
                               TextSourceAttribution(
-                                _attributionLabel,
+                                _attributionLabel(l10n),
                                 onTap: _openAttribution,
                               ),
                             ],
@@ -191,12 +189,12 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
                             borderRadius: BorderRadius.circular(8),
                             child: Row(
                               children: [
-                                const Expanded(
+                                Expanded(
                                   child: Padding(
-                                    padding: EdgeInsets.all(8),
+                                    padding: const EdgeInsets.all(8),
                                     child: Text(
-                                      'Map tiles unavailable. Coordinates are still usable.',
-                                      style: TextStyle(fontSize: 11),
+                                      l10n.mapTilesUnavailable,
+                                      style: const TextStyle(fontSize: 11),
                                     ),
                                   ),
                                 ),
@@ -205,7 +203,7 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
                                     _tileFailed = false;
                                     _reload++;
                                   }),
-                                  child: const Text('Retry'),
+                                  child: Text(l10n.mapRetry),
                                 ),
                               ],
                             ),
@@ -233,7 +231,7 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
                       TextButton.icon(
                         onPressed: _openMap,
                         icon: const Icon(Icons.open_in_new, size: 16),
-                        label: const Text('OPEN'),
+                        label: Text(l10n.mapOpen),
                       ),
                     ],
                   ),

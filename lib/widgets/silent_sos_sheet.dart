@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/l10n/l10n.dart';
 import '../core/routes/app_routes.dart';
 import '../core/theme/app_theme.dart';
 import '../models/trusted_contact.dart';
@@ -31,7 +32,10 @@ class _SilentSosSheet extends StatefulWidget {
 class _SilentSosSheetState extends State<_SilentSosSheet> {
   List<TrustedContact>? _contacts;
   bool _sending = false;
-  String? _error;
+
+  /// Kept as a message selector, not a resolved string, so the sheet always
+  /// shows the language in use rather than the one active when it failed.
+  String Function(AppLocalizations)? _error;
 
   @override
   void initState() {
@@ -50,10 +54,7 @@ class _SilentSosSheetState extends State<_SilentSosSheet> {
       }
     } catch (_) {
       if (mounted) {
-        setState(
-          () =>
-              _error = 'Could not load contacts. Retry to choose a recipient.',
-        );
+        setState(() => _error = (l10n) => l10n.sosContactsLoadFailed);
       }
     }
   }
@@ -78,10 +79,7 @@ class _SilentSosSheetState extends State<_SilentSosSheet> {
       );
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _error =
-              'Could not save the SOS. Please retry or contact help directly.',
-        );
+        setState(() => _error = (l10n) => l10n.sosSaveFailed);
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -89,169 +87,171 @@ class _SilentSosSheetState extends State<_SilentSosSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    child: Container(
-      margin: const EdgeInsets.only(top: 60),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 22,
-          right: 22,
-          top: 14,
-          bottom: 22 + MediaQuery.of(context).viewInsets.bottom,
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.only(top: 60),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 22,
+            right: 22,
+            top: 14,
+            bottom: 22 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.emergency.withValues(alpha: .1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.shield_moon_rounded,
-                      color: AppColors.emergency,
-                      size: 24,
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Silent SOS',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.text,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.emergency.withValues(alpha: .1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.shield_moon_rounded,
+                        color: AppColors.emergency,
+                        size: 24,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sends your location and a critical alert without any sound, '
-                'countdown, or confirmation screen. Use this when you can\'t '
-                'speak or can\'t safely make noise.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: .08),
-                  borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        l10n.sosTitle,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Text(
-                  'This is separate from your phone\'s built-in Emergency SOS '
-                  '(side-button gesture) — apps cannot control that OS feature.',
-                  style: TextStyle(
-                    color: AppColors.warning,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              if (_error != null) ...[
+                const SizedBox(height: 8),
                 Text(
-                  _error!,
-                  style: const TextStyle(color: AppColors.emergency),
-                ),
-                if (_contacts == null)
-                  TextButton(
-                    onPressed: _loadContacts,
-                    child: const Text('RETRY'),
+                  l10n.sosIntro,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
                   ),
-              ],
-              if (_contacts == null && _error == null)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_contacts?.isEmpty == true)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Text(
-                    'No trusted contacts saved yet. Add one from the Home '
-                    'screen to enable Silent SOS delivery.',
-                    style: TextStyle(color: AppColors.textMuted),
-                  ),
-                )
-              else
-                ...((_contacts ?? <TrustedContact>[]).map(
-                  (contact) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: AppColors.purple,
-                        child: Icon(Icons.person, color: Colors.white),
-                      ),
-                      title: Text(
-                        contact.name,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      subtitle: Text(contact.relationship),
-                      trailing: const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 16,
-                        color: AppColors.textMuted,
-                      ),
-                      onTap: _sending
-                          ? null
-                          : () => _send(contactId: contact.id),
+                    l10n.sosOsNote,
+                    style: const TextStyle(
+                      color: AppColors.warning,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                )),
-              const SizedBox(height: 6),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _sending ? null : () => _send(),
-                  icon: const Icon(Icons.campaign_rounded),
-                  label: Text(_sending ? 'Sending…' : 'ALERT ALL CONTACTS'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.emergency,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                ),
+                const SizedBox(height: 18),
+                if (_error != null) ...[
+                  Text(
+                    _error!(l10n),
+                    style: const TextStyle(color: AppColors.emergency),
+                  ),
+                  if (_contacts == null)
+                    TextButton(
+                      onPressed: _loadContacts,
+                      child: Text(l10n.commonRetry),
                     ),
-                    textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                ],
+                if (_contacts == null && _error == null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_contacts?.isEmpty == true)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      l10n.sosNoContacts,
+                      style: const TextStyle(color: AppColors.textMuted),
+                    ),
+                  )
+                else
+                  ...((_contacts ?? <TrustedContact>[]).map(
+                    (contact) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: AppColors.purple,
+                          child: Icon(Icons.person, color: Colors.white),
+                        ),
+                        title: Text(
+                          contact.name,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text(contact.relationship),
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                          color: AppColors.textMuted,
+                        ),
+                        onTap: _sending
+                            ? null
+                            : () => _send(contactId: contact.id),
+                      ),
+                    ),
+                  )),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _sending ? null : () => _send(),
+                    icon: const Icon(Icons.campaign_rounded),
+                    label: Text(_sending ? l10n.sosSending : l10n.sosAlertAll),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.emergency,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton(
-                  onPressed: _sending
-                      ? null
-                      : () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                const SizedBox(height: 8),
+                Center(
+                  child: TextButton(
+                    onPressed: _sending
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: Text(l10n.sosCancel),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

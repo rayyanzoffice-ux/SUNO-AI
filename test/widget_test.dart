@@ -735,8 +735,8 @@ void main() {
       SunoRuntimeService.instance = runtime;
       String? openedId;
       await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
+        localizedTestApp(
+          Builder(
             builder: (context) => Scaffold(
               body: TextButton(
                 onPressed: () => showSilentSosSheet(context),

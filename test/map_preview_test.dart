@@ -4,6 +4,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suno_ai/widgets/map_preview_card.dart';
 
+import 'helpers/test_app.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late List<MethodCall> launches;
@@ -28,8 +30,8 @@ void main() {
           null,
         );
   });
-  Widget card(double? latitude, double? longitude) => MaterialApp(
-    home: Scaffold(
+  Widget card(double? latitude, double? longitude) => localizedTestApp(
+    Scaffold(
       body: Center(
         child: SizedBox(
           width: 360,
