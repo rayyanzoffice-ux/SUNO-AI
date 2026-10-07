@@ -8,6 +8,7 @@ import '../backend/detection/live_detection_repository.dart';
 import '../backend/detection/suno_audio_classifier.dart';
 import '../backend/ml/yamnet_stage.dart';
 import '../backend/services/foreground_service_bridge.dart';
+import '../core/l10n/l10n.dart';
 import '../models/detection_result.dart';
 import '../models/incident.dart';
 import 'detection_notification_service.dart';
@@ -97,7 +98,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
       await ForegroundServiceBridge.start(
         microphoneEnabled: true,
         locationEnabled: await runtime.locationService.hasPermission(),
-        status: 'Starting monitoring',
+        status: tr.notifStartingStatus,
       );
       _ownsService = true;
       if (generation != _generation) return;
@@ -118,7 +119,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
       );
       await repo.startMonitoring();
       if (generation != _generation) return;
-      await ForegroundServiceBridge.updateStatus('SUNO is listening');
+      await ForegroundServiceBridge.updateStatus(tr.notifListeningStatus);
       if (generation != _generation) return;
       _repo = repo;
       _microphone = microphone;
@@ -132,33 +133,33 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
       transferred = true;
       active = true;
     } catch (startError, startStack) {
-      if (generation == _generation) error = 'Live monitoring could not start. Check microphone permission and device support, then retry.';
+      if (generation == _generation) error = tr.monitoringStartFailed;
     } finally {
       if (!transferred) {
         try {
           await repo?.stopMonitoring();
         } catch (_) {
-          error = 'Could not finish stopping audio capture.';
+          error = tr.monitoringStopCaptureFailed;
         }
         try {
           classifier?.close();
         } catch (_) {
-          error = 'Could not release the audio classifier. Restart SUNO.';
+          error = tr.monitoringClassifierReleaseFailed;
         }
         try {
           yamnet?.close();
         } catch (_) {
-          error = 'Could not release the audio processor. Restart SUNO.';
+          error = tr.monitoringProcessorReleaseFailed;
         }
         try {
           await microphone?.dispose();
         } catch (_) {
-          error = 'Could not release the microphone. Restart SUNO before listening again.';
+          error = tr.monitoringMicrophoneReleaseFailed;
         }
         try {
           if (_ownsService && !_busy) await _stopNative();
         } catch (_) {
-          error = 'Could not stop the Android service. Check the system notification and restart SUNO.';
+          error = tr.monitoringAndroidStopFailed;
         }
       }
       starting = false;
@@ -178,14 +179,14 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _onMotionError(Object _) {
-    motionWarning = 'Motion sensor unavailable. Audio monitoring is still active.';
+    motionWarning = tr.monitoringMotionUnavailable;
     _changed();
   }
 
   Future<void> _onServiceStopped() async {
     _ownsService = false;
     _nativeInterrupted = true;
-    error = 'Android stopped background monitoring. Keep SUNO open for any pending safety action, then restart Live mode.';
+    error = tr.monitoringAndroidStopped;
     await stop();
   }
 
@@ -199,13 +200,11 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
         try {
           await _stopCapture();
         } catch (_) {
-          error =
-              'Audio cleanup failed. Restart SUNO after this safety action.';
+          error = tr.monitoringCleanupFailed;
         }
         await runtime.recordDetection(result);
       } catch (_) {
-        error =
-            'Could not save the detection. Please use Silent SOS or seek help.';
+        error = tr.monitoringDetectionSaveFailed;
       } finally {
         _handling = false;
         _runtimeChanged();
@@ -232,13 +231,13 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
           unawaited(
             showFullScreenDetectionNotification(
               incidentId: incident.id,
-              title: completed ? 'Emergency alert' : 'Are you safe?',
+              title: completed ? tr.notifTitleEmergency : tr.safetyAreYouSafe,
               body: completed
-                  ? 'Open SUNO to check contact delivery status.'
-                  : 'Respond before the safety check expires.',
+                  ? tr.notifBodyCheckDelivery
+                  : tr.notifBodyRespondInTime,
               isCritical: completed,
             ).catchError((Object _) {
-              error = 'Safety notifications unavailable. Check Android notification settings.';
+              error = tr.monitoringNotificationsUnavailable;
               _changed();
             }),
           );
@@ -255,8 +254,8 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
           if (!_busy) _nativeInterrupted = false;
           if (_busy && !_nativeInterrupted) {
             final status = runtime.hasPendingSafetyCheck
-                ? 'Safety check in progress'
-                : 'Sending emergency alerts';
+                ? tr.notifSafetyCheckStatus
+                : tr.notifSendingAlertsStatus;
             if (!_ownsService) {
               await ForegroundServiceBridge.start(
                 microphoneEnabled: false,
@@ -271,7 +270,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
           }
         })
         .catchError((Object _) {
-          error = 'Android could not keep the safety action in the background. Keep SUNO open until it finishes.';
+          error = tr.monitoringBackgroundKeepFailed;
           _changed();
         });
     _changed();
@@ -332,7 +331,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
         if (_ownsService && (!_busy || _disposed)) await _stopNative();
       }
     } catch (_) {
-      error = 'Could not complete monitoring cleanup. Check the system notification and restart SUNO.';
+      error = tr.monitoringCleanupIncomplete;
     }
     _runtimeChanged();
     _changed();
