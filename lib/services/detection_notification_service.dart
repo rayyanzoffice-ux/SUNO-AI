@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../core/l10n/l10n.dart';
+
 const emergencyChannelId = 'suno_alerts_v2';
 const detectionChannelId = 'suno_detection_v2';
 const _detectionNotificationId = 9001;
@@ -9,6 +11,8 @@ final notificationVibration = Int64List.fromList([0, 400, 200, 400, 200, 800]);
 final sunoNotifications = FlutterLocalNotificationsPlugin();
 
 Future<void> initDetectionNotificationChannel() async {
+  // Channel text is written once per launch, so a language change reaches
+  // Android's notification settings only after SUNO is restarted.
   final android = sunoNotifications
       .resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin
@@ -16,8 +20,8 @@ Future<void> initDetectionNotificationChannel() async {
   for (final channel in [
     AndroidNotificationChannel(
       emergencyChannelId,
-      'SUNO Emergency Alerts',
-      description: 'Emergency alerts and responses from trusted contacts',
+      tr.chanEmergencyName,
+      description: tr.chanEmergencyDesc,
       importance: Importance.max,
       enableVibration: true,
       vibrationPattern: notificationVibration,
@@ -25,8 +29,8 @@ Future<void> initDetectionNotificationChannel() async {
     ),
     AndroidNotificationChannel(
       detectionChannelId,
-      'SUNO Danger Detected',
-      description: 'Safety checks and danger detected on this device',
+      tr.chanDangerName,
+      description: tr.chanDangerDesc,
       importance: Importance.max,
       enableVibration: true,
       vibrationPattern: notificationVibration,
@@ -53,7 +57,7 @@ Future<void> showFullScreenDetectionNotification({
     NotificationDetails(
       android: AndroidNotificationDetails(
         detectionChannelId,
-        'SUNO Danger Detected',
+        tr.chanDangerName,
         importance: Importance.max,
         priority: Priority.high,
         fullScreenIntent: true,

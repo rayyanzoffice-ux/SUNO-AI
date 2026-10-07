@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../backend/backend_exports.dart';
+import '../core/l10n/l10n.dart';
 import '../core/l10n/locale_controller.dart';
 import '../core/utils/display_name.dart';
 import '../models/alert_dispatch_result.dart';
@@ -239,7 +240,7 @@ class SunoRuntimeService extends ChangeNotifier {
         })
         .catchError((Object _) {
           _safetySaveFailed = true;
-          operationError = 'Could not save your safety decision. No alert was sent. Retry below or seek help another way.';
+          operationError = tr.errorSafetyDecisionNotSaved;
           _changed();
         });
   }
@@ -476,7 +477,7 @@ class SunoRuntimeService extends ChangeNotifier {
   void _dispatchInBackground(String id, {String? onlyContactId}) {
     unawaited(
       dispatchIncident(id, onlyContactId: onlyContactId).catchError((Object _) {
-        operationError = 'The alert could not be completed. Check the saved incident and retry.';
+        operationError = tr.errorAlertIncomplete;
         _changed();
         return const AlertDispatchResult(
           success: false,

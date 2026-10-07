@@ -14,6 +14,7 @@ import 'backend/persistence/hive_incident_repository.dart';
 import 'backend/persistence/hive_locale_repository.dart';
 import 'backend/persistence/hive_profile_repository.dart';
 import 'backend/persistence/hive_trusted_contact_repository.dart';
+import 'core/l10n/l10n.dart';
 import 'core/l10n/locale_controller.dart';
 import 'core/navigation/alert_navigation.dart';
 import 'core/navigation/navigator_key.dart';
@@ -86,9 +87,7 @@ Future<void> _drainInbox() {
     StackTrace stack,
   ) {
     _log('drain inbox FAILED: $error\n$stack');
-    SunoRuntimeService.instance.reportError(
-      'Some received alerts could not be restored. Reopen SUNO to retry.',
-    );
+    SunoRuntimeService.instance.reportError(tr.errorAlertsRestoreFailed);
   });
   return _draining;
 }
@@ -113,9 +112,7 @@ Future<void> _openPayload(
     }
   } catch (error, stack) {
     _log('open payload FAILED source=$source: $error\n$stack');
-    SunoRuntimeService.instance.reportError(
-      'Could not open this alert. Please reopen SUNO.',
-    );
+    SunoRuntimeService.instance.reportError(tr.errorAlertOpenFailed);
   }
 }
 
@@ -156,7 +153,7 @@ void _navigateToIncident(NavigatorState navigator, Map<String, String> data) {
   );
   if (incident == null) {
     ScaffoldMessenger.maybeOf(navigator.context)?.showSnackBar(
-      const SnackBar(content: Text('This incident is no longer available.')),
+      SnackBar(content: Text(tr.errorIncidentUnavailable)),
     );
     return;
   }
@@ -214,13 +211,15 @@ Future<void> _handleForegroundMessage(RemoteMessage message) async {
     await sunoNotifications.show(
       data['incidentId'].hashCode,
       message.notification?.title ??
-          (response ? 'SUNO contact response' : 'SUNO emergency alert'),
+          (response
+              ? tr.notifTitleContactResponse
+              : tr.notifTitleEmergencyAlert),
       message.notification?.body ??
           (response ? data['message'] : data['eventType']),
       NotificationDetails(
         android: AndroidNotificationDetails(
           emergencyChannelId,
-          'SUNO Emergency Alerts',
+          tr.chanEmergencyName,
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
@@ -232,9 +231,7 @@ Future<void> _handleForegroundMessage(RemoteMessage message) async {
     );
   } catch (error, stack) {
     _log('foreground message FAILED: $error\n$stack');
-    SunoRuntimeService.instance.reportError(
-      'Could not process an incoming notification. Please reopen SUNO.',
-    );
+    SunoRuntimeService.instance.reportError(tr.errorNotificationProcessFailed);
   }
 }
 
@@ -297,14 +294,10 @@ Future<void> main() async {
   SunoRuntimeService.instance = runtime;
   await runtime.restoreLatestIncident();
   if (!firebaseReady) {
-    runtime.reportError(
-      'Push alerts are unavailable. Check Firebase configuration and restart SUNO.',
-    );
+    runtime.reportError(tr.errorPushUnavailable);
   }
   if (!notificationsReady) {
-    runtime.reportError(
-      'Notifications unavailable. Keep SUNO open and check Android notification settings.',
-    );
+    runtime.reportError(tr.errorNotificationsUnavailable);
   }
   MonitoringService.instance;
 
@@ -324,9 +317,7 @@ Future<void> main() async {
       }
     } catch (error, stack) {
       _log('launch details FAILED: $error\n$stack');
-      runtime.reportError(
-        'Could not restore the tapped notification. Open incident history.',
-      );
+      runtime.reportError(tr.errorTappedNotificationRestoreFailed);
     }
   }
   if (firebaseReady) {
@@ -353,9 +344,7 @@ Future<void> main() async {
       }
     } catch (error, stack) {
       _log('getInitialMessage FAILED: $error\n$stack');
-      runtime.reportError(
-        'Could not restore the launch alert. Open incident history.',
-      );
+      runtime.reportError(tr.errorLaunchAlertRestoreFailed);
     }
   }
   runApp(const SunoApp());
@@ -364,9 +353,7 @@ Future<void> main() async {
   if (alertService != null) {
     unawaited(
       alertService.registerDevice().catchError((Object _) {
-        runtime.reportError(
-          'Push token unavailable. Check connectivity and notification permission, then retry from Trusted Contacts.',
-        );
+        runtime.reportError(tr.errorPushTokenUnavailable);
         return null;
       }),
     );
