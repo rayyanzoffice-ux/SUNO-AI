@@ -515,7 +515,9 @@ void main() {
       trustedContactRepository: contacts,
       alertService: alerts,
     );
-    await tester.pumpWidget(const MaterialApp(home: ContactsSetupScreen()));
+    await tester.pumpWidget(
+      localizedTestApp(const ContactsSetupScreen()),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Could not load your saved contacts.'), findsOneWidget);
     contacts.failLoad = false;

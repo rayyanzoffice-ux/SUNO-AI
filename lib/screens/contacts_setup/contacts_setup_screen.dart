@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/l10n/l10n.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/trusted_contact.dart';
 import '../../services/suno_runtime_service.dart';
@@ -23,7 +24,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
   final contacts = <TrustedContact>[];
   String? myFcmToken;
   bool loadingToken = true;
-  String? _loadError;
+  bool _loadFailed = false;
   final _deletingIds = <String>{};
 
   String? _editingId;
@@ -46,20 +47,21 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
           contacts
             ..clear()
             ..addAll(saved);
-          _loadError = null;
+          _loadFailed = false;
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() => _loadError = 'Could not load your saved contacts.');
-      }
+      if (mounted) setState(() => _loadFailed = true);
     }
   }
 
-  void _showError(String message) {
+  /// Shows [message] resolved against the language currently in use, so no
+  /// untranslated string is ever kept in state.
+  void _showError(String Function(AppLocalizations) message) {
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message(context.l10n))),
+      );
     }
   }
 
@@ -72,9 +74,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
       final token = await SunoRuntimeService.instance.refreshDeviceToken();
       if (mounted) setState(() => myFcmToken = token);
     } catch (_) {
-      _showError(
-        'Token unavailable. Check internet and allow notifications in Android Settings, then retry.',
-      );
+      _showError((l10n) => l10n.contactsTokenUnavailable);
     } finally {
       if (mounted) setState(() => loadingToken = false);
     }
@@ -87,7 +87,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
         _myName.text = saved;
       }
     } catch (_) {
-      _showError('Could not load your saved name.');
+      _showError((l10n) => l10n.contactsMyNameLoadFailed);
     }
   }
 
@@ -95,7 +95,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     try {
       await SunoRuntimeService.instance.saveMyName(_myName.text);
     } catch (_) {
-      _showError('Could not save your name. Please retry.');
+      _showError((l10n) => l10n.contactsMyNameSaveFailed);
     }
   }
 
@@ -106,12 +106,10 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
       await Clipboard.setData(ClipboardData(text: token));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('FCM token copied. Send it to your trusted contact.'),
-        ),
+        SnackBar(content: Text(context.l10n.contactsTokenCopied)),
       );
     } catch (_) {
-      _showError('Could not copy the token. Please retry.');
+      _showError((l10n) => l10n.contactsTokenCopyFailed);
     }
   }
 
@@ -119,13 +117,11 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     if (_saving || (_editingId != null && _busy(_editingId!))) return;
     final token = fcmToken.text.trim();
     if (token.isNotEmpty && (token.length < 21 || token.length > 4096)) {
-      _showError('Paste the full FCM token copied from the other phone.');
+      _showError((l10n) => l10n.contactsTokenTooShort);
       return;
     }
     if (name.text.trim().isEmpty || relationship.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name and relationship are required.')),
-      );
+      _showError((l10n) => l10n.contactsNameRelationshipRequired);
       return;
     }
 
@@ -169,15 +165,13 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
         SnackBar(
           content: Text(
             editingId == null
-                ? 'Trusted contact saved locally.'
-                : 'Trusted contact updated.',
+                ? context.l10n.contactsSaved
+                : context.l10n.contactsUpdated,
           ),
         ),
       );
     } catch (_) {
-      _showError(
-        'Could not save the contact. Your entries are still here; please retry.',
-      );
+      _showError((l10n) => l10n.contactsSaveFailed);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -208,20 +202,23 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     try {
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Delete contact?'),
-          content: Text('Remove ${contact.name} from your safety network?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('CANCEL'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('DELETE'),
-            ),
-          ],
-        ),
+        builder: (context) {
+          final l10n = context.l10n;
+          return AlertDialog(
+            title: Text(l10n.contactsDeleteDialogTitle),
+            content: Text(l10n.contactsDeleteDialogBody(contact.name)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(l10n.commonCancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(l10n.contactsDeleteDialogConfirm),
+              ),
+            ],
+          );
+        },
       );
       if (confirmed != true || !mounted) return;
       await SunoRuntimeService.instance.removeTrustedContact(contact.id);
@@ -231,7 +228,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
         if (_editingId == contact.id) _clearForm();
       });
     } catch (_) {
-      _showError('Could not delete the contact. Please retry.');
+      _showError((l10n) => l10n.contactsDeleteFailed);
     } finally {
       if (mounted) setState(() => _deletingIds.remove(contact.id));
     }
@@ -257,35 +254,32 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'FCM accepted the silent test for ${contact.name}. Verify visible alerts on both phones separately.',
-            ),
+            content: Text(context.l10n.contactsTestAccepted(contact.name)),
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '${contact.name} token rejected by FCM. Check the token.',
-            ),
+            content: Text(context.l10n.contactsTestRejected(contact.name)),
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Test failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.contactsTestFailed('$e'))),
+      );
     } finally {
       if (mounted) setState(() => _testingIds.remove(contact.id));
     }
   }
 
-  String _pushStatus(TrustedContact contact) {
+  String _pushStatus(TrustedContact contact, AppLocalizations l10n) {
     if (contact.fcmToken == null || contact.fcmToken!.trim().isEmpty) {
-      return 'Not configured';
+      return l10n.contactsStatusNotConfigured;
     }
-    if (contact.isVerified) return 'FCM test accepted';
-    return 'Token saved, unverified';
+    if (contact.isVerified) return l10n.contactsStatusVerified;
+    return l10n.contactsStatusUnverified;
   }
 
   String _formatVerifiedAt(DateTime value) {
@@ -322,286 +316,305 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Trusted contacts')),
-    body: SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Your safety network',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Contacts are stored locally on this device. Exchange FCM tokens between two phones so SUNO can route emergency push alerts to the trusted contact.',
-              style: TextStyle(color: AppColors.textMuted),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'MY FCM TOKEN',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (loadingToken)
-                      const Row(
-                        children: [
-                          SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text('Getting token from Firebase...'),
-                          ),
-                        ],
-                      )
-                    else if (myFcmToken == null || myFcmToken!.isEmpty)
-                      const Text(
-                        'Token unavailable. Check internet, Firebase setup, and notification permission, then refresh below.',
-                        style: TextStyle(color: AppColors.textMuted),
-                      )
-                    else ...[
-                      SelectableText(
-                        myFcmToken!,
-                        maxLines: 4,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _copyMyToken,
-                          icon: const Icon(Icons.copy),
-                          label: const Text('COPY MY FCM TOKEN'),
-                        ),
-                      ),
-                    ],
-                    TextButton(
-                      onPressed: loadingToken ? null : _loadMyToken,
-                      child: const Text('REFRESH MY TOKEN'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _myName,
-                  textCapitalization: TextCapitalization.words,
-                  inputFormatters: [LengthLimitingTextInputFormatter(40)],
-                  onChanged: (_) => unawaited(_saveMyName()),
-                  decoration: const InputDecoration(
-                    labelText: 'Your name',
-                    helperText:
-                        'Shown to your trusted contacts when an alert reaches them.',
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_loadError != null) ...[
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.contactsTitle)),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                _loadError!,
-                style: const TextStyle(color: AppColors.emergency),
+                l10n.contactsHeading,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              TextButton(
-                onPressed: _loadContacts,
-                child: const Text('RETRY CONTACTS'),
+              const SizedBox(height: 8),
+              Text(
+                l10n.contactsIntro,
+                style: const TextStyle(color: AppColors.textMuted),
               ),
-            ],
-            ...contacts.map(
-              (contact) => Card(
-                child: ListTile(
-                  contentPadding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
-                  leading: const CircleAvatar(
-                    backgroundColor: AppColors.purple,
-                    child: Icon(Icons.person),
-                  ),
-                  title: Text(
-                    contact.name,
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  subtitle: Column(
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(contact.relationship),
-                      if (contact.phone.isNotEmpty) Text(contact.phone),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            _pushStatusIcon(contact),
-                            size: 14,
-                            color: _pushStatusColor(contact),
+                      Text(
+                        l10n.contactsMyFcmToken,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (loadingToken)
+                        Row(
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(l10n.contactsTokenLoading),
+                            ),
+                          ],
+                        )
+                      else if (myFcmToken == null || myFcmToken!.isEmpty)
+                        Text(
+                          l10n.contactsTokenUnavailableBody,
+                          style: const TextStyle(color: AppColors.textMuted),
+                        )
+                      else ...[
+                        SelectableText(
+                          myFcmToken!,
+                          maxLines: 4,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _copyMyToken,
+                            icon: const Icon(Icons.copy),
+                            label: Text(l10n.contactsCopyToken),
                           ),
-                          const SizedBox(width: 4),
-                          Flexible(
+                        ),
+                      ],
+                      TextButton(
+                        onPressed: loadingToken ? null : _loadMyToken,
+                        child: Text(l10n.contactsRefreshToken),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: TextField(
+                    controller: _myName,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: [LengthLimitingTextInputFormatter(40)],
+                    onChanged: (_) => unawaited(_saveMyName()),
+                    decoration: InputDecoration(
+                      labelText: l10n.contactsYourName,
+                      helperText: l10n.contactsYourNameHelper,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (_loadFailed) ...[
+                Text(
+                  l10n.contactsLoadFailed,
+                  style: const TextStyle(color: AppColors.emergency),
+                ),
+                TextButton(
+                  onPressed: _loadContacts,
+                  child: Text(l10n.contactsRetry),
+                ),
+              ],
+              ...contacts.map(
+                (contact) => Card(
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
+                    leading: const CircleAvatar(
+                      backgroundColor: AppColors.purple,
+                      child: Icon(Icons.person),
+                    ),
+                    title: Text(
+                      contact.name,
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(contact.relationship),
+                        if (contact.phone.isNotEmpty) Text(contact.phone),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              _pushStatusIcon(contact),
+                              size: 14,
+                              color: _pushStatusColor(contact),
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                _pushStatus(contact, l10n),
+                                style: TextStyle(
+                                  color: _pushStatusColor(contact),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (contact.verifiedAt != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
                             child: Text(
-                              _pushStatus(contact),
-                              style: TextStyle(
-                                color: _pushStatusColor(contact),
-                                fontWeight: FontWeight.w700,
+                              l10n.contactsLastAcceptedTest(
+                                _formatVerifiedAt(contact.verifiedAt!),
+                              ),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 11,
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                      if (contact.verifiedAt != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            'Last accepted test: ${_formatVerifiedAt(contact.verifiedAt!)}',
-                            style: const TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 11,
+                      ],
+                    ),
+                    isThreeLine: true,
+                    trailing: PopupMenuButton<String>(
+                      enabled: !_busy(contact.id),
+                      onSelected: (value) async {
+                        if (value == 'edit') {
+                          _startEdit(contact);
+                        } else if (value == 'delete') {
+                          await _delete(contact);
+                        } else if (value == 'test') {
+                          await _testContact(contact);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        if (contact.fcmToken != null &&
+                            contact.fcmToken!.trim().isNotEmpty)
+                          PopupMenuItem(
+                            value: 'test',
+                            child: Row(
+                              children: [
+                                _testingIds.contains(contact.id)
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.send_outlined,
+                                        size: 18,
+                                      ),
+                                const SizedBox(width: 10),
+                                Flexible(child: Text(l10n.contactsMenuTest)),
+                              ],
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                  isThreeLine: true,
-                  trailing: PopupMenuButton<String>(
-                    enabled: !_busy(contact.id),
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        _startEdit(contact);
-                      } else if (value == 'delete') {
-                        await _delete(contact);
-                      } else if (value == 'test') {
-                        await _testContact(contact);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (contact.fcmToken != null &&
-                          contact.fcmToken!.trim().isNotEmpty)
                         PopupMenuItem(
-                          value: 'test',
+                          value: 'edit',
                           child: Row(
                             children: [
-                              _testingIds.contains(contact.id)
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.send_outlined, size: 18),
+                              const Icon(Icons.edit_outlined, size: 18),
                               const SizedBox(width: 10),
-                              const Flexible(
-                                child: Text('Test FCM acceptance'),
+                              Text(l10n.commonEdit),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: AppColors.emergency,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                l10n.commonDelete,
+                                style: const TextStyle(
+                                  color: AppColors.emergency,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_outlined, size: 18),
-                            SizedBox(width: 10),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.delete_outline,
-                              size: 18,
-                              color: AppColors.emergency,
-                            ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Delete',
-                              style: TextStyle(color: AppColors.emergency),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              _editingId == null ? 'Add a contact' : 'Edit contact',
-              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: name,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Name *'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phone,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone',
-                helperText: 'Optional — useful for a future call fallback.',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: relationship,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Relationship *'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: fcmToken,
-              minLines: 1,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'FCM token (optional)',
-                helperText: 'Needed only for real push alerts to this contact.',
-              ),
-            ),
-            const SizedBox(height: 18),
-            PrimaryActionButton(
-              label: _editingId == null ? 'SAVE CONTACT' : 'UPDATE CONTACT',
-              icon: _editingId == null
-                  ? Icons.person_add_alt_1
-                  : Icons.check_rounded,
-              onPressed: _saving ? null : save,
-            ),
-            if (_editingId != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Center(
-                  child: TextButton(
-                    onPressed: _saving ? null : () => setState(_clearForm),
-                    child: const Text('CANCEL EDIT'),
-                  ),
+              const SizedBox(height: 24),
+              Text(
+                _editingId == null
+                    ? l10n.contactsAddHeading
+                    : l10n.contactsEditHeading,
+                style: const TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-          ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: name,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(labelText: l10n.contactsFieldName),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phone,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: l10n.contactsFieldPhone,
+                  helperText: l10n.contactsFieldPhoneHelper,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: relationship,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText: l10n.contactsFieldRelationship,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: fcmToken,
+                minLines: 1,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: l10n.contactsFieldToken,
+                  helperText: l10n.contactsFieldTokenHelper,
+                ),
+              ),
+              const SizedBox(height: 18),
+              PrimaryActionButton(
+                label: _editingId == null
+                    ? l10n.contactsSaveButton
+                    : l10n.contactsUpdateButton,
+                icon: _editingId == null
+                    ? Icons.person_add_alt_1
+                    : Icons.check_rounded,
+                onPressed: _saving ? null : save,
+              ),
+              if (_editingId != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Center(
+                    child: TextButton(
+                      onPressed: _saving ? null : () => setState(_clearForm),
+                      child: Text(l10n.contactsCancelEdit),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
