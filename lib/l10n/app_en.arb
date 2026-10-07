@@ -35,5 +35,86 @@
   "eventPossibleDistress": "Possible Distress Sound",
   "eventDistressImpact": "Distress Sound + Impact",
   "eventManualSilentAlert": "Manual Silent Alert",
-  "eventEmergencyAlert": "Emergency Alert"
+  "eventEmergencyAlert": "Emergency Alert",
+
+  "emergencyClosedSafe": "You confirmed safe. This safety check is closed.",
+  "emergencyContactResolved": "A contact marked this incident as resolved.",
+  "emergencySending": "Sending alerts to your trusted contacts…",
+  "emergencyNoDeliveryResult": "No confirmed delivery result. Check your contacts and retry if needed.",
+  "emergencyDispatchAwaiting": "FCM accepted {sent} of {attempted} alerts. Awaiting a contact response.",
+  "@emergencyDispatchAwaiting": {
+    "placeholders": { "sent": { "type": "int" }, "attempted": { "type": "int" } }
+  },
+  "emergencyDispatchPartial": "FCM accepted {sent} of {attempted} alerts. {failed} failed.",
+  "@emergencyDispatchPartial": {
+    "placeholders": {
+      "sent": { "type": "int" },
+      "attempted": { "type": "int" },
+      "failed": { "type": "int" }
+    }
+  },
+  "emergencySavedLocally": "Alert saved locally — contacts could not be reached ({reason}).",
+  "@emergencySavedLocally": {
+    "placeholders": { "reason": { "type": "String" } }
+  },
+  "emergencyUnknownReason": "unknown reason",
+  "emergencyIncidentResolved": "Incident resolved",
+  "emergencyCheckCancelled": "Safety check cancelled",
+  "emergencyAlertActivated": "Emergency Alert Activated",
+  "emergencyDemoNote": "DEMO: simulated danger, real contact notifications",
+  "emergencyRetryFailed": "Could not retry. Please check connectivity.",
+  "emergencyRetryButton": "RETRY ALERT TO ALL CONTACTS",
+  "emergencyLabelEvent": "Event",
+  "emergencyLabelRiskScore": "Risk Score",
+  "emergencyLabelConfidence": "Confidence",
+  "commonLocation": "Location",
+  "emergencyRiskValue": "{score}% ({level})",
+  "@emergencyRiskValue": {
+    "placeholders": { "score": { "type": "int" }, "level": { "type": "String" } }
+  },
+  "emergencyLocationAtAlert": "Location at alert time",
+  "emergencyLocalServicesNote": "In immediate danger, contact local emergency services.",
+  "emergencyViewHistory": "View incident history",
+  "errorIncidentUnavailable": "This incident is no longer available.",
+  "riskLevelLow": "Low",
+  "riskLevelMedium": "Medium",
+  "riskLevelCritical": "Critical",
+  "commonLocationUnavailable": "Location unavailable",
+
+  "monitoringTitle": "Monitoring",
+  "monitoringDemoMode": "Demo Mode",
+  "monitoringLiveMode": "Live Mode",
+  "monitoringStatusStarting": "Starting…",
+  "monitoringListeningLive": "SUNO is Listening Live",
+  "monitoringLivePaused": "Live monitoring paused",
+  "monitoringActive": "SUNO is Active",
+  "monitoringLiveSubtitle": "Real microphone and location — processed on this device",
+  "monitoringDemoSubtitle": "Simulated danger • Real GPS and contact alerts\nThe microphone is off in Demo mode.",
+  "monitoringSilentSosHint": "Long-press the mic for Silent SOS",
+  "monitoringLowRiskDone": "Low-risk simulation complete. No alert was sent.",
+  "monitoringSimulationFailed": "Simulation could not finish. Please retry.",
+  "monitoringLocating": "Locating…",
+  "monitoringGpsReady": "GPS ready",
+  "monitoringPermissionDenied": "Permission denied",
+  "monitoringGpsDisabled": "GPS disabled",
+  "monitoringGpsTimedOut": "GPS timed out — retry",
+  "monitoringLabelSound": "Sound",
+  "monitoringLabelMotion": "Motion",
+  "monitoringStatusListening": "Listening",
+  "monitoringStatusNormal": "Normal",
+  "monitoringStatusSensing": "Sensing",
+  "monitoringStatusStable": "Stable",
+  "monitoringStatusDemo": "Demo",
+  "monitoringAnalyzing": "Analyzing {level} risk…",
+  "@monitoringAnalyzing": {
+    "placeholders": { "level": { "type": "String" } }
+  },
+  "monitoringAnalyzingShort": "Analyzing…",
+  "monitoringSimulateDistress": "Demo: Simulate Distress",
+  "monitoringStartLive": "START LIVE MONITORING",
+  "monitoringStop": "STOP MONITORING",
+  "monitoringChipLow": "LOW",
+  "monitoringChipMedium": "MEDIUM",
+  "monitoringChipCritical": "CRITICAL",
+  "commonUnavailable": "Unavailable"
 }
