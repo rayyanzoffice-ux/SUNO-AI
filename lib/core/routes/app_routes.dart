@@ -5,8 +5,10 @@ import '../../screens/contacts_setup/contacts_setup_screen.dart';
 import '../../screens/emergency_alert/emergency_alert_screen.dart';
 import '../../screens/history/history_screen.dart';
 import '../../screens/home/home_screen.dart';
+import '../../screens/language/language_selection_screen.dart';
 import '../../screens/monitoring/monitoring_screen.dart';
 import '../../screens/safety_check/safety_check_screen.dart';
+import '../../screens/settings/settings_screen.dart';
 
 abstract final class AppRoutes {
   static const home = '/';
@@ -16,6 +18,9 @@ abstract final class AppRoutes {
   static const alertReceived = '/alert-received';
   static const history = '/history';
   static const contactsSetup = '/contacts-setup';
+  static const settings = '/settings';
+  static const languageSetup = '/language-setup';
+  static const languageSelection = '/language-selection';
 
   static final routes = <String, WidgetBuilder>{
     home: (_) => const HomeScreen(),
@@ -28,6 +33,9 @@ abstract final class AppRoutes {
     ),
     history: (_) => const HistoryScreen(),
     contactsSetup: (_) => const ContactsSetupScreen(),
+    settings: (_) => const SettingsScreen(),
+    languageSetup: (_) => const LanguageSelectionScreen(isFirstRun: true),
+    languageSelection: (_) => const LanguageSelectionScreen(),
   };
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {

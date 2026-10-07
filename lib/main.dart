@@ -11,8 +11,10 @@ import 'app.dart';
 import 'backend/alerts/fcm_alert_service.dart';
 import 'backend/persistence/app_storage.dart';
 import 'backend/persistence/hive_incident_repository.dart';
+import 'backend/persistence/hive_locale_repository.dart';
 import 'backend/persistence/hive_profile_repository.dart';
 import 'backend/persistence/hive_trusted_contact_repository.dart';
+import 'core/l10n/locale_controller.dart';
 import 'core/navigation/alert_navigation.dart';
 import 'core/navigation/navigator_key.dart';
 import 'core/routes/app_routes.dart';
@@ -255,6 +257,10 @@ class _AppLifecycle extends WidgetsBindingObserver {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initStorage();
+  LocaleController.instance = LocaleController(
+    repository: const HiveLocaleRepository(),
+  );
+  await LocaleController.instance.load();
   FcmAlertService? alertService;
   var firebaseReady = false;
   try {

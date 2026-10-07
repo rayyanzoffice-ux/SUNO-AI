@@ -12,6 +12,10 @@ import 'package:suno_ai/widgets/primary_action_button.dart';
 import 'package:suno_ai/widgets/silent_sos_sheet.dart';
 import 'package:suno_ai/app.dart';
 import 'package:suno_ai/backend/backend_exports.dart';
+import 'package:suno_ai/backend/profile/locale_repository.dart';
+import 'package:suno_ai/core/l10n/app_locales.dart';
+import 'package:suno_ai/core/l10n/l10n.dart';
+import 'package:suno_ai/core/l10n/locale_controller.dart';
 import 'package:suno_ai/core/routes/app_routes.dart';
 import 'package:suno_ai/models/detection_result.dart';
 import 'package:suno_ai/models/incident.dart';
@@ -27,6 +31,12 @@ import 'package:suno_ai/services/monitoring_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() {
+    LocaleController.instance = LocaleController(
+      repository: InMemoryLocaleRepository(),
+    );
+    // Picks English so SunoApp opens Home: the locale and the hasChosenLanguage
+    // flag are both set synchronously, before setLanguage reaches its await.
+    unawaited(LocaleController.instance.setLanguage(SunoLanguages.english));
     SunoRuntimeService.instance = SunoRuntimeService(
       locationService: _UnavailableLocation(),
     );
@@ -851,7 +861,13 @@ void main() {
       tester.view.physicalSize = size;
 
       for (final screen in screens) {
-        await tester.pumpWidget(MaterialApp(home: screen));
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: screen,
+          ),
+        );
         await tester.pump();
         expect(
           tester.takeException(),
