@@ -219,5 +219,27 @@
   "mapRetry": "重试",
   "mapOpen": "打开",
 
-  "riskBadgeValue": "{score}% {label}"
+  "riskBadgeValue": "{score}% {label}",
+
+  "monitoringStartFailed": "无法启动实时监听。请检查麦克风权限和设备支持，然后重试。",
+  "monitoringStopCaptureFailed": "无法完成停止音频采集。",
+  "monitoringClassifierReleaseFailed": "无法释放音频分类器。请重启 SUNO。",
+  "monitoringProcessorReleaseFailed": "无法释放音频处理器。请重启 SUNO。",
+  "monitoringMicrophoneReleaseFailed": "无法释放麦克风。请重启 SUNO 后再监听。",
+  "monitoringAndroidStopFailed": "无法停止 Android 服务。请检查系统通知并重启 SUNO。",
+  "monitoringMotionUnavailable": "运动传感器不可用。音频监听仍在进行。",
+  "monitoringAndroidStopped": "Android 已停止后台监听。若有待完成的安全操作，请保持 SUNO 打开，然后重新开启实时模式。",
+  "monitoringCleanupFailed": "音频清理失败。请在本次安全操作结束后重启 SUNO。",
+  "monitoringDetectionSaveFailed": "无法保存检测结果。请使用静默求救或直接求助。",
+  "monitoringNotificationsUnavailable": "安全通知不可用。请检查 Android 的通知设置。",
+  "monitoringBackgroundKeepFailed": "Android 无法在后台保持该安全操作。请保持 SUNO 打开直到完成。",
+  "monitoringCleanupIncomplete": "无法完成监听清理。请检查系统通知并重启 SUNO。",
+
+  "notifStartingStatus": "正在启动监听",
+  "notifListeningStatus": "SUNO 正在聆听",
+  "notifTitleEmergency": "紧急警报",
+  "notifBodyCheckDelivery": "打开 SUNO 查看联系人送达状态。",
+  "notifBodyRespondInTime": "请在安全检查到期前回应。",
+  "notifSafetyCheckStatus": "安全检查进行中",
+  "notifSendingAlertsStatus": "正在发送紧急警报"
 }

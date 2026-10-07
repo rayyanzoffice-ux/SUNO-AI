@@ -219,5 +219,27 @@
   "mapRetry": "إعادة المحاولة",
   "mapOpen": "افتح",
 
-  "riskBadgeValue": "{label} {score}%"
+  "riskBadgeValue": "{label} {score}%",
+
+  "monitoringStartFailed": "تعذَّر بدء المراقبة المباشرة. تحقَّق من إذن الميكروفون ودعم الجهاز، ثم أعد المحاولة.",
+  "monitoringStopCaptureFailed": "لم يكتمل إيقاف التقاط الصوت.",
+  "monitoringClassifierReleaseFailed": "لم يمكن تحرير مصنِّف الصوت. أعد تشغيل SUNO.",
+  "monitoringProcessorReleaseFailed": "لم يمكن تحرير معالج الصوت. أعد تشغيل SUNO.",
+  "monitoringMicrophoneReleaseFailed": "لم يمكن تحرير الميكروفون. أعد تشغيل SUNO قبل الاستماع مرة أخرى.",
+  "monitoringAndroidStopFailed": "لم يمكن إيقاف خدمة Android. تحقق من إشعار النظام وأعد تشغيل SUNO.",
+  "monitoringMotionUnavailable": "مستشعر الحركة غير متاح. مراقبة الصوت لا تزال نشطة.",
+  "monitoringAndroidStopped": "أوقف Android المراقبة في الخلفية. أبقِ SUNO مفتوحًا إذا كان هناك إجراء سلامة معلَّق، ثم أعد تشغيل الوضع المباشر.",
+  "monitoringCleanupFailed": "لم يكتمل تنظيف الصوت. أعد تشغيل SUNO بعد إجراء السلامة هذا.",
+  "monitoringDetectionSaveFailed": "لم يمكن حفظ نتيجة الكشف. استخدم SOS الصامت أو اطلب المساعدة.",
+  "monitoringNotificationsUnavailable": "تنبيهات السلامة غير متاحة. تحقق من إعدادات الإشعارات في Android.",
+  "monitoringBackgroundKeepFailed": "لم يستطع Android إبقاء إجراء السلامة في الخلفية. أبقِ SUNO مفتوحًا حتى ينتهي.",
+  "monitoringCleanupIncomplete": "لم يكتمل تنظيف المراقبة. تحقق من إشعار النظام وأعد تشغيل SUNO.",
+
+  "notifStartingStatus": "جارٍ بدء المراقبة",
+  "notifListeningStatus": "SUNO يستمع",
+  "notifTitleEmergency": "تنبيه طارئ",
+  "notifBodyCheckDelivery": "افتح SUNO للتحقق من حالة تسليم التنبيهات إلى جهات الاتصال.",
+  "notifBodyRespondInTime": "رد قبل انتهاء فحص السلامة.",
+  "notifSafetyCheckStatus": "فحص السلامة جارٍ",
+  "notifSendingAlertsStatus": "إرسال التنبيهات الطارئة"
 }

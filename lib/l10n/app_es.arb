@@ -219,5 +219,27 @@
   "mapRetry": "Reintentar",
   "mapOpen": "ABRIR",
 
-  "riskBadgeValue": "{score}% {label}"
+  "riskBadgeValue": "{score}% {label}",
+
+  "monitoringStartFailed": "No se pudo iniciar el monitoreo en vivo. Verifica el permiso del micrófono y la compatibilidad del dispositivo, e inténtalo de nuevo.",
+  "monitoringStopCaptureFailed": "No se pudo terminar de detener la captura de audio.",
+  "monitoringClassifierReleaseFailed": "No se pudo liberar el clasificador de audio. Reinicia SUNO.",
+  "monitoringProcessorReleaseFailed": "No se pudo liberar el procesador de audio. Reinicia SUNO.",
+  "monitoringMicrophoneReleaseFailed": "No se pudo liberar el micrófono. Reinicia SUNO antes de volver a escuchar.",
+  "monitoringAndroidStopFailed": "No se pudo detener el servicio de Android. Revisa la notificación del sistema y reinicia SUNO.",
+  "monitoringMotionUnavailable": "Sensor de movimiento no disponible. El monitoreo de audio sigue activo.",
+  "monitoringAndroidStopped": "Android detuvo el monitoreo en segundo plano. Mantén SUNO abierto si hay alguna acción de seguridad pendiente y vuelve a activar el modo en vivo.",
+  "monitoringCleanupFailed": "Falló la limpieza del audio. Reinicia SUNO después de esta acción de seguridad.",
+  "monitoringDetectionSaveFailed": "No se pudo guardar la detección. Usa el SOS silencioso o pide ayuda directamente.",
+  "monitoringNotificationsUnavailable": "Notificaciones de seguridad no disponibles. Revisa la configuración de notificaciones de Android.",
+  "monitoringBackgroundKeepFailed": "Android no pudo mantener la acción de seguridad en segundo plano. Mantén SUNO abierto hasta que termine.",
+  "monitoringCleanupIncomplete": "No se pudo completar la limpieza del monitoreo. Revisa la notificación del sistema y reinicia SUNO.",
+
+  "notifStartingStatus": "Iniciando monitoreo",
+  "notifListeningStatus": "SUNO está escuchando",
+  "notifTitleEmergency": "Alerta de emergencia",
+  "notifBodyCheckDelivery": "Abre SUNO para ver el estado de entrega a tus contactos.",
+  "notifBodyRespondInTime": "Responde antes de que expire el chequeo de seguridad.",
+  "notifSafetyCheckStatus": "Chequeo de seguridad en curso",
+  "notifSendingAlertsStatus": "Enviando alertas de emergencia"
 }

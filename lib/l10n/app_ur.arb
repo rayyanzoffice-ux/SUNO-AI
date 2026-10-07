@@ -219,5 +219,27 @@
   "mapRetry": "دوبارہ کوشش کریں",
   "mapOpen": "کھولیں",
 
-  "riskBadgeValue": "{label} {score}%"
+  "riskBadgeValue": "{label} {score}%",
+
+  "monitoringStartFailed": "لائیو مانیٹرنگ شروع نہیں ہو سکی۔ مائیک اجازت اور ڈیوائس سپورٹ چیک کریں، پھر دوبارہ کوشش کریں۔",
+  "monitoringStopCaptureFailed": "آڈیو کیپچر بند کرنا مکمل نہیں ہو سکا۔",
+  "monitoringClassifierReleaseFailed": "آڈیو کلاسیفائر خارج نہیں ہو سکا۔ SUNO دوبارہ چلائیں۔",
+  "monitoringProcessorReleaseFailed": "آڈیو پروسیسر خارج نہیں ہو سکا۔ SUNO دوبارہ چلائیں۔",
+  "monitoringMicrophoneReleaseFailed": "مائیک خارج نہیں ہو سکا۔ دوبارہ سننے سے پہلے SUNO دوبارہ چلائیں۔",
+  "monitoringAndroidStopFailed": "Android سروس بند نہیں ہو سکی۔ سسٹم اطلاع دیکھیں اور SUNO دوبارہ چلائیں۔",
+  "monitoringMotionUnavailable": "موشن سینسر دستیاب نہیں۔ آڈیو مانیٹرنگ ابھی بھی فعال ہے۔",
+  "monitoringAndroidStopped": "Android نے پسِ منظر مانیٹرنگ روک دی۔ کوئی حفاظتی کارروائی زیرِ التوا ہو تو SUNO کھلا رکھیں، پھر لائیو موڈ چلائیں۔",
+  "monitoringCleanupFailed": "آڈیو صفائی ناکام ہوئی۔ اس حفاظتی کارروائی کے بعد SUNO دوبارہ چلائیں۔",
+  "monitoringDetectionSaveFailed": "ڈٹیکشن محفوظ نہیں ہو سکا۔ براہ کرم خاموش SOS استعمال کریں یا مدد لیں۔",
+  "monitoringNotificationsUnavailable": "حفاظتی اطلاعات دستیاب نہیں۔ Android اطلاعات کی ترتیبات دیکھیں۔",
+  "monitoringBackgroundKeepFailed": "Android اس حفاظتی کارروائی کو پسِ منظر میں نہیں رکھ سکا۔ مکمل ہونے تک SUNO کھلا رکھیں۔",
+  "monitoringCleanupIncomplete": "مانیٹرنگ کی صفائی مکمل نہیں ہو سکی۔ سسٹم اطلاع دیکھیں اور SUNO دوبارہ چلائیں۔",
+
+  "notifStartingStatus": "مانیٹرنگ شروع ہو رہی ہے",
+  "notifListeningStatus": "SUNO سن رہا ہے",
+  "notifTitleEmergency": "ہنگامی الرٹ",
+  "notifBodyCheckDelivery": "رابطوں کی ڈیلیوری حالت دیکھنے کے لیے SUNO کھولیں۔",
+  "notifBodyRespondInTime": "سیفٹی چیک ختم ہونے سے پہلے جواب دیں۔",
+  "notifSafetyCheckStatus": "سیفٹی چیک جاری ہے",
+  "notifSendingAlertsStatus": "ہنگامی الرٹ بھیجے جا رہے ہیں"
 }

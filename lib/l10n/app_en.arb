@@ -281,5 +281,27 @@
   "riskBadgeValue": "{score}% {label}",
   "@riskBadgeValue": {
     "placeholders": { "score": { "type": "int" }, "label": { "type": "String" } }
-  }
+  },
+
+  "monitoringStartFailed": "Live monitoring could not start. Check microphone permission and device support, then retry.",
+  "monitoringStopCaptureFailed": "Could not finish stopping audio capture.",
+  "monitoringClassifierReleaseFailed": "Could not release the audio classifier. Restart SUNO.",
+  "monitoringProcessorReleaseFailed": "Could not release the audio processor. Restart SUNO.",
+  "monitoringMicrophoneReleaseFailed": "Could not release the microphone. Restart SUNO before listening again.",
+  "monitoringAndroidStopFailed": "Could not stop the Android service. Check the system notification and restart SUNO.",
+  "monitoringMotionUnavailable": "Motion sensor unavailable. Audio monitoring is still active.",
+  "monitoringAndroidStopped": "Android stopped background monitoring. Keep SUNO open for any pending safety action, then restart Live mode.",
+  "monitoringCleanupFailed": "Audio cleanup failed. Restart SUNO after this safety action.",
+  "monitoringDetectionSaveFailed": "Could not save the detection. Please use Silent SOS or seek help.",
+  "monitoringNotificationsUnavailable": "Safety notifications unavailable. Check Android notification settings.",
+  "monitoringBackgroundKeepFailed": "Android could not keep the safety action in the background. Keep SUNO open until it finishes.",
+  "monitoringCleanupIncomplete": "Could not complete monitoring cleanup. Check the system notification and restart SUNO.",
+
+  "notifStartingStatus": "Starting monitoring",
+  "notifListeningStatus": "SUNO is listening",
+  "notifTitleEmergency": "Emergency alert",
+  "notifBodyCheckDelivery": "Open SUNO to check contact delivery status.",
+  "notifBodyRespondInTime": "Respond before the safety check expires.",
+  "notifSafetyCheckStatus": "Safety check in progress",
+  "notifSendingAlertsStatus": "Sending emergency alerts"
 }

@@ -219,5 +219,27 @@
   "mapRetry": "আবার চেষ্টা করুন",
   "mapOpen": "খুলুন",
 
-  "riskBadgeValue": "{label} {score}%"
+  "riskBadgeValue": "{label} {score}%",
+
+  "monitoringStartFailed": "লাইভ মনিটরিং শুরু করা যায়নি। মাইক্রোফোনের অনুমতি ও ডিভাইস সমর্থন পরীক্ষা করে আবার চেষ্টা করুন।",
+  "monitoringStopCaptureFailed": "অডিও ক্যাপচার বন্ধ করা সম্পন্ন করা যায়নি।",
+  "monitoringClassifierReleaseFailed": "অডিও ক্লাসিফায়ার মুক্ত করা যায়নি। SUNO আবার চালু করুন।",
+  "monitoringProcessorReleaseFailed": "অডিও প্রসেসর মুক্ত করা যায়নি। SUNO আবার চালু করুন।",
+  "monitoringMicrophoneReleaseFailed": "মাইক্রোফোন মুক্ত করা যায়নি। আবার শোনার আগে SUNO আবার চালু করুন।",
+  "monitoringAndroidStopFailed": "Android সেবা বন্ধ করা যায়নি। সিস্টেম বিজ্ঞপ্তি দেখে SUNO আবার চালু করুন।",
+  "monitoringMotionUnavailable": "মোশন সেন্সর অনুপলব্ধ। অডিও মনিটরিং এখনও সক্রিয়।",
+  "monitoringAndroidStopped": "Android ব্যাকগ্রাউন্ড মনিটরিং থামিয়ে দিয়েছে। কোনো নিরাপত্তা পদক্ষেপ অপেক্ষমাণ থাকলে SUNO খোলা রাখুন, তারপর লাইভ মোড চালু করুন।",
+  "monitoringCleanupFailed": "অডিও পরিষ্কার করা ব্যর্থ হয়েছে। এই নিরাপত্তা পদক্ষেপের পর SUNO আবার চালু করুন।",
+  "monitoringDetectionSaveFailed": "শনাক্তকরণ সংরক্ষণ করা যায়নি। অনুগ্রহ করে নীরব SOS ব্যবহার করুন বা সরাসরি সাহায্য চান।",
+  "monitoringNotificationsUnavailable": "নিরাপত্তা বিজ্ঞপ্তি অনুপলব্ধ। Android বিজ্ঞপ্তির সেটিংস পরীক্ষা করুন।",
+  "monitoringBackgroundKeepFailed": "Android নিরাপত্তা পদক্ষেপটি ব্যাকগ্রাউন্ডে রাখতে পারেনি। শেষ হওয়া পর্যন্ত SUNO খোলা রাখুন।",
+  "monitoringCleanupIncomplete": "মনিটরিং পরিষ্কার করা সম্পন্ন করা যায়নি। সিস্টেম বিজ্ঞপ্তি দেখে SUNO আবার চালু করুন।",
+
+  "notifStartingStatus": "মনিটরিং শুরু হচ্ছে",
+  "notifListeningStatus": "SUNO শুনছে",
+  "notifTitleEmergency": "জরুরি সতর্কতা",
+  "notifBodyCheckDelivery": "যোগাযোগকারীরা বার্তা পেয়েছেন কিনা দেখতে SUNO খুলুন।",
+  "notifBodyRespondInTime": "নিরাপত্তা চেক শেষ হওয়ার আগে উত্তর দিন।",
+  "notifSafetyCheckStatus": "নিরাপত্তা চেক চলছে",
+  "notifSendingAlertsStatus": "জরুরি সতর্কতা পাঠানো হচ্ছে"
 }

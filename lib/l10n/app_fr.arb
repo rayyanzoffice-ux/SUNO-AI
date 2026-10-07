@@ -219,5 +219,27 @@
   "mapRetry": "Réessayer",
   "mapOpen": "OUVRIR",
 
-  "riskBadgeValue": "{score}% {label}"
+  "riskBadgeValue": "{score}% {label}",
+
+  "monitoringStartFailed": "Impossible de démarrer la surveillance en direct. Vérifiez l’autorisation du micro et la compatibilité de l’appareil, puis réessayez.",
+  "monitoringStopCaptureFailed": "Impossible d’arrêter complètement la capture audio.",
+  "monitoringClassifierReleaseFailed": "Impossible de libérer le classifieur audio. Redémarrez SUNO.",
+  "monitoringProcessorReleaseFailed": "Impossible de libérer le processeur audio. Redémarrez SUNO.",
+  "monitoringMicrophoneReleaseFailed": "Impossible de libérer le micro. Redémarrez SUNO avant de réécouter.",
+  "monitoringAndroidStopFailed": "Impossible d’arrêter le service Android. Vérifiez la notification système et redémarrez SUNO.",
+  "monitoringMotionUnavailable": "Capteur de mouvement indisponible. La surveillance audio est toujours active.",
+  "monitoringAndroidStopped": "Android a arrêté la surveillance en arrière-plan. Gardez SUNO ouvert si une action de sécurité est en attente, puis relancez le mode en direct.",
+  "monitoringCleanupFailed": "Le nettoyage audio a échoué. Redémarrez SUNO après cette action de sécurité.",
+  "monitoringDetectionSaveFailed": "Impossible d’enregistrer la détection. Veuillez utiliser le SOS silencieux ou demander de l’aide.",
+  "monitoringNotificationsUnavailable": "Notifications de sécurité indisponibles. Vérifiez les paramètres de notification d’Android.",
+  "monitoringBackgroundKeepFailed": "Android n’a pas pu maintenir l’action de sécurité en arrière-plan. Gardez SUNO ouvert jusqu’à la fin.",
+  "monitoringCleanupIncomplete": "Impossible de terminer le nettoyage de la surveillance. Vérifiez la notification système et redémarrez SUNO.",
+
+  "notifStartingStatus": "Démarrage de la surveillance",
+  "notifListeningStatus": "SUNO écoute",
+  "notifTitleEmergency": "Alerte d’urgence",
+  "notifBodyCheckDelivery": "Ouvrez SUNO pour vérifier la remise aux contacts.",
+  "notifBodyRespondInTime": "Répondez avant l’expiration du contrôle de sécurité.",
+  "notifSafetyCheckStatus": "Contrôle de sécurité en cours",
+  "notifSendingAlertsStatus": "Envoi des alertes d’urgence"
 }

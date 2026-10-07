@@ -219,5 +219,27 @@
   "mapRetry": "फिर कोशिश करें",
   "mapOpen": "खोलें",
 
-  "riskBadgeValue": "{label} {score}%"
+  "riskBadgeValue": "{label} {score}%",
+
+  "monitoringStartFailed": "लाइव मॉनिटरिंग शुरू नहीं हो सकी। माइक अनुमति और डिवाइस सहायता जाँचें, फिर कोशिश करें।",
+  "monitoringStopCaptureFailed": "ऑडियो कैप्चर बंद करना पूरा नहीं हो सका।",
+  "monitoringClassifierReleaseFailed": "ऑडियो क्लासिफायर रिलीज़ नहीं हो सका। SUNO फिर से चालू करें।",
+  "monitoringProcessorReleaseFailed": "ऑडियो प्रोसेसर रिलीज़ नहीं हो सका। SUNO फिर से चालू करें।",
+  "monitoringMicrophoneReleaseFailed": "माइक रिलीज़ नहीं हो सका। फिर से सुनने से पहले SUNO फिर से चालू करें।",
+  "monitoringAndroidStopFailed": "Android सेवा बंद नहीं हो सकी। सिस्टम सूचना जाँचें और SUNO फिर से चालू करें।",
+  "monitoringMotionUnavailable": "मोशन सेंसर उपलब्ध नहीं। ऑडियो मॉनिटरिंग अभी भी सक्रिय है।",
+  "monitoringAndroidStopped": "Android ने बैकग्राउंड मॉनिटरिंग रोक दी। कोई लंबित सुरक्षा कार्रवाई हो तो SUNO खुला रखें, फिर लाइव मोड चालू करें।",
+  "monitoringCleanupFailed": "ऑडियो सफाई असफल रही। इस सुरक्षा कार्रवाई के बाद SUNO फिर से चालू करें।",
+  "monitoringDetectionSaveFailed": "डिटेक्शन सहेजा नहीं जा सका। कृपया साइलेंट SOS इस्तेमाल करें या सीधे मदद लें।",
+  "monitoringNotificationsUnavailable": "सुरक्षा सूचनाएं उपलब्ध नहीं। Android सूचना सेटिंग जाँचें।",
+  "monitoringBackgroundKeepFailed": "Android इस सुरक्षा कार्रवाई को बैकग्राउंड में नहीं रख सका। पूरी होने तक SUNO खुला रखें।",
+  "monitoringCleanupIncomplete": "मॉनिटरिंग सफाई पूरी नहीं हो सकी। सिस्टम सूचना जाँचें और SUNO फिर से चालू करें।",
+
+  "notifStartingStatus": "मॉनिटरिंग शुरू हो रही है",
+  "notifListeningStatus": "SUNO सुन रहा है",
+  "notifTitleEmergency": "आपातकालीन अलर्ट",
+  "notifBodyCheckDelivery": "संपर्क डिलीवरी स्थिति देखने के लिए SUNO खोलें।",
+  "notifBodyRespondInTime": "सुरक्षा जांच खत्म होने से पहले जवाब दें।",
+  "notifSafetyCheckStatus": "सुरक्षा जांच जारी है",
+  "notifSendingAlertsStatus": "आपातकालीन अलर्ट भेजे जा रहे हैं"
 }
