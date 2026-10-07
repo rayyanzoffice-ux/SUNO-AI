@@ -199,5 +199,25 @@
   "receivedMessageUnable": "Sin contacto",
   "receivedResponseFailed": "Respuesta fallida: {error}",
   "receivedSenderTokenMissing": "El token del remitente no está disponible. Contáctalos directamente.",
-  "receivedIncidentRemoved": "El incidente fue eliminado."
+  "receivedIncidentRemoved": "El incidente fue eliminado.",
+
+  "sosTitle": "SOS silencioso",
+  "sosIntro": "Envía tu ubicación y una alerta crítica sin ningún sonido, cuenta atrás ni pantalla de confirmación. Úsalo cuando no puedas hablar o no puedas hacer ruido con seguridad.",
+  "sosOsNote": "Esto es independiente del SOS de emergencia integrado en tu teléfono (gesto del botón lateral): las aplicaciones no pueden controlar esa función del sistema.",
+  "sosContactsLoadFailed": "No se pudieron cargar los contactos. Reintenta para elegir un destinatario.",
+  "sosSaveFailed": "No se pudo guardar el SOS. Inténtalo de nuevo o pide ayuda directamente.",
+  "sosNoContacts": "Aún no hay contactos de confianza guardados. Añade uno desde la pantalla de inicio para activar el SOS silencioso.",
+  "sosSending": "Enviando…",
+  "sosAlertAll": "ALERTAR A TODOS LOS CONTACTOS",
+  "sosCancel": "Cancelar",
+
+  "mapOpenFailed": "No se pudo abrir Maps. Revisa tu navegador o tu app de mapas.",
+  "mapAttributionFailed": "No se pudo abrir la atribución del mapa. Revisa tu navegador.",
+  "mapAttributionOsm": "Colaboradores de OpenStreetMap",
+  "mapAttributionOsmMapTiler": "Colaboradores de OpenStreetMap, MapTiler",
+  "mapTilesUnavailable": "Los mosaicos del mapa no están disponibles. Las coordenadas siguen siendo útiles.",
+  "mapRetry": "Reintentar",
+  "mapOpen": "ABRIR",
+
+  "riskBadgeValue": "{score}% {label}"
 }

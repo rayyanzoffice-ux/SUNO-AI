@@ -199,5 +199,25 @@
   "receivedMessageUnable": "无法联系",
   "receivedResponseFailed": "回复失败：{error}",
   "receivedSenderTokenMissing": "发送方的令牌不可用。请直接联系对方。",
-  "receivedIncidentRemoved": "该事件已被移除。"
+  "receivedIncidentRemoved": "该事件已被移除。",
+
+  "sosTitle": "静默求救",
+  "sosIntro": "在没有任何声音、倒计时或确认页面的情况下发送你的位置和紧急警报。无法说话或不能安全地发出声音时使用。",
+  "sosOsNote": "这与手机自带的紧急 SOS（侧键操作）不同——应用无法控制该操作系统功能。",
+  "sosContactsLoadFailed": "无法加载联系人。请重试以选择接收人。",
+  "sosSaveFailed": "无法保存求救请求。请重试，或直接向他人求助。",
+  "sosNoContacts": "尚未保存任何可信联系人。请在首页添加一位，才能发送静默求救。",
+  "sosSending": "正在发送…",
+  "sosAlertAll": "通知所有联系人",
+  "sosCancel": "取消",
+
+  "mapOpenFailed": "无法打开地图。请检查你的浏览器或地图应用。",
+  "mapAttributionFailed": "无法打开地图版权信息。请检查你的浏览器。",
+  "mapAttributionOsm": "OpenStreetMap 贡献者",
+  "mapAttributionOsmMapTiler": "OpenStreetMap 贡献者，MapTiler",
+  "mapTilesUnavailable": "地图瓦片不可用。坐标仍然可以使用。",
+  "mapRetry": "重试",
+  "mapOpen": "打开",
+
+  "riskBadgeValue": "{score}% {label}"
 }

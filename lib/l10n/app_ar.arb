@@ -199,5 +199,25 @@
   "receivedMessageUnable": "تعذر التواصل",
   "receivedResponseFailed": "فشل الرد: {error}",
   "receivedSenderTokenMissing": "رمز المرسل غير متاح. تواصل معهم مباشرة.",
-  "receivedIncidentRemoved": "تم حذف الحادث."
+  "receivedIncidentRemoved": "تم حذف الحادث.",
+
+  "sosTitle": "SOS صامت",
+  "sosIntro": "يرسل موقعك وتنبيهًا خطيرًا بدون أي صوت أو عدٍّ تنازلي أو شاشة تأكيد. استخدمه عندما لا تستطيع الكلام أو لا يمكنك إحداث ضوضاء بأمان.",
+  "sosOsNote": "هذا منفصل عن ميزة SOS للطوارئ المدمجة في هاتفك (إشارة الزر الجانبي) — لا يمكن للتطبيقات التحكم في تلك الميزة النظامية.",
+  "sosContactsLoadFailed": "تعذَّر تحميل جهات الاتصال. أعد المحاولة لاختيار مستلم.",
+  "sosSaveFailed": "تعذَّر حفظ SOS. أعد المحاولة أو اطلب المساعدة مباشرة.",
+  "sosNoContacts": "لم تُحفظ أي جهة اتصال موثوقة بعد. أضف جهة من الشاشة الرئيسية لتفعيل إرسال SOS صامت.",
+  "sosSending": "جارٍ الإرسال…",
+  "sosAlertAll": "نبّه جميع جهات الاتصال",
+  "sosCancel": "إلغاء",
+
+  "mapOpenFailed": "تعذَّر فتح Maps. تحقّق من متصفحك أو من تطبيق الخرائط.",
+  "mapAttributionFailed": "تعذَّر فتح نسب الخريطة. تحقّق من متصفحك.",
+  "mapAttributionOsm": "المساهمون في OpenStreetMap",
+  "mapAttributionOsmMapTiler": "المساهمون في OpenStreetMap وMapTiler",
+  "mapTilesUnavailable": "وحدات الخريطة غير متاحة. الإحداثيات ما زالت صالحة للاستخدام.",
+  "mapRetry": "إعادة المحاولة",
+  "mapOpen": "افتح",
+
+  "riskBadgeValue": "{label} {score}%"
 }

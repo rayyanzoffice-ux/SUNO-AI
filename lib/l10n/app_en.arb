@@ -258,5 +258,28 @@
     "placeholders": { "error": { "type": "String" } }
   },
   "receivedSenderTokenMissing": "Sender token unavailable. Please contact them directly.",
-  "receivedIncidentRemoved": "The incident was removed."
+  "receivedIncidentRemoved": "The incident was removed.",
+
+  "sosTitle": "Silent SOS",
+  "sosIntro": "Sends your location and a critical alert without any sound, countdown, or confirmation screen. Use this when you can’t speak or can’t safely make noise.",
+  "sosOsNote": "This is separate from your phone’s built-in Emergency SOS (side-button gesture) — apps cannot control that OS feature.",
+  "sosContactsLoadFailed": "Could not load contacts. Retry to choose a recipient.",
+  "sosSaveFailed": "Could not save the SOS. Please retry or contact help directly.",
+  "sosNoContacts": "No trusted contacts saved yet. Add one from the Home screen to enable Silent SOS delivery.",
+  "sosSending": "Sending…",
+  "sosAlertAll": "ALERT ALL CONTACTS",
+  "sosCancel": "Cancel",
+
+  "mapOpenFailed": "Could not open Maps. Check your browser or map app.",
+  "mapAttributionFailed": "Could not open map attribution. Check your browser.",
+  "mapAttributionOsm": "OpenStreetMap contributors",
+  "mapAttributionOsmMapTiler": "OpenStreetMap contributors, MapTiler",
+  "mapTilesUnavailable": "Map tiles unavailable. Coordinates are still usable.",
+  "mapRetry": "Retry",
+  "mapOpen": "OPEN",
+
+  "riskBadgeValue": "{score}% {label}",
+  "@riskBadgeValue": {
+    "placeholders": { "score": { "type": "int" }, "label": { "type": "String" } }
+  }
 }

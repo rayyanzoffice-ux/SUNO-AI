@@ -199,5 +199,25 @@
   "receivedMessageUnable": "رابطہ نہیں ہو سکا",
   "receivedResponseFailed": "جواب ناکام: {error}",
   "receivedSenderTokenMissing": "بھیجنے والے کا ٹوکن دستیاب نہیں۔ براہ کرم ان سے براہ راست رابطہ کریں۔",
-  "receivedIncidentRemoved": "واقعہ ہٹا دیا گیا۔"
+  "receivedIncidentRemoved": "واقعہ ہٹا دیا گیا۔",
+
+  "sosTitle": "خاموش SOS",
+  "sosIntro": "کسی آواز، کاؤنٹ ڈاؤن یا تصدیق اسکرین کے بغیر آپ کا مقام اور ایک سنگین الرٹ بھیجتا ہے۔ جب آپ بول نہ سکیں یا محفوظ طریقے سے شور نہ کر سکیں تو اسے استعمال کریں۔",
+  "sosOsNote": "یہ آپ کے فون کے بلٹ ان ایمرجنسی SOS (سائیڈ بٹن اشارے) سے الگ ہے — ایپس اس OS فیچر کو کنٹرول نہیں کر سکتیں۔",
+  "sosContactsLoadFailed": "رابطے لوڈ نہیں ہو سکے۔ وصول کنندہ منتخب کرنے کے لیے دوبارہ کوشش کریں۔",
+  "sosSaveFailed": "SOS محفوظ نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں یا براہ راست مدد کے لیے رابطہ کریں۔",
+  "sosNoContacts": "ابھی کوئی قابلِ اعتماد رابطہ محفوظ نہیں ہے۔ خاموش SOS بھیجنے کے لیے ہوم اسکرین سے ایک شامل کریں۔",
+  "sosSending": "بھیجا جا رہا ہے…",
+  "sosAlertAll": "تمام رابطوں کو الرٹ کریں",
+  "sosCancel": "منسوخ کریں",
+
+  "mapOpenFailed": "Maps کھل نہیں سکا۔ اپنا براؤزر یا نقشہ ایپ دیکھیں۔",
+  "mapAttributionFailed": "نقشے کا کریڈٹ کھل نہیں سکا۔ اپنا براؤزر دیکھیں۔",
+  "mapAttributionOsm": "OpenStreetMap کے مشارکین",
+  "mapAttributionOsmMapTiler": "OpenStreetMap کے مشارکین، MapTiler",
+  "mapTilesUnavailable": "نقشے کے ٹائل دستیاب نہیں۔ کوآرڈینیٹس اب بھی استعمال ہو سکتے ہیں۔",
+  "mapRetry": "دوبارہ کوشش کریں",
+  "mapOpen": "کھولیں",
+
+  "riskBadgeValue": "{label} {score}%"
 }

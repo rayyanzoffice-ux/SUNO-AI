@@ -199,5 +199,25 @@
   "receivedMessageUnable": "Contact impossible",
   "receivedResponseFailed": "Échec de la réponse : {error}",
   "receivedSenderTokenMissing": "Le jeton de l’expéditeur est indisponible. Contactez-les directement.",
-  "receivedIncidentRemoved": "L’incident a été supprimé."
+  "receivedIncidentRemoved": "L’incident a été supprimé.",
+
+  "sosTitle": "SOS silencieux",
+  "sosIntro": "Envoie votre position et une alerte critique sans aucun son, compte à rebours ni écran de confirmation. À utiliser quand vous ne pouvez pas parler ou pas faire de bruit en sécurité.",
+  "sosOsNote": "C’est distinct du SOS urgence intégré à votre téléphone (geste du bouton latéral) : les applications ne peuvent pas contrôler cette fonction du système.",
+  "sosContactsLoadFailed": "Impossible de charger les contacts. Réessayez pour choisir un destinataire.",
+  "sosSaveFailed": "Impossible d’enregistrer le SOS. Réessayez ou demandez de l’aide directement.",
+  "sosNoContacts": "Aucun contact de confiance enregistré pour l’instant. Ajoutez-en un depuis l’écran d’accueil pour activer le SOS silencieux.",
+  "sosSending": "Envoi…",
+  "sosAlertAll": "ALERTER TOUS LES CONTACTS",
+  "sosCancel": "Annuler",
+
+  "mapOpenFailed": "Impossible d’ouvrir Maps. Vérifiez votre navigateur ou votre application de cartes.",
+  "mapAttributionFailed": "Impossible d’ouvrir les crédits de la carte. Vérifiez votre navigateur.",
+  "mapAttributionOsm": "Contributeurs OpenStreetMap",
+  "mapAttributionOsmMapTiler": "Contributeurs OpenStreetMap, MapTiler",
+  "mapTilesUnavailable": "Tuiles de la carte indisponibles. Les coordonnées restent utilisables.",
+  "mapRetry": "Réessayer",
+  "mapOpen": "OUVRIR",
+
+  "riskBadgeValue": "{score}% {label}"
 }

@@ -199,5 +199,25 @@
   "receivedMessageUnable": "संपर्क नहीं हो सका",
   "receivedResponseFailed": "उत्तर विफल: {error}",
   "receivedSenderTokenMissing": "भेजने वाले का टोकन उपलब्ध नहीं है। कृपया उनसे सीधे संपर्क करें।",
-  "receivedIncidentRemoved": "घटना हटा दी गई।"
+  "receivedIncidentRemoved": "घटना हटा दी गई।",
+
+  "sosTitle": "साइलेंट SOS",
+  "sosIntro": "किसी आवाज़, काउंटडाउन या पुष्टि स्क्रीन के बिना आपका स्थान और एक गंभीर अलर्ट भेजता है। जब आप बोल नहीं सकते या सुरक्षित रूप से शोर नहीं कर सकते तो इसका उपयोग करें।",
+  "sosOsNote": "यह आपके फ़ोन के अंदरूनी आपातकालीन SOS (साइड-बटन जेस्चर) से अलग है — ऐप्स उस OS फ़ीचर को नियंत्रित नहीं कर सकते।",
+  "sosContactsLoadFailed": "संपर्क लोड नहीं हो सके। प्राप्तकर्ता चुनने के लिए फिर कोशिश करें।",
+  "sosSaveFailed": "SOS सहेजा नहीं जा सका। कृपया फिर कोशिश करें या सीधे मदद के लिए संपर्क करें।",
+  "sosNoContacts": "अभी कोई विश्वसनीय संपर्क सहेजा नहीं गया है। साइलेंट SOS भेजने के लिए होम स्क्रीन से एक जोड़ें।",
+  "sosSending": "भेजा जा रहा है…",
+  "sosAlertAll": "सभी संपर्कों को अलर्ट करें",
+  "sosCancel": "रद्द करें",
+
+  "mapOpenFailed": "Maps नहीं खुल सका। अपना ब्राउज़र या मैप ऐप जाँचें।",
+  "mapAttributionFailed": "नक्शे का श्रेय नहीं खुल सका। अपना ब्राउज़र जाँचें।",
+  "mapAttributionOsm": "OpenStreetMap के सहयोगी",
+  "mapAttributionOsmMapTiler": "OpenStreetMap के सहयोगी, MapTiler",
+  "mapTilesUnavailable": "नक्शे के टाइल उपलब्ध नहीं हैं। निर्देशांक फिर भी काम करेंगे।",
+  "mapRetry": "फिर कोशिश करें",
+  "mapOpen": "खोलें",
+
+  "riskBadgeValue": "{label} {score}%"
 }
