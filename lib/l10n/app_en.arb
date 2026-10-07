@@ -227,5 +227,36 @@
   "contactsTestFailed": "Test failed: {error}",
   "@contactsTestFailed": {
     "placeholders": { "error": { "type": "String" } }
-  }
+  },
+
+  "receivedTitle": "Safety alert",
+  "receivedYourContact": "Your contact",
+  "receivedMayBeInDanger": "{name} may be in danger",
+  "@receivedMayBeInDanger": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "receivedIncidentUnavailable": "This incident is unavailable",
+  "receivedIncidentResolved": "Incident resolved",
+  "receivedResponseNeeded": "Alert received — response needed",
+  "receivedNoResponse": "No response can be sent for this incident.",
+  "receivedEventLabel": "Event",
+  "receivedDetectedLabel": "Detected",
+  "receivedTimeUnavailable": "Time unavailable",
+  "receivedDemoNotice": "DEMO ALERT — the danger was simulated.",
+  "receivedLocationHeading": "Location at alert time",
+  "receivedButtonChecking": "I AM CHECKING ON THEM",
+  "receivedButtonSafe": "THEY ARE SAFE",
+  "receivedButtonUnable": "UNABLE TO CONTACT",
+  "receivedStatusChecking": "Contact checking — help is on the way",
+  "receivedStatusResolved": "Resolved — contact confirmed they are safe",
+  "receivedStatusUnable": "Unable to contact — emergency remains active",
+  "receivedMessageChecking": "I am checking on them",
+  "receivedMessageSafe": "They are safe",
+  "receivedMessageUnable": "Unable to contact",
+  "receivedResponseFailed": "Response failed: {error}",
+  "@receivedResponseFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "receivedSenderTokenMissing": "Sender token unavailable. Please contact them directly.",
+  "receivedIncidentRemoved": "The incident was removed."
 }
