@@ -1,0 +1,39 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "SUNO — AI Safety Companion",
+  "@appTitle": { "description": "App name shown in the Android task switcher." },
+
+  "homeAiSafetyCompanion": "AI SAFETY COMPANION",
+  "homeSlogan": "It listens for danger,\nnot conversations.",
+  "homePrivacyLine": "Private. On-device. Always ready.",
+  "homeSosHint": "Long-press the logo for Silent SOS",
+  "homeStartMonitoring": "START MONITORING",
+  "homeTrustedContacts": "Trusted Contacts",
+
+  "safetyPossibleEmergency": "Possible emergency\ndetected",
+  "safetyAreYouSafe": "Are you safe?",
+  "safetyAutoAlert": "Alert activates automatically when time runs out",
+  "safetyIAmSafe": "I AM SAFE",
+  "safetyCantRespond": "CAN’T RESPOND",
+  "safetyRetryIAmSafe": "RETRY: I AM SAFE",
+  "safetyRetryAlert": "RETRY EMERGENCY ALERT",
+
+  "settingsTitle": "Settings",
+  "settingsLanguage": "Language",
+  "settingsChangeLanguage": "Change language",
+
+  "languageChooseTitle": "Choose your language",
+  "languageChooseSubtitle": "You can change this later in Settings.",
+  "languageContinue": "Continue",
+  "languageSaveFailed": "Could not save your language. It will reset next time you open SUNO.",
+
+  "eventDistressSound": "Distress Sound",
+  "eventEmergencyAlarm": "Emergency Alarm",
+  "eventImpactBreaking": "Impact / Breaking Sound",
+  "eventAmbientSound": "Ambient Sound",
+  "eventPossibleDistress": "Possible Distress Sound",
+  "eventDistressImpact": "Distress Sound + Impact",
+  "eventManualSilentAlert": "Manual Silent Alert",
+  "eventEmergencyAlert": "Emergency Alert"
+}
