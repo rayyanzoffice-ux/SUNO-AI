@@ -241,5 +241,26 @@
   "notifBodyCheckDelivery": "افتح SUNO للتحقق من حالة تسليم التنبيهات إلى جهات الاتصال.",
   "notifBodyRespondInTime": "رد قبل انتهاء فحص السلامة.",
   "notifSafetyCheckStatus": "فحص السلامة جارٍ",
-  "notifSendingAlertsStatus": "إرسال التنبيهات الطارئة"
+  "notifSendingAlertsStatus": "إرسال التنبيهات الطارئة",
+
+  "errorSafetyDecisionNotSaved": "تعذَّر حفظ قرارك المتعلِّق بالسلامة. لم يُرسَل أي تنبيه. أعد المحاولة أدناه أو اطلب المساعدة بطريقة أخرى.",
+  "errorAlertIncomplete": "لم يكتمل التنبيه. تحقَّق من الحادث المحفوظ وأعد المحاولة.",
+  "errorAlertsRestoreFailed": "تعذَّرت استعادة بعض التنبيهات المستلَمة. افتح SUNO من جديد لإعادة المحاولة.",
+  "errorAlertOpenFailed": "تعذَّر فتح هذا التنبيه. يُرجى فتح SUNO من جديد.",
+  "errorNotificationProcessFailed": "تعذَّرت معالجة إشعار وارد. يُرجى فتح SUNO من جديد.",
+  "errorPushUnavailable": "التنبيهات الفورية غير متاحة. تحقَّق من إعدادات Firebase وأعد تشغيل SUNO.",
+  "errorNotificationsUnavailable": "الإشعارات غير متاحة. أبقِ SUNO مفتوحًا وتحقَّق من إعدادات الإشعارات في Android.",
+  "errorTappedNotificationRestoreFailed": "تعذَّرت استعادة الإشعار المضغوط. افتح سجل الحوادث.",
+  "errorLaunchAlertRestoreFailed": "تعذَّرت استعادة تنبيه التشغيل. افتح سجل الحوادث.",
+  "errorPushTokenUnavailable": "رمز التنبيه الفوري غير متاح. تحقَّق من الاتصال ومن إذن الإشعارات، ثم أعد المحاولة من جهات الاتصال الموثوقة.",
+
+  "notifTitleContactResponse": "رد من جهة اتصال SUNO",
+  "notifTitleEmergencyAlert": "تنبيه طارئ من SUNO",
+
+  "chanEmergencyName": "تنبيهات SUNO الطارئة",
+  "chanEmergencyDesc": "تنبيهات طارئة وردود من جهات اتصالك الموثوقة",
+  "chanDangerName": "رصد SUNO خطرًا",
+  "chanDangerDesc": "فحوص السلامة والمخاطر المرصودة على هذا الجهاز",
+
+  "statusSafetyCheckEscalated": "تم تصعيد فحص السلامة"
 }

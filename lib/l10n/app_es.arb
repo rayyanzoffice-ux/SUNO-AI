@@ -241,5 +241,26 @@
   "notifBodyCheckDelivery": "Abre SUNO para ver el estado de entrega a tus contactos.",
   "notifBodyRespondInTime": "Responde antes de que expire el chequeo de seguridad.",
   "notifSafetyCheckStatus": "Chequeo de seguridad en curso",
-  "notifSendingAlertsStatus": "Enviando alertas de emergencia"
+  "notifSendingAlertsStatus": "Enviando alertas de emergencia",
+
+  "errorSafetyDecisionNotSaved": "No se pudo guardar tu decisión de seguridad. No se envió ninguna alerta. Reintenta abajo o busca ayuda de otra forma.",
+  "errorAlertIncomplete": "No se pudo completar la alerta. Revisa el incidente guardado e inténtalo de nuevo.",
+  "errorAlertsRestoreFailed": "Algunas alertas recibidas no se pudieron restaurar. Vuelve a abrir SUNO para reintentar.",
+  "errorAlertOpenFailed": "No se pudo abrir esta alerta. Vuelve a abrir SUNO.",
+  "errorNotificationProcessFailed": "No se pudo procesar una notificación entrante. Vuelve a abrir SUNO.",
+  "errorPushUnavailable": "Las alertas push no están disponibles. Revisa la configuración de Firebase y reinicia SUNO.",
+  "errorNotificationsUnavailable": "Notificaciones no disponibles. Mantén SUNO abierto y revisa la configuración de notificaciones de Android.",
+  "errorTappedNotificationRestoreFailed": "No se pudo restaurar la notificación en la que tocaste. Abre el historial de incidentes.",
+  "errorLaunchAlertRestoreFailed": "No se pudo restaurar la alerta de inicio. Abre el historial de incidentes.",
+  "errorPushTokenUnavailable": "Token de push no disponible. Revisa la conectividad y el permiso de notificaciones, y reinténtalo desde Contactos de confianza.",
+
+  "notifTitleContactResponse": "Respuesta de un contacto de SUNO",
+  "notifTitleEmergencyAlert": "Alerta de emergencia de SUNO",
+
+  "chanEmergencyName": "Alertas de emergencia de SUNO",
+  "chanEmergencyDesc": "Alertas de emergencia y respuestas de tus contactos de confianza",
+  "chanDangerName": "SUNO detectó un peligro",
+  "chanDangerDesc": "Chequeos de seguridad y peligros detectados en este dispositivo",
+
+  "statusSafetyCheckEscalated": "El chequeo de seguridad pasó a emergencia"
 }

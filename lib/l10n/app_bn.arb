@@ -241,5 +241,26 @@
   "notifBodyCheckDelivery": "যোগাযোগকারীরা বার্তা পেয়েছেন কিনা দেখতে SUNO খুলুন।",
   "notifBodyRespondInTime": "নিরাপত্তা চেক শেষ হওয়ার আগে উত্তর দিন।",
   "notifSafetyCheckStatus": "নিরাপত্তা চেক চলছে",
-  "notifSendingAlertsStatus": "জরুরি সতর্কতা পাঠানো হচ্ছে"
+  "notifSendingAlertsStatus": "জরুরি সতর্কতা পাঠানো হচ্ছে",
+
+  "errorSafetyDecisionNotSaved": "আপনার নিরাপত্তা সিদ্ধান্ত সংরক্ষণ করা যায়নি। কোনো সতর্কতা পাঠানো হয়নি। নিচে আবার চেষ্টা করুন বা অন্যভাবে সাহায্য নিন।",
+  "errorAlertIncomplete": "সতর্কতাটি সম্পন্ন করা যায়নি। সংরক্ষিত ইনসিডেন্টটি দেখে আবার চেষ্টা করুন।",
+  "errorAlertsRestoreFailed": "কয়েকটি প্রাপ্ত সতর্কতা পুনরুদ্ধার করা যায়নি। আবার চেষ্টা করতে SUNO পুনরায় খুলুন।",
+  "errorAlertOpenFailed": "এই সতর্কতাটি খোলা যায়নি। অনুগ্রহ করে SUNO পুনরায় খুলুন।",
+  "errorNotificationProcessFailed": "আসা বিজ্ঞপ্তি প্রক্রিয়া করা যায়নি। অনুগ্রহ করে SUNO পুনরায় খুলুন।",
+  "errorPushUnavailable": "পুশ সতর্কতা অনুপলব্ধ। Firebase কনফিগারেশন পরীক্ষা করে SUNO আবার চালু করুন।",
+  "errorNotificationsUnavailable": "বিজ্ঞপ্তি অনুপলব্ধ। SUNO খোলা রাখুন এবং Android বিজ্ঞপ্তির সেটিংস পরীক্ষা করুন।",
+  "errorTappedNotificationRestoreFailed": "যে বিজ্ঞপ্তিতে ট্যাপ করা হয়েছিল তা পুনরুদ্ধার করা যায়নি। ইনসিডেন্ট ইতিহাস খুলুন।",
+  "errorLaunchAlertRestoreFailed": "শুরুর সতর্কতাটি পুনরুদ্ধার করা যায়নি। ইনসিডেন্ট ইতিহাস খুলুন।",
+  "errorPushTokenUnavailable": "পুশ টোকেন অনুপলব্ধ। সংযোগ ও বিজ্ঞপ্তির অনুমতি পরীক্ষা করে বিশ্বস্ত যোগাযোগকারী থেকে আবার চেষ্টা করুন।",
+
+  "notifTitleContactResponse": "SUNO যোগাযোগকারীর উত্তর",
+  "notifTitleEmergencyAlert": "SUNO জরুরি সতর্কতা",
+
+  "chanEmergencyName": "SUNO জরুরি সতর্কতা",
+  "chanEmergencyDesc": "বিশ্বস্ত যোগাযোগকারীদের কাছ থেকে জরুরি সতর্কতা ও উত্তর",
+  "chanDangerName": "SUNO বিপদ শনাক্ত করেছে",
+  "chanDangerDesc": "এই ডিভাইসে নিরাপত্তা চেক ও বিপদ শনাক্তকরণ",
+
+  "statusSafetyCheckEscalated": "নিরাপত্তা চেক জরুরি পর্যায়ে উন্নীত হয়েছে"
 }

@@ -241,5 +241,26 @@
   "notifBodyCheckDelivery": "संपर्क डिलीवरी स्थिति देखने के लिए SUNO खोलें।",
   "notifBodyRespondInTime": "सुरक्षा जांच खत्म होने से पहले जवाब दें।",
   "notifSafetyCheckStatus": "सुरक्षा जांच जारी है",
-  "notifSendingAlertsStatus": "आपातकालीन अलर्ट भेजे जा रहे हैं"
+  "notifSendingAlertsStatus": "आपातकालीन अलर्ट भेजे जा रहे हैं",
+
+  "errorSafetyDecisionNotSaved": "आपका सुरक्षा निर्णय सहेजा नहीं जा सका। कोई अलर्ट भेजा नहीं गया। नीचे फिर कोशिश करें या किसी और तरीके से मदद लें।",
+  "errorAlertIncomplete": "अलर्ट पूरा नहीं हो सका। सहेजे गए इंसीडेंट की जाँच करें और फिर कोशिश करें।",
+  "errorAlertsRestoreFailed": "कुछ प्राप्त अलर्ट बहाल नहीं हो सके। फिर कोशिश करने के लिए SUNO दोबारा खोलें।",
+  "errorAlertOpenFailed": "यह अलर्ट खोला नहीं जा सका। कृपया SUNO दोबारा खोलें।",
+  "errorNotificationProcessFailed": "आने वाली सूचना प्रोसेस नहीं हो सकी। कृपया SUNO दोबारा खोलें।",
+  "errorPushUnavailable": "पुश अलर्ट उपलब्ध नहीं हैं। Firebase कॉन्फ़िगरेशन जाँचें और SUNO फिर से चालू करें।",
+  "errorNotificationsUnavailable": "सूचनाएं उपलब्ध नहीं हैं। SUNO खुला रखें और Android सूचना सेटिंग जाँचें।",
+  "errorTappedNotificationRestoreFailed": "जिस सूचना पर टैप किया गया था वह बहाल नहीं हो सकी। इंसीडेंट इतिहास खोलें।",
+  "errorLaunchAlertRestoreFailed": "शुरुआती अलर्ट बहाल नहीं हो सका। इंसीडेंट इतिहास खोलें।",
+  "errorPushTokenUnavailable": "पुश टोकन उपलब्ध नहीं। कनेक्टिविटी और सूचना अनुमति जाँचें, फिर विश्वसनीय संपर्कों से दोबारा कोशिश करें।",
+
+  "notifTitleContactResponse": "SUNO संपर्क का उत्तर",
+  "notifTitleEmergencyAlert": "SUNO आपातकालीन अलर्ट",
+
+  "chanEmergencyName": "SUNO आपातकालीन अलर्ट",
+  "chanEmergencyDesc": "विश्वसनीय संपर्कों से आपातकालीन अलर्ट और उत्तर",
+  "chanDangerName": "SUNO ने खतरा पाया",
+  "chanDangerDesc": "इस डिवाइस पर सुरक्षा जांच और खतरा पहचान",
+
+  "statusSafetyCheckEscalated": "सुरक्षा जांच आपातकाल में बदल दी गई"
 }

@@ -241,5 +241,26 @@
   "notifBodyCheckDelivery": "Ouvrez SUNO pour vérifier la remise aux contacts.",
   "notifBodyRespondInTime": "Répondez avant l’expiration du contrôle de sécurité.",
   "notifSafetyCheckStatus": "Contrôle de sécurité en cours",
-  "notifSendingAlertsStatus": "Envoi des alertes d’urgence"
+  "notifSendingAlertsStatus": "Envoi des alertes d’urgence",
+
+  "errorSafetyDecisionNotSaved": "Impossible d’enregistrer votre décision de sécurité. Aucune alerte n’a été envoyée. Réessayez ci-dessous ou cherchez de l’aide autrement.",
+  "errorAlertIncomplete": "L’alerte n’a pas pu être menée à son terme. Vérifiez l’incident enregistré et réessayez.",
+  "errorAlertsRestoreFailed": "Certaines alertes reçues n’ont pas pu être restaurées. Rouvrez SUNO pour réessayer.",
+  "errorAlertOpenFailed": "Impossible d’ouvrir cette alerte. Veuillez rouvrir SUNO.",
+  "errorNotificationProcessFailed": "Impossible de traiter une notification entrante. Veuillez rouvrir SUNO.",
+  "errorPushUnavailable": "Alertes push indisponibles. Vérifiez la configuration Firebase et redémarrez SUNO.",
+  "errorNotificationsUnavailable": "Notifications indisponibles. Gardez SUNO ouvert et vérifiez les paramètres de notification d’Android.",
+  "errorTappedNotificationRestoreFailed": "Impossible de restaurer la notification touchée. Ouvrez l’historique des incidents.",
+  "errorLaunchAlertRestoreFailed": "Impossible de restaurer l’alerte de lancement. Ouvrez l’historique des incidents.",
+  "errorPushTokenUnavailable": "Jeton push indisponible. Vérifiez la connectivité et l’autorisation de notification, puis réessayez depuis Contacts de confiance.",
+
+  "notifTitleContactResponse": "Réponse d’un contact SUNO",
+  "notifTitleEmergencyAlert": "Alerte d’urgence SUNO",
+
+  "chanEmergencyName": "Alertes d’urgence SUNO",
+  "chanEmergencyDesc": "Alertes d’urgence et réponses de vos contacts de confiance",
+  "chanDangerName": "SUNO a détecté un danger",
+  "chanDangerDesc": "Contrôles de sécurité et dangers détectés sur cet appareil",
+
+  "statusSafetyCheckEscalated": "Le contrôle de sécurité est devenu une alerte"
 }

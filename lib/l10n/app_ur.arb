@@ -241,5 +241,26 @@
   "notifBodyCheckDelivery": "رابطوں کی ڈیلیوری حالت دیکھنے کے لیے SUNO کھولیں۔",
   "notifBodyRespondInTime": "سیفٹی چیک ختم ہونے سے پہلے جواب دیں۔",
   "notifSafetyCheckStatus": "سیفٹی چیک جاری ہے",
-  "notifSendingAlertsStatus": "ہنگامی الرٹ بھیجے جا رہے ہیں"
+  "notifSendingAlertsStatus": "ہنگامی الرٹ بھیجے جا رہے ہیں",
+
+  "errorSafetyDecisionNotSaved": "آپ کا حفاظتی فیصلہ محفوظ نہیں ہو سکا۔ کوئی الرٹ نہیں بھیجا گیا۔ نیچے دوبارہ کوشش کریں یا کسی اور ذریعے سے مدد لیں۔",
+  "errorAlertIncomplete": "الرٹ مکمل نہیں ہو سکا۔ محفوظ شدہ انسیڈنٹ دیکھیں اور دوبارہ کوشش کریں۔",
+  "errorAlertsRestoreFailed": "کچھ وصول شدہ الرٹ بحال نہیں ہو سکے۔ دوبارہ کوشش کے لیے SUNO دوبارہ کھولیں۔",
+  "errorAlertOpenFailed": "یہ الرٹ کھولا نہیں جا سکا۔ براہ کرم SUNO دوبارہ کھولیں۔",
+  "errorNotificationProcessFailed": "اکنے والی اطلاع پروسیس نہیں ہو سکی۔ براہ کرم SUNO دوبارہ کھولیں۔",
+  "errorPushUnavailable": "پش الرٹ دستیاب نہیں۔ Firebase ترتیبات چیک کریں اور SUNO دوبارہ چلائیں۔",
+  "errorNotificationsUnavailable": "اطلاعات دستیاب نہیں۔ SUNO کھلا رکھیں اور Android اطلاعات کی ترتیبات چیک کریں۔",
+  "errorTappedNotificationRestoreFailed": "دبائی گئی اطلاع بحال نہیں ہو سکی۔ انسیڈنٹ ہسٹری کھولیں۔",
+  "errorLaunchAlertRestoreFailed": "شروعاتی الرٹ بحال نہیں ہو سکا۔ انسیڈنٹ ہسٹری کھولیں۔",
+  "errorPushTokenUnavailable": "پش ٹوکن دستیاب نہیں۔ انٹرنیٹ رابطہ اور اطلاع کی اجازت چیک کریں، پھر قابلِ اعتماد رابطوں سے دوبارہ کوشش کریں۔",
+
+  "notifTitleContactResponse": "SUNO رابطے کا جواب",
+  "notifTitleEmergencyAlert": "SUNO ہنگامی الرٹ",
+
+  "chanEmergencyName": "SUNO ہنگامی الرٹس",
+  "chanEmergencyDesc": "قابلِ اعتماد رابطوں سے ہنگامی الرٹس اور جوابات",
+  "chanDangerName": "SUNO نے خطرہ پہچانا",
+  "chanDangerDesc": "اس ڈیوائس پر سیفٹی چیک اور خطرے کی شناخت",
+
+  "statusSafetyCheckEscalated": "سیفٹی چیک ہنگامی حالت میں تبدیل ہو گیا"
 }

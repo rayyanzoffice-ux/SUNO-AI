@@ -241,5 +241,26 @@
   "notifBodyCheckDelivery": "打开 SUNO 查看联系人送达状态。",
   "notifBodyRespondInTime": "请在安全检查到期前回应。",
   "notifSafetyCheckStatus": "安全检查进行中",
-  "notifSendingAlertsStatus": "正在发送紧急警报"
+  "notifSendingAlertsStatus": "正在发送紧急警报",
+
+  "errorSafetyDecisionNotSaved": "无法保存您的安全决定。未发送任何警报。请在下方重试，或通过其他方式求助。",
+  "errorAlertIncomplete": "警报未能完成。请检查已保存的事件后重试。",
+  "errorAlertsRestoreFailed": "部分收到的警报无法恢复。请重新打开 SUNO 重试。",
+  "errorAlertOpenFailed": "无法打开此警报。请重新打开 SUNO。",
+  "errorNotificationProcessFailed": "无法处理收到的通知。请重新打开 SUNO。",
+  "errorPushUnavailable": "推送警报不可用。请检查 Firebase 配置并重启 SUNO。",
+  "errorNotificationsUnavailable": "通知不可用。请保持 SUNO 打开并检查 Android 通知设置。",
+  "errorTappedNotificationRestoreFailed": "无法恢复您点按的通知。请打开事件历史。",
+  "errorLaunchAlertRestoreFailed": "无法恢复启动时的警报。请打开事件历史。",
+  "errorPushTokenUnavailable": "推送令牌不可用。请检查网络连接和通知权限，然后在可信联系人中重试。",
+
+  "notifTitleContactResponse": "SUNO 联系人回复",
+  "notifTitleEmergencyAlert": "SUNO 紧急警报",
+
+  "chanEmergencyName": "SUNO 紧急警报",
+  "chanEmergencyDesc": "来自可信联系人的紧急警报与回复",
+  "chanDangerName": "SUNO 检测到危险",
+  "chanDangerDesc": "本设备上的安全确认与危险检测",
+
+  "statusSafetyCheckEscalated": "安全检查已升级为紧急警报"
 }

@@ -303,5 +303,26 @@
   "notifBodyCheckDelivery": "Open SUNO to check contact delivery status.",
   "notifBodyRespondInTime": "Respond before the safety check expires.",
   "notifSafetyCheckStatus": "Safety check in progress",
-  "notifSendingAlertsStatus": "Sending emergency alerts"
+  "notifSendingAlertsStatus": "Sending emergency alerts",
+
+  "errorSafetyDecisionNotSaved": "Could not save your safety decision. No alert was sent. Retry below or seek help another way.",
+  "errorAlertIncomplete": "The alert could not be completed. Check the saved incident and retry.",
+  "errorAlertsRestoreFailed": "Some received alerts could not be restored. Reopen SUNO to retry.",
+  "errorAlertOpenFailed": "Could not open this alert. Please reopen SUNO.",
+  "errorNotificationProcessFailed": "Could not process an incoming notification. Please reopen SUNO.",
+  "errorPushUnavailable": "Push alerts are unavailable. Check Firebase configuration and restart SUNO.",
+  "errorNotificationsUnavailable": "Notifications unavailable. Keep SUNO open and check Android notification settings.",
+  "errorTappedNotificationRestoreFailed": "Could not restore the tapped notification. Open incident history.",
+  "errorLaunchAlertRestoreFailed": "Could not restore the launch alert. Open incident history.",
+  "errorPushTokenUnavailable": "Push token unavailable. Check connectivity and notification permission, then retry from Trusted Contacts.",
+
+  "notifTitleContactResponse": "SUNO contact response",
+  "notifTitleEmergencyAlert": "SUNO emergency alert",
+
+  "chanEmergencyName": "SUNO Emergency Alerts",
+  "chanEmergencyDesc": "Emergency alerts and responses from trusted contacts",
+  "chanDangerName": "SUNO Danger Detected",
+  "chanDangerDesc": "Safety checks and danger detected on this device",
+
+  "statusSafetyCheckEscalated": "Safety check escalated"
 }
