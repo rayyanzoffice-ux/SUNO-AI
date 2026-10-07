@@ -28,6 +28,8 @@ import 'package:suno_ai/screens/safety_check/safety_check_screen.dart';
 import 'package:suno_ai/services/suno_runtime_service.dart';
 import 'package:suno_ai/services/monitoring_service.dart';
 
+import 'helpers/test_app.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() {
@@ -181,7 +183,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Are you safe?'), findsOneWidget);
-      await tester.tap(find.text("CAN'T RESPOND"));
+      await tester.tap(find.text('CAN’T RESPOND'));
       await tester.pumpAndSettle();
 
       expect(find.text('Emergency Alert Activated'), findsOneWidget);
@@ -1027,8 +1029,8 @@ class _UnavailableLocation extends LocationService {
 
 Future<void> _pumpScenario(WidgetTester tester, DetectionScenario scenario) =>
     tester.pumpWidget(
-      MaterialApp(
-        home: MonitoringScreen(scenario: scenario),
+      localizedTestApp(
+        MonitoringScreen(scenario: scenario),
         routes: {
           AppRoutes.monitoring: (_) => const MonitoringScreen(),
           AppRoutes.safetyCheck: (_) => const SafetyCheckScreen(),
