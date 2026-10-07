@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/event_type_labels.dart';
+import '../../core/l10n/l10n.dart';
 import '../../core/navigation/alert_navigation.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
@@ -20,7 +22,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   List<Incident> _incidents = const [];
   bool _loading = true;
   bool _clearing = false;
-  String? _error;
+  bool _loadFailed = false;
 
   SunoRuntimeService get _runtime =>
       widget.runtimeService ?? SunoRuntimeService.instance;
@@ -37,13 +39,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (mounted) {
         setState(() {
           _incidents = data;
-          _error = null;
+          _loadFailed = false;
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() => _error = 'Could not load history. Please retry.');
-      }
+      if (mounted) setState(() => _loadFailed = true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -56,9 +56,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not delete the incident. Please retry.'),
-          ),
+          SnackBar(content: Text(context.l10n.historyDeleteFailed)),
         );
       }
       return false;
@@ -67,23 +65,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _clearAll() async {
     if (_clearing) return;
+    final l10n = context.l10n;
     setState(() => _clearing = true);
     try {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Clear all history?'),
-          content: const Text(
-            'This permanently deletes every incident from this device.',
-          ),
+          title: Text(l10n.historyClearDialogTitle),
+          content: Text(l10n.historyClearDialogBody),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('CANCEL'),
+              child: Text(l10n.commonCancel),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('CLEAR ALL'),
+              child: Text(l10n.historyClearDialogConfirm),
             ),
           ],
         ),
@@ -95,11 +92,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not clear history. Finish any active safety action, then retry.',
-            ),
-          ),
+          SnackBar(content: Text(l10n.historyClearFailed)),
         );
       }
       await _load();
@@ -134,6 +127,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final l10n = context.l10n;
+    final localeName = Localizations.localeOf(context).toLanguageTag();
     final filtered = switch (_filter) {
       1 =>
         _incidents.where((i) => i.status != IncidentStatus.cancelled).toList(),
@@ -144,12 +139,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Incident History'),
+        title: Text(l10n.historyTitle),
         actions: [
           if (_incidents.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
-              tooltip: 'Clear all history',
+              tooltip: l10n.historyClearAllTooltip,
               onPressed: _clearing ? null : _clearAll,
             ),
         ],
@@ -160,16 +155,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Your recent safety activity',
-                style: TextStyle(color: AppColors.textMuted),
+              Text(
+                l10n.historySubtitle,
+                style: const TextStyle(color: AppColors.textMuted),
               ),
-              if (_error != null) ...[
+              if (_loadFailed) ...[
                 Text(
-                  _error!,
+                  l10n.historyLoadFailed,
                   style: const TextStyle(color: AppColors.emergency),
                 ),
-                TextButton(onPressed: _load, child: const Text('RETRY')),
+                TextButton(
+                  onPressed: _load,
+                  child: Text(l10n.commonRetry),
+                ),
               ],
               const SizedBox(height: 18),
               _FilterBar(
@@ -178,7 +176,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               const SizedBox(height: 22),
               Text(
-                '${filtered.length} INCIDENTS',
+                l10n.historyIncidentCount(filtered.length),
                 style: const TextStyle(
                   color: AppColors.textMuted,
                   fontSize: 11,
@@ -191,7 +189,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: filtered.isEmpty
                     ? Center(
                         child: Text(
-                          _emptyState(),
+                          _emptyState(l10n),
                           style: const TextStyle(
                             color: AppColors.textMuted,
                             fontWeight: FontWeight.w600,
@@ -211,8 +209,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ? DismissDirection.none
                               : DismissDirection.endToStart,
                           background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
+                            alignment: Alignment.centerEnd,
+                            padding: const EdgeInsetsDirectional.only(end: 20),
                             decoration: BoxDecoration(
                               color: AppColors.emergency,
                               borderRadius: BorderRadius.circular(20),
@@ -231,6 +229,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           }),
                           child: _HistoryCard.from(
                             filtered[i],
+                            l10n,
+                            localeName,
                             onTap: filtered[i].detectionResult.riskLevel ==
                                     RiskLevel.critical
                                 ? () => _openIncident(filtered[i])
@@ -246,10 +246,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  String _emptyState() => switch (_filter) {
-    1 => 'No alert incidents',
-    2 => 'No canceled incidents',
-    _ => 'No incidents yet',
+  String _emptyState(AppLocalizations l10n) => switch (_filter) {
+    1 => l10n.historyEmptyAlerts,
+    2 => l10n.historyEmptyCanceled,
+    _ => l10n.historyEmptyAll,
   };
 }
 
@@ -259,43 +259,50 @@ class _FilterBar extends StatelessWidget {
   final void Function(int) onSelected;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: const Color(0xFFEDEFF5),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: List.generate(3, (i) {
-        const labels = ['All', 'Alerts', 'Canceled'];
-        return Expanded(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => onSelected(i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: selected == i ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: selected == i
-                    ? const [BoxShadow(color: Colors.black12, blurRadius: 5)]
-                    : null,
-              ),
-              child: Text(
-                labels[i],
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: selected == i ? AppColors.text : AppColors.textMuted,
-                  fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final labels = [
+      l10n.historyFilterAll,
+      l10n.historyFilterAlerts,
+      l10n.historyFilterCanceled,
+    ];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDEFF5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: List.generate(3, (i) {
+          return Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => onSelected(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected == i ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: selected == i
+                      ? const [BoxShadow(color: Colors.black12, blurRadius: 5)]
+                      : null,
+                ),
+                child: Text(
+                  labels[i],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected == i ? AppColors.text : AppColors.textMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      }),
-    ),
-  );
+          );
+        }),
+      ),
+    );
+  }
 }
 
 class _HistoryCard extends StatelessWidget {
@@ -308,22 +315,29 @@ class _HistoryCard extends StatelessWidget {
     required this.color,
     required this.icon,
     required this.id,
-    this.origin,
+    this.originLabel,
     this.onTap,
   });
 
-  factory _HistoryCard.from(Incident incident, {VoidCallback? onTap}) {
+  factory _HistoryCard.from(
+    Incident incident,
+    AppLocalizations l10n,
+    String localeName, {
+    VoidCallback? onTap,
+  }) {
     final s = incident.status;
     return _HistoryCard(
       id: incident.id,
-      title: _titleFor(s, incident.isReceived),
-      event: incident.detectionResult.eventType,
+      title: _titleFor(s, incident.isReceived, l10n),
+      event: localizedEventType(l10n, incident.detectionResult.eventType),
       score: '${incident.detectionResult.riskScore}%',
-      status: _statusFor(s),
-      time: _time(incident.createdAt),
+      status: _statusFor(s, l10n),
+      time: _time(incident.createdAt, l10n, localeName),
       color: _colorFor(s),
       icon: _iconFor(s, incident.isReceived),
-      origin: incident.isReceived ? incident.origin : null,
+      originLabel: incident.isReceived
+          ? l10n.historyFrom(incident.origin)
+          : null,
       onTap: onTap,
     );
   }
@@ -332,29 +346,34 @@ class _HistoryCard extends StatelessWidget {
   final String title, event, score, status, time;
   final Color color;
   final IconData icon;
-  final String? origin;
+  final String? originLabel;
   final VoidCallback? onTap;
 
-  static String _titleFor(IncidentStatus s, bool isReceived) {
-    if (isReceived) return 'Received alert';
+  static String _titleFor(
+    IncidentStatus s,
+    bool isReceived,
+    AppLocalizations l10n,
+  ) {
+    if (isReceived) return l10n.historyCardReceivedAlert;
     return switch (s) {
-      IncidentStatus.cancelled => 'Canceled alert',
-      IncidentStatus.safetyCheck => 'Safety check',
-      IncidentStatus.resolved => 'Resolved alert',
-      IncidentStatus.monitoring => 'Monitoring',
-      _ => 'Critical alert',
+      IncidentStatus.cancelled => l10n.historyCardCanceledAlert,
+      IncidentStatus.safetyCheck => l10n.historyCardSafetyCheck,
+      IncidentStatus.resolved => l10n.historyCardResolvedAlert,
+      IncidentStatus.monitoring => l10n.historyCardMonitoring,
+      _ => l10n.historyCardCriticalAlert,
     };
   }
 
-  static String _statusFor(IncidentStatus s) => switch (s) {
-    IncidentStatus.contactChecking => 'Contact checking',
-    IncidentStatus.resolved => 'Resolved — confirmed safe',
-    IncidentStatus.cancelled => 'User confirmed safe',
-    IncidentStatus.alertTriggered => 'Escalation needed',
-    IncidentStatus.contactNotified => 'FCM accepted alert',
-    IncidentStatus.safetyCheck => 'Safety check pending',
-    IncidentStatus.monitoring => 'Monitoring',
-  };
+  static String _statusFor(IncidentStatus s, AppLocalizations l10n) =>
+      switch (s) {
+        IncidentStatus.contactChecking => l10n.historyStatusContactChecking,
+        IncidentStatus.resolved => l10n.historyStatusResolved,
+        IncidentStatus.cancelled => l10n.historyStatusUserSafe,
+        IncidentStatus.alertTriggered => l10n.historyStatusEscalationNeeded,
+        IncidentStatus.contactNotified => l10n.historyStatusFcmAccepted,
+        IncidentStatus.safetyCheck => l10n.historyStatusSafetyPending,
+        IncidentStatus.monitoring => l10n.historyStatusMonitoring,
+      };
 
   static Color _colorFor(IncidentStatus s) => switch (s) {
     IncidentStatus.cancelled || IncidentStatus.resolved => AppColors.safe,
@@ -374,30 +393,20 @@ class _HistoryCard extends StatelessWidget {
     };
   }
 
-  static String _time(DateTime t) {
+  static String _time(
+    DateTime t,
+    AppLocalizations l10n,
+    String localeName,
+  ) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final d = DateTime(t.year, t.month, t.day);
-    final clock = formatClock12Hour(t);
-    if (d == today) return 'Today · $clock';
+    final clock = formatClockLocalized(t, localeName);
+    if (d == today) return l10n.historyTodayAt(clock);
     if (d == today.subtract(const Duration(days: 1))) {
-      return 'Yesterday · $clock';
+      return l10n.historyYesterdayAt(clock);
     }
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[t.month - 1]} ${t.day} · $clock';
+    return l10n.historyDateAt(formatMonthDayLocalized(t, localeName), clock);
   }
 
   @override
@@ -442,10 +451,10 @@ class _HistoryCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (origin != null) ...[
+                  if (originLabel != null) ...[
                     const SizedBox(height: 2),
                     Text(
-                      'from $origin',
+                      originLabel!,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.indigo,

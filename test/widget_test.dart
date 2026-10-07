@@ -239,7 +239,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: HistoryScreen(runtimeService: runtime)),
+      localizedTestApp(HistoryScreen(runtimeService: runtime)),
     );
     await tester.pumpAndSettle();
 
@@ -271,7 +271,7 @@ void main() {
     await repository.save(critical);
 
     await tester.pumpWidget(
-      MaterialApp(home: HistoryScreen(runtimeService: runtime)),
+      localizedTestApp(HistoryScreen(runtimeService: runtime)),
     );
     await tester.pumpAndSettle();
 
@@ -313,7 +313,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      MaterialApp(home: HistoryScreen(runtimeService: runtime)),
+      localizedTestApp(HistoryScreen(runtimeService: runtime)),
     );
     await tester.pumpAndSettle();
     expect(find.text('Could not load history. Please retry.'), findsOneWidget);
@@ -365,8 +365,8 @@ void main() {
     );
     Map<String, String>? opened;
     await tester.pumpWidget(
-      MaterialApp(
-        home: HistoryScreen(runtimeService: runtime),
+      localizedTestApp(
+        HistoryScreen(runtimeService: runtime),
         routes: {
           AppRoutes.alertReceived: (context) {
             opened =
@@ -413,8 +413,8 @@ void main() {
     );
     var openedDetail = false;
     await tester.pumpWidget(
-      MaterialApp(
-        home: HistoryScreen(runtimeService: runtime),
+      localizedTestApp(
+        HistoryScreen(runtimeService: runtime),
         routes: {
           AppRoutes.alertReceived: (_) {
             openedDetail = true;
@@ -452,8 +452,8 @@ void main() {
     );
     String? openedId;
     await tester.pumpWidget(
-      MaterialApp(
-        home: HistoryScreen(runtimeService: runtime),
+      localizedTestApp(
+        HistoryScreen(runtimeService: runtime),
         routes: {
           AppRoutes.emergencyAlert: (context) {
             openedId = ModalRoute.of(context)!.settings.arguments as String;
