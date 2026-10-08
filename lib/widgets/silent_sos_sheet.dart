@@ -209,8 +209,10 @@ class _SilentSosSheetState extends State<_SilentSosSheet> {
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         subtitle: Text(contact.relationship),
-                        trailing: const Icon(
-                          Icons.arrow_forward_ios_rounded,
+                        trailing: Icon(
+                          Directionality.of(context) == TextDirection.rtl
+                              ? Icons.arrow_back_ios_rounded
+                              : Icons.arrow_forward_ios_rounded,
                           size: 16,
                           color: AppColors.textMuted,
                         ),

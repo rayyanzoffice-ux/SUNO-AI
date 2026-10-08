@@ -214,7 +214,7 @@ class _MapPreviewCardState extends State<MapPreviewCard> {
                 ),
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.only(left: 12),
+                  padding: const EdgeInsetsDirectional.only(start: 12),
                   child: Row(
                     children: [
                       Expanded(

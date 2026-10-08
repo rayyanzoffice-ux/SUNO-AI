@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/l10n/event_type_labels.dart';
 import '../../core/l10n/l10n.dart';
+import '../../core/l10n/text_spacing.dart';
 import '../../core/navigation/alert_navigation.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_theme.dart';
@@ -177,11 +178,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 22),
               Text(
                 l10n.historyIncidentCount(filtered.length),
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.textMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
+                  letterSpacing: scriptSafeLetterSpacing(context, 1.2),
                 ),
               ),
               const SizedBox(height: 10),

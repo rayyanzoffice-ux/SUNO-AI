@@ -143,7 +143,7 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                           style: const TextStyle(
                             color: AppColors.emergency,
                             fontSize: 30,
-                            height: 1.08,
+                            height: 1.4,
                             fontWeight: FontWeight.w900,
                           ),
                         ),

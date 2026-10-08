@@ -145,7 +145,7 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 24,
-                        height: 1.2,
+                        height: 1.4,
                         color: AppColors.emergency,
                         fontWeight: FontWeight.w800,
                       ),

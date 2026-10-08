@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/l10n/text_spacing.dart';
 import '../core/theme/app_theme.dart';
 
 class PrimaryActionButton extends StatelessWidget {
@@ -32,9 +33,9 @@ class PrimaryActionButton extends StatelessWidget {
             child: Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w800,
-                letterSpacing: .3,
+                letterSpacing: scriptSafeLetterSpacing(context, .3),
               ),
             ),
           ),

@@ -426,7 +426,12 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
               ...contacts.map(
                 (contact) => Card(
                   child: ListTile(
-                    contentPadding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
+                    contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                      14,
+                      14,
+                      6,
+                      14,
+                    ),
                     leading: const CircleAvatar(
                       backgroundColor: AppColors.purple,
                       child: Icon(Icons.person),
@@ -505,9 +510,13 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Icon(
-                                        Icons.send_outlined,
-                                        size: 18,
+                                    : Transform.flip(
+                                        flipX: Directionality.of(context) ==
+                                            TextDirection.rtl,
+                                        child: const Icon(
+                                          Icons.send_outlined,
+                                          size: 18,
+                                        ),
                                       ),
                                 const SizedBox(width: 10),
                                 Flexible(child: Text(l10n.contactsMenuTest)),
