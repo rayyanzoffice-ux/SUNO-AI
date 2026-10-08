@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../backend/backend_exports.dart';
+import '../core/l10n/app_locales.dart';
 import '../core/l10n/l10n.dart';
 import '../core/l10n/locale_controller.dart';
 import '../core/utils/display_name.dart';
@@ -382,6 +383,7 @@ class SunoRuntimeService extends ChangeNotifier {
         origin: 'Trusted Contact',
         senderToken: alert.senderToken,
         senderName: senderName,
+        senderLang: SunoLanguages.byCode(alert.senderLang)?.code,
       );
       await _incidents.save(received);
       _knownIncidents[id] = received;
@@ -398,6 +400,7 @@ class SunoRuntimeService extends ChangeNotifier {
     required String responderName,
     required String status,
     required String message,
+    String? recipientLang,
   }) async {
     final service = _alertService;
     if (service == null || recipientToken.trim().isEmpty) {
@@ -411,6 +414,7 @@ class SunoRuntimeService extends ChangeNotifier {
       responderName: responderName,
       status: status,
       message: message,
+      recipientLang: recipientLang,
     );
   }
 
@@ -567,8 +571,11 @@ class SunoRuntimeService extends ChangeNotifier {
             if (service.deviceToken != null)
               'senderToken': service.deviceToken!,
             'senderName': ?myName,
-            // Drives the wording of the recipient's push banner only; in-app text
-            // always uses the recipient's own language.
+            // Drive the wording of the recipient's push banner only; in-app
+            // text always uses the recipient's own language. `lang` is the key
+            // the relay reads first, `languageCode` stays for the deployed
+            // build that knows only the old name.
+            'lang': LocaleController.instance.language.code,
             'languageCode': LocaleController.instance.language.code,
           },
         );

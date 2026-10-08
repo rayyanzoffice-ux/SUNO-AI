@@ -71,7 +71,7 @@ Future<void> _acceptPayload(Map<String, String> data) async {
   if (data['type'] == 'response') {
     await runtime.applyContactResponse(
       incidentId: data['incidentId'] ?? '',
-      responderName: data['responderName'] ?? 'Your contact',
+      responderName: data['responderName'] ?? tr.receivedYourContact,
       status: data['status'] ?? '',
       message: data['message'] ?? '',
     );

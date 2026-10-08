@@ -693,6 +693,43 @@ void main() {
     expect(find.text('Your contact may be in danger'), findsOneWidget);
   }, timeout: Timeout(Duration(seconds: 60)));
 
+  testWidgets('a reply to a Spanish sender is written in Spanish', (
+    tester,
+  ) async {
+    final alerts = _TestAlerts();
+    SunoRuntimeService.instance.dispose();
+    final runtime = SunoRuntimeService(alertService: alerts);
+    SunoRuntimeService.instance = runtime;
+    final payload = <String, String>{
+      'incidentId': 'spanish-sender',
+      'eventType': 'Distress Sound',
+      'riskLevel': 'critical',
+      'riskScore': '95',
+      'detectedAt': DateTime.now().toIso8601String(),
+      'senderToken': 'synthetic-sender-token-12345',
+      'lang': 'es',
+    };
+    final accepted = runtime.acceptReceivedAlert(
+      ReceivedAlert.fromData(payload),
+    );
+    await tester.pump();
+    await accepted;
+    await tester.pumpWidget(
+      localizedTestApp(AlertReceivedScreen(payload: payload)),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('THEY ARE SAFE'));
+    await tester.tap(find.text('THEY ARE SAFE'));
+    await tester.pumpAndSettle();
+    expect(alerts.responses.single.message, 'Están a salvo');
+    expect(alerts.responses.single.lang, 'es');
+    // The responder's own line stays in the language this screen is shown in.
+    expect(
+      runtime.incidentById('spanish-sender')?.contactResponseText,
+      'Resolved — contact confirmed they are safe',
+    );
+  }, timeout: Timeout(Duration(seconds: 60)));
+
   testWidgets('alert screen publishes and clears its visible incident id', (
     tester,
   ) async {
@@ -990,6 +1027,7 @@ class _TestAlerts implements AlertService {
   bool failTest = false;
   bool failResponse = false;
   final responseIds = <String>[];
+  final responses = <({String message, String? lang})>[];
   @override
   String get deviceToken => 'synthetic-device-token-12345';
   @override
@@ -1010,8 +1048,10 @@ class _TestAlerts implements AlertService {
     required String responderName,
     required String status,
     required String message,
+    String? recipientLang,
   }) async {
     responseIds.add(incidentId);
+    responses.add((message: message, lang: recipientLang));
     if (failResponse) throw StateError('Relay unavailable');
   }
 

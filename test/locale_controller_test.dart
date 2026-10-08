@@ -69,4 +69,12 @@ void main() {
       SunoLanguages.english,
     );
   });
+
+  test('a reply can be built in the language carried by the alert', () {
+    expect(appLocalizationsFor('es').receivedMessageSafe, 'Están a salvo');
+    expect(appLocalizationsFor('ar').receivedYourContact, 'جهة اتصالك');
+    expect(appLocalizationsFor(null).receivedMessageSafe, 'They are safe');
+    expect(appLocalizationsFor('').receivedMessageSafe, 'They are safe');
+    expect(appLocalizationsFor('pt').receivedMessageSafe, 'They are safe');
+  });
 }

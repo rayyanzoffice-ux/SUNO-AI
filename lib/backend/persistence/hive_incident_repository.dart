@@ -14,6 +14,7 @@ Map<String, dynamic> _incidentToMap(Incident incident) => {
   'origin': incident.origin,
   'senderToken': incident.senderToken,
   'senderName': incident.senderName,
+  'senderLang': incident.senderLang,
   'safetyCheckDeadline': incident.safetyCheckDeadline?.toIso8601String(),
   if (incident.dispatchResult case final dispatch?)
     'dispatch': {
@@ -42,6 +43,7 @@ Incident _incidentFromMap(Map<dynamic, dynamic> raw) {
     origin: m['origin'] as String? ?? 'self',
     senderToken: m['senderToken'] as String?,
     senderName: m['senderName'] as String?,
+    senderLang: m['senderLang'] as String?,
     safetyCheckDeadline: DateTime.tryParse(
       m['safetyCheckDeadline'] as String? ?? '',
     ),

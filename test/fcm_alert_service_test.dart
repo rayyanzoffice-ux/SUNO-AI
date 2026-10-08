@@ -147,6 +147,38 @@ void main() {
   );
 
   test(
+    'a reply carries the banner language only when one is known',
+    () async {
+      await service.sendResponse(
+        recipientToken: 'synthetic-recipient-token',
+        incidentId: 'spanish-sender',
+        responderName: 'Test contact',
+        status: 'resolved',
+        message: 'Están a salvo',
+        recipientLang: 'es',
+      );
+      expect(bodies.single['response'], {
+        'recipientToken': 'synthetic-recipient-token',
+        'incidentId': 'spanish-sender',
+        'responderName': 'Test contact',
+        'status': 'resolved',
+        'message': 'Están a salvo',
+        'lang': 'es',
+      });
+      await service.sendResponse(
+        recipientToken: 'synthetic-recipient-token',
+        incidentId: 'legacy-sender',
+        responderName: 'Test contact',
+        status: 'resolved',
+        message: 'They are safe',
+      );
+      final legacy = bodies.last['response'] as Map<String, dynamic>;
+      expect(legacy.containsKey('lang'), isFalse);
+      expect(legacy.length, 5);
+    },
+  );
+
+  test(
     'missing configuration and invalid tokens never reach the server',
     () async {
       final unconfigured = FcmAlertService(

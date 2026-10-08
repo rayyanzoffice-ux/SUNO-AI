@@ -36,6 +36,7 @@ class Incident {
     this.dispatchResult,
     this.senderToken,
     this.senderName,
+    this.senderLang,
   });
 
   final String id;
@@ -49,6 +50,10 @@ class Incident {
   final AlertDispatchResult? dispatchResult;
   final String? senderToken;
   final String? senderName;
+
+  /// Language of the person who raised the alert, used to write the reply back
+  /// to them. Null for own incidents and for records saved before Phase 8.
+  final String? senderLang;
 
   bool get isReceived => origin != 'self';
 
@@ -70,5 +75,6 @@ class Incident {
     dispatchResult: dispatchResult ?? this.dispatchResult,
     senderToken: senderToken,
     senderName: senderName,
+    senderLang: senderLang,
   );
 }

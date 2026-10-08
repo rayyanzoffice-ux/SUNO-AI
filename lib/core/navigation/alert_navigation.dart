@@ -13,6 +13,7 @@ Map<String, String> alertReceivedArguments(Incident incident) {
     'incidentId': incident.id,
     'senderToken': incident.senderToken ?? '',
     if (name != null && name.isNotEmpty) 'senderName': name,
+    if (incident.senderLang != null) 'lang': incident.senderLang!,
     'eventType': detection.eventType,
     'riskScore': '${detection.riskScore}',
     'riskLevel': detection.riskLevel.wireValue,

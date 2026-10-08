@@ -134,6 +134,7 @@ class FcmAlertService implements AlertService {
     required String responderName,
     required String status,
     required String message,
+    String? recipientLang,
   }) async {
     if (recipientToken.trim().isEmpty) {
       throw StateError('Sender token is missing.');
@@ -145,6 +146,7 @@ class FcmAlertService implements AlertService {
         'responderName': responderName,
         'status': status,
         'message': message,
+        if (recipientLang != null) 'lang': recipientLang,
       },
     });
     if (_acceptedCount(result, 1) != 1) {

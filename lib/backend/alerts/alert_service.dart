@@ -15,12 +15,16 @@ abstract interface class AlertService {
   Future<bool> sendTestMessage(String token);
 
   /// Sends a response back to the original sender's device.
+  ///
+  /// [recipientLang] is the language the reply banner is written in — the
+  /// sender's own language. Missing or unsupported codes mean English.
   Future<void> sendResponse({
     required String recipientToken,
     required String incidentId,
     required String responderName,
     required String status,
     required String message,
+    String? recipientLang,
   });
 
   Future<void> cancelAlert(String incidentId);

@@ -64,16 +64,26 @@ const EVENT_LABELS: Record<string, Record<string, string>> = {
 };
 // %s is replaced with the sender's name by a function replacer, so a name containing
 // "$&" or "$1" cannot alter the text the way a string replacement would.
-const BANNERS: Record<string, { alert: string; alertNamed: string; simulated: string; simulatedNamed: string; risk: string }> = {
-  en: { alert: 'SUNO emergency alert', alertNamed: '%s may be in danger', simulated: 'SUNO simulated emergency', simulatedNamed: 'SUNO simulated emergency — %s', risk: 'Risk' },
-  zh: { alert: 'SUNO 紧急警报', alertNamed: '%s 可能处于危险中', simulated: 'SUNO 模拟紧急情况', simulatedNamed: 'SUNO 模拟紧急情况 — %s', risk: '风险' },
-  hi: { alert: 'SUNO आपातकालीन अलर्ट', alertNamed: '%s ख़तरे में हो सकते हैं', simulated: 'SUNO सिमुलेटेड आपातकाल', simulatedNamed: 'SUNO सिमुलेटेड आपातकाल — %s', risk: 'जोखिम' },
-  es: { alert: 'Alerta de emergencia SUNO', alertNamed: '%s puede estar en peligro', simulated: 'Emergencia simulada de SUNO', simulatedNamed: 'Emergencia simulada de SUNO — %s', risk: 'Riesgo' },
-  fr: { alert: 'Alerte d’urgence SUNO', alertNamed: '%s est peut-être en danger', simulated: 'Urgence simulée SUNO', simulatedNamed: 'Urgence simulée SUNO — %s', risk: 'Risque' },
-  ur: { alert: 'SUNO ایمرجنسی الرٹ', alertNamed: '%s خطر میں ہو سکتے ہیں', simulated: 'SUNO مشقی ایمرجنسی', simulatedNamed: 'SUNO مشقی ایمرجنسی — %s', risk: 'خطرہ' },
-  ar: { alert: 'تنبيه طوارئ من SUNO', alertNamed: 'قد يكون %s في خطر', simulated: 'حالة طوارئ تجريبية من SUNO', simulatedNamed: 'حالة طوارئ تجريبية من SUNO — %s', risk: 'خطر' },
-  bn: { alert: 'SUNO জরুরি সতর্কতা', alertNamed: '%s বিপদে থাকতে পারেন', simulated: 'SUNO অনুকরণ জরুরি অবস্থা', simulatedNamed: 'SUNO অনুকরণ জরুরি অবস্থা — %s', risk: 'ঝুঁকি' },
+// contactResponseTitle mirrors lib/l10n/app_<code>.arb "notifTitleContactResponse" so the
+// reply banner and the app's own notification title for the same event never disagree.
+const BANNERS: Record<string, { alert: string; alertNamed: string; simulated: string; simulatedNamed: string; risk: string; contactResponseTitle: string }> = {
+  en: { alert: 'SUNO emergency alert', alertNamed: '%s may be in danger', simulated: 'SUNO simulated emergency', simulatedNamed: 'SUNO simulated emergency — %s', risk: 'Risk', contactResponseTitle: 'SUNO contact response' },
+  zh: { alert: 'SUNO 紧急警报', alertNamed: '%s 可能处于危险中', simulated: 'SUNO 模拟紧急情况', simulatedNamed: 'SUNO 模拟紧急情况 — %s', risk: '风险', contactResponseTitle: 'SUNO 联系人回复' },
+  hi: { alert: 'SUNO आपातकालीन अलर्ट', alertNamed: '%s ख़तरे में हो सकते हैं', simulated: 'SUNO सिमुलेटेड आपातकाल', simulatedNamed: 'SUNO सिमुलेटेड आपातकाल — %s', risk: 'जोखिम', contactResponseTitle: 'SUNO संपर्क का उत्तर' },
+  es: { alert: 'Alerta de emergencia SUNO', alertNamed: '%s puede estar en peligro', simulated: 'Emergencia simulada de SUNO', simulatedNamed: 'Emergencia simulada de SUNO — %s', risk: 'Riesgo', contactResponseTitle: 'Respuesta de un contacto de SUNO' },
+  fr: { alert: 'Alerte d’urgence SUNO', alertNamed: '%s est peut-être en danger', simulated: 'Urgence simulée SUNO', simulatedNamed: 'Urgence simulée SUNO — %s', risk: 'Risque', contactResponseTitle: 'Réponse d’un contact SUNO' },
+  ur: { alert: 'SUNO ایمرجنسی الرٹ', alertNamed: '%s خطر میں ہو سکتے ہیں', simulated: 'SUNO مشقی ایمرجنسی', simulatedNamed: 'SUNO مشقی ایمرجنسی — %s', risk: 'خطرہ', contactResponseTitle: 'SUNO رابطے کا جواب' },
+  ar: { alert: 'تنبيه طوارئ من SUNO', alertNamed: 'قد يكون %s في خطر', simulated: 'حالة طوارئ تجريبية من SUNO', simulatedNamed: 'حالة طوارئ تجريبية من SUNO — %s', risk: 'خطر', contactResponseTitle: 'رد من جهة اتصال SUNO' },
+  bn: { alert: 'SUNO জরুরি সতর্কতা', alertNamed: '%s বিপদে থাকতে পারেন', simulated: 'SUNO অনুকরণ জরুরি অবস্থা', simulatedNamed: 'SUNO অনুকরণ জরুরি অবস্থা — %s', risk: 'ঝুঁকি', contactResponseTitle: 'SUNO যোগাযোগকারীর উত্তর' },
 };
+// Never let a language problem block a delivery: the new `lang` key wins, then the older
+// `languageCode`, then anything unrecognised (including no key at all) means English.
+function bannerLang(primary: unknown, fallback: unknown): string {
+  for (const value of [primary, fallback]) {
+    if (typeof value === 'string' && LANGUAGE_CODES.has(value)) return value;
+  }
+  return 'en';
+}
 const encoder = new TextEncoder();
 
 type Delivery = { token: string; message: Record<string, unknown> };
@@ -113,8 +123,9 @@ export async function handleRequest(req: Request): Promise<Response> {
         !ALLOWED_RESPONSE_STATUSES.has(r.status)) {
       return json({ error: 'Invalid response payload' }, 400);
     }
+    const replyBanner = BANNERS[bannerLang(r.lang, r.languageCode)];
     deliveries.push({ token: r.recipientToken.trim(), message: {
-      notification: { title: 'SUNO contact response', body: `${r.responderName}: ${r.message}` },
+      notification: { title: replyBanner.contactResponseTitle, body: `${r.responderName}: ${r.message}` },
       data: { type: 'response', incidentId: r.incidentId, responderName: r.responderName, status: r.status, message: r.message },
       android,
     } });
@@ -148,8 +159,8 @@ export async function handleRequest(req: Request): Promise<Response> {
     const tokens = [...new Set((body.contactTokens as string[]).map((value) => value.trim()))];
     const senderName = typeof payload.senderName === 'string' ? payload.senderName.trim() : '';
     // Never let a language problem block an alert: anything unrecognised, including an
-    // older app that sends no languageCode at all, silently falls back to English.
-    const language = LANGUAGE_CODES.has(String(payload.languageCode)) ? String(payload.languageCode) : 'en';
+    // older app that sends neither lang nor languageCode at all, falls back to English.
+    const language = bannerLang(payload.lang, payload.languageCode);
     const banner = BANNERS[language];
     const eventType = String(payload.eventType);
     const event = EVENT_LABELS[language][eventType] ?? eventType;

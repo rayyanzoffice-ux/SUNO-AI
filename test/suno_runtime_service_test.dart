@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suno_ai/backend/backend_exports.dart';
+import 'package:suno_ai/backend/profile/locale_repository.dart';
+import 'package:suno_ai/core/l10n/app_locales.dart';
+import 'package:suno_ai/core/l10n/locale_controller.dart';
 import 'package:suno_ai/models/detection_result.dart';
 import 'package:suno_ai/models/incident.dart';
 import 'package:suno_ai/models/received_alert.dart';
@@ -404,6 +407,79 @@ void main() {
     },
   );
 
+  test(
+    'outgoing alerts carry the chosen language in both wire keys',
+    () async {
+      final controller = LocaleController(
+        repository: InMemoryLocaleRepository(),
+      );
+      await controller.setLanguage(SunoLanguages.spanish);
+      LocaleController.instance = controller;
+      addTearDown(() {
+        LocaleController.instance = LocaleController(
+          repository: InMemoryLocaleRepository(),
+        );
+      });
+      final alerts = FakeAlerts();
+      final runtime = makeRuntime(alerts: alerts);
+      final incident = (await runtime.recordDetection(
+        detection(RiskLevel.critical),
+      ))!;
+      await finishDispatch(runtime, incident.id);
+      expect(alerts.payloads.single['lang'], 'es');
+      expect(alerts.payloads.single['languageCode'], 'es');
+      expect(alerts.payloads.single.length, lessThanOrEqualTo(16));
+    },
+  );
+
+  test(
+    'a received alert stores the sender language and drops unknown codes',
+    () async {
+      final runtime = makeRuntime();
+      for (final data in [
+        {'incidentId': 'new', 'lang': 'es'},
+        {'incidentId': 'legacy', 'languageCode': 'fr'},
+        {'incidentId': 'unsupported', 'lang': 'pt'},
+        {'incidentId': 'blank', 'lang': '  '},
+      ]) {
+        await runtime.acceptReceivedAlert(
+          ReceivedAlert.fromData({...data, 'eventType': 'Distress Sound'}),
+        );
+      }
+      expect(runtime.incidentById('new')?.senderLang, 'es');
+      expect(runtime.incidentById('legacy')?.senderLang, 'fr');
+      expect(runtime.incidentById('unsupported')?.senderLang, isNull);
+      expect(runtime.incidentById('blank')?.senderLang, isNull);
+      await runtime.updateStatus(IncidentStatus.resolved, 'Safe', 'new');
+      expect(runtime.incidentById('new')?.senderLang, 'es');
+    },
+  );
+
+  test(
+    'a reply forwards the banner language and omits it when unknown',
+    () async {
+      final alerts = FakeAlerts();
+      final runtime = makeRuntime(alerts: alerts);
+      await runtime.sendResponse(
+        recipientToken: 'synthetic-sender-token',
+        incidentId: 'spanish-sender',
+        responderName: 'Ayan',
+        status: 'resolved',
+        message: 'Están a salvo',
+        recipientLang: 'es',
+      );
+      expect(alerts.responses.single.lang, 'es');
+      await runtime.sendResponse(
+        recipientToken: 'synthetic-sender-token',
+        incidentId: 'legacy-sender',
+        responderName: 'Ayan',
+        status: 'resolved',
+        message: 'They are safe',
+      );
+      expect(alerts.responses.last.lang, isNull);
+    },
+  );
+
   test('late response cannot reopen a resolved outgoing incident', () async {
     final runtime = makeRuntime();
     final incident = (await runtime.recordDetection(
@@ -534,6 +610,8 @@ class FakeLocation extends LocationService {
 
 class FakeAlerts implements AlertService {
   final payloads = <Map<String, String>>[];
+  final responses =
+      <({String incidentId, String message, String? lang})>[];
   Completer<int>? pending;
   bool responseFails = false;
   @override
@@ -558,7 +636,11 @@ class FakeAlerts implements AlertService {
     required String responderName,
     required String status,
     required String message,
+    String? recipientLang,
   }) async {
+    responses.add(
+      (incidentId: incidentId, message: message, lang: recipientLang),
+    );
     if (responseFails) throw StateError('Synthetic response failure');
   }
 }

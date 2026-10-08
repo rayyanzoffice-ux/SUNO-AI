@@ -30,8 +30,9 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
   Incident? get _incident =>
       SunoRuntimeService.instance.incidentById(_incidentId);
 
-  /// A stored response keeps the responder's language; only the defaults here
-  /// follow the local reader.
+  /// The responder's own status line, kept on this device in the responder's
+  /// language. What is sent to the person in danger is written in *their*
+  /// language instead, because they are the one who has to read it.
   String _statusText(AppLocalizations l10n) => _incident == null
       ? l10n.receivedNoResponse
       : _incident?.contactResponseText ?? l10n.receivedResponseNeeded;
@@ -58,6 +59,18 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
   String get _riskLevel => widget.payload['riskLevel'] ?? 'critical';
   String? get _locationText => widget.payload['locationText'];
   String? get _senderToken => widget.payload['senderToken'];
+
+  /// Language of the person in danger, as carried by the alert. The stored
+  /// incident already normalises it; the payload keys cover a live notification
+  /// whose incident row has not been read back yet.
+  String? get _senderLang =>
+      _incident?.senderLang ??
+      widget.payload['lang'] ??
+      widget.payload['languageCode'];
+
+  /// Strings for text **sent to** the person in danger, so their reply banner
+  /// and the text inside it read in their language, not in this reader's.
+  AppLocalizations get _senderL10n => appLocalizationsFor(_senderLang);
 
   /// Best available name for the person in danger, or null when unknown.
   String? get _senderName {
@@ -105,9 +118,10 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
       await SunoRuntimeService.instance.sendResponse(
         recipientToken: senderToken,
         incidentId: _incidentId,
-        responderName: myName ?? l10n.receivedYourContact,
+        responderName: myName ?? _senderL10n.receivedYourContact,
         status: statusWire,
         message: message,
+        recipientLang: _senderLang,
       );
       final saved = await SunoRuntimeService.instance.updateStatus(
         status,
@@ -277,7 +291,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                           IncidentStatus.contactChecking,
                           l10n.receivedStatusChecking,
                           'contactChecking',
-                          l10n.receivedMessageChecking,
+                          _senderL10n.receivedMessageChecking,
                         ),
                 ),
                 const SizedBox(height: 9),
@@ -291,7 +305,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                           IncidentStatus.resolved,
                           l10n.receivedStatusResolved,
                           'resolved',
-                          l10n.receivedMessageSafe,
+                          _senderL10n.receivedMessageSafe,
                         ),
                 ),
                 const SizedBox(height: 4),
@@ -303,7 +317,7 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
                             IncidentStatus.alertTriggered,
                             l10n.receivedStatusUnable,
                             'alertTriggered',
-                            l10n.receivedMessageUnable,
+                            _senderL10n.receivedMessageUnable,
                           ),
                     child: Text(l10n.receivedButtonUnable),
                   ),

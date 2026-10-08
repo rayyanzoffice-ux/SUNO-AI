@@ -114,6 +114,24 @@ Deno.test('local relay validation and mocked upstream delivery', async (t) => {
       equal((messages[0].notification as Record<string, unknown>).title, 'SUNO emergency alert');
       equal((messages[0].data as Record<string, unknown>).languageCode, 'pt');
     });
+    await t.step('prefers lang over languageCode and never blocks on an unknown code', async () => {
+      messages.length = 0;
+      const spanish = await handleRequest(request({ contactTokens: [fakeToken],
+        payload: { ...payload, isSimulated: 'false', senderName: 'Ali', lang: 'es', languageCode: 'ar' } }));
+      equal(spanish.status, 200);
+      equal((messages[0].notification as Record<string, unknown>).title, 'Ali puede estar en peligro');
+      equal((messages[0].data as Record<string, unknown>).lang, 'es');
+      messages.length = 0;
+      const legacyOnly = await handleRequest(request({ contactTokens: [fakeToken],
+        payload: { ...payload, isSimulated: 'false', senderName: 'Ali', languageCode: 'ar' } }));
+      equal(legacyOnly.status, 200);
+      equal((messages[0].notification as Record<string, unknown>).title, 'قد يكون Ali في خطر');
+      messages.length = 0;
+      const unknown = await handleRequest(request({ contactTokens: [fakeToken],
+        payload: { ...payload, isSimulated: 'false', senderName: 'Ali', lang: 'pt' } }));
+      equal(unknown.status, 200);
+      equal((messages[0].notification as Record<string, unknown>).title, 'Ali may be in danger');
+    });
     await t.step('silent tests have no notification content', async () => {
       messages.length = 0;
       equal((await handleRequest(request({ contactTokens: [fakeToken], payload: { type: 'test' }, test: true }))).status, 200);
@@ -126,6 +144,25 @@ Deno.test('local relay validation and mocked upstream delivery', async (t) => {
         incidentId: 'old-incident', responderName: 'Your contact', status: 'resolved', message: 'They are safe' } }));
       equal((await response.json()).sent, 1);
       equal((messages[0].data as Record<string, unknown>).incidentId, 'old-incident');
+    });
+    await t.step('titles the reply banner in the sender language and keeps English without it', async () => {
+      messages.length = 0;
+      const spanish = await handleRequest(request({ response: { recipientToken: fakeToken,
+        incidentId: 'spanish-incident', responderName: 'Ali', status: 'resolved',
+        message: 'Están a salvo', lang: 'es' } }));
+      equal(spanish.status, 200);
+      const banner = messages[0].notification as Record<string, unknown>;
+      equal(banner.title, 'Respuesta de un contacto de SUNO');
+      equal(banner.body, 'Ali: Están a salvo');
+      equal((messages[0].data as Record<string, unknown>).incidentId, 'spanish-incident');
+      for (const lang of [undefined, 'pt']) {
+        messages.length = 0;
+        const reply = await handleRequest(request({ response: { recipientToken: fakeToken,
+          incidentId: 'english-incident', responderName: 'Your contact', status: 'resolved',
+          message: 'They are safe', lang } }));
+        equal(reply.status, 200);
+        equal((messages[0].notification as Record<string, unknown>).title, 'SUNO contact response');
+      }
     });
     await t.step('OAuth failure is bounded and has no credential-bearing response', async () => {
       globalThis.fetch = () => Promise.reject(new Error('sensitive-upstream-value'));

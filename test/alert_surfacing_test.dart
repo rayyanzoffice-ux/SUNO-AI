@@ -172,6 +172,17 @@ void main() {
         '',
       );
     });
+
+    test('carries the sender language only when it is known', () {
+      expect(
+        alertReceivedArguments(_received('a6', senderLang: 'es'))['lang'],
+        'es',
+      );
+      expect(
+        alertReceivedArguments(_received('a7')).containsKey('lang'),
+        isFalse,
+      );
+    });
   });
 }
 
@@ -185,6 +196,7 @@ Incident _received(
   String origin = 'trusted_contact',
   String? senderToken = 'synthetic-sender-token',
   String? senderName,
+  String? senderLang,
   double? latitude,
   double? longitude,
   String? locationText,
@@ -211,5 +223,6 @@ Incident _received(
     origin: origin,
     senderToken: senderToken,
     senderName: senderName,
+    senderLang: senderLang,
   );
 }
