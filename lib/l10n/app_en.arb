@@ -27,6 +27,9 @@
   "languageChooseSubtitle": "You can change this later in Settings.",
   "languageContinue": "Continue",
   "languageSaveFailed": "Could not save your language. It will reset next time you open SUNO.",
+  "settingsSubtitle": "Personalize SUNO",
+  "settingsSectionLanguage": "LANGUAGE",
+  "languageSettingsHint": "The whole app switches instantly. Your choice stays on this phone.",
 
   "eventDistressSound": "Distress Sound",
   "eventEmergencyAlarm": "Emergency Alarm",
