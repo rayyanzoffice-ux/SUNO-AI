@@ -140,11 +140,10 @@ class _AlertReceivedScreenState extends State<AlertReceivedScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final localeName = Localizations.localeOf(context).toLanguageTag();
     final time = _detectedAt?.toLocal();
     final displayTime = time == null
         ? l10n.receivedTimeUnavailable
-        : formatIsoDayWithClock(time, localeName);
+        : '${formatIsoDay(time)} · ${formatClock12Hour(time)}';
     final score = int.tryParse(_riskScore) ?? 0;
     final level = RiskLevel.values.firstWhere(
       (l) => l.wireValue == _riskLevel,

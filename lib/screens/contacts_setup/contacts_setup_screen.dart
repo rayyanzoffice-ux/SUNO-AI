@@ -467,7 +467,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                             padding: const EdgeInsets.only(top: 2),
                             child: Text(
                               l10n.contactsLastAcceptedTest(
-                                formatIsoStamp(contact.verifiedAt!),
+                                formatIsoDayWithClock24(contact.verifiedAt!),
                               ),
                               style: const TextStyle(
                                 color: AppColors.textMuted,
