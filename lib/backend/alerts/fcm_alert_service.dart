@@ -146,7 +146,7 @@ class FcmAlertService implements AlertService {
         'responderName': responderName,
         'status': status,
         'message': message,
-        if (recipientLang != null) 'lang': recipientLang,
+        'lang': ?recipientLang,
       },
     });
     if (_acceptedCount(result, 1) != 1) {
