@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/l10n/l10n.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/time_format.dart';
 import '../../models/trusted_contact.dart';
 import '../../services/suno_runtime_service.dart';
 import '../../widgets/primary_action_button.dart';
@@ -282,13 +283,6 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     return l10n.contactsStatusUnverified;
   }
 
-  String _formatVerifiedAt(DateTime value) {
-    final local = value.toLocal();
-    String two(int number) => number.toString().padLeft(2, '0');
-    return '${local.year}-${two(local.month)}-${two(local.day)} '
-        '${two(local.hour)}:${two(local.minute)}';
-  }
-
   Color _pushStatusColor(TrustedContact contact) {
     if (contact.fcmToken == null || contact.fcmToken!.trim().isEmpty) {
       return AppColors.textMuted;
@@ -473,7 +467,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
                             padding: const EdgeInsets.only(top: 2),
                             child: Text(
                               l10n.contactsLastAcceptedTest(
-                                _formatVerifiedAt(contact.verifiedAt!),
+                                formatIsoStamp(contact.verifiedAt!),
                               ),
                               style: const TextStyle(
                                 color: AppColors.textMuted,
