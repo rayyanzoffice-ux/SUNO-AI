@@ -1,8 +1,9 @@
 import 'package:intl/intl.dart';
 
 /// Formats a [DateTime] as 12-hour clock time with an AM/PM suffix, e.g.
-/// "2:07 PM" or "11:45 AM". Shared by History and Trusted Contact View so
-/// timestamps read consistently across the app.
+/// "2:07 PM" or "11:45 AM". Used for the received alert's "Detected" line,
+/// which is deliberately not locale-aware, and as the fallback when
+/// locale-aware data is unavailable.
 String formatClock12Hour(DateTime time) {
   final hour24 = time.hour;
   final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;

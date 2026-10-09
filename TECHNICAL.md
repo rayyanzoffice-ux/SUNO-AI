@@ -337,17 +337,19 @@ Alerts flow through a **two-device push notification path** using Firebase Cloud
 ### Incoming Alerts
 
 - Remote messages are parsed from URL-encoded `key=value` data payloads
-- Fields: `incidentId`, `eventType`, `riskScore`, `riskLevel`, `detectedAt`, `location`, `senderToken`, `latitude`, `longitude`
+- Fields: `incidentId`, `eventType`, `riskScore`, `riskLevel`, `detectedAt`, `location` (also accepted as `locationText`), `senderToken`, `senderName`, `isSimulated`, `latitude`, `longitude`, plus `lang` — read before the older `languageCode` — naming the sender's language for the push banner
 - Background messages handled by `firebaseMessagingBackgroundHandler`
 - Received alerts are converted to `Incident` objects with `origin: 'Trusted Contact'` and persisted
+- The language code is kept only when it is one of the 8 supported codes, stored on the incident as `senderLang`, and selects the language of the reply that goes back; unknown or missing means English
 
 ### Two-Way Response Flow
 
 1. Trusted contact receives push notification on their device
 2. Opens `AlertReceivedScreen` showing event details, map, risk level
-3. Taps a response: "I AM CHECKING ON THEM", "THEY ARE SAFE", or "UNABLE TO CONTACT"
+3. Taps a response: "I AM CHECKING ON THEM", "THEY ARE SAFE", or "UNABLE TO CONTACT" — these labels are shown in the responder's own language, the English above being the template
 4. Response sent back via Supabase edge function (`send_response` action)
 5. Original sender's device receives the response, updates incident status and displays `contactResponseText` in real time on the Emergency Alert screen
+6. The message the person in danger actually reads is built in **their** language, not the responder's; the responder's own status line stays in the language of their app
 
 ---
 
