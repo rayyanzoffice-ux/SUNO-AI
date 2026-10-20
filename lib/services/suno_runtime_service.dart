@@ -25,13 +25,15 @@ class SunoRuntimeService extends ChangeNotifier {
     ProfileRepository? profileRepository,
     this._alertService,
     LocationService? locationService,
+    SmsFallbackService? smsFallbackService,
   }) : _detectionEngine = detectionEngine ?? DetectionEngine.instance,
        _safetyCheckEngine = safetyCheckEngine ?? SafetyCheckEngine(),
        _incidents = incidentRepository ?? InMemoryIncidentRepository(),
        _contacts =
            trustedContactRepository ?? InMemoryTrustedContactRepository(),
        _profile = profileRepository ?? InMemoryProfileRepository(),
-       locationService = locationService ?? LocationService();
+       locationService = locationService ?? LocationService(),
+       _smsFallback = smsFallbackService ?? const SmsFallbackService();
 
   static SunoRuntimeService instance = SunoRuntimeService();
   final DetectionEngine _detectionEngine;
@@ -41,6 +43,7 @@ class SunoRuntimeService extends ChangeNotifier {
   final ProfileRepository _profile;
   final AlertService? _alertService;
   final LocationService locationService;
+  final SmsFallbackService _smsFallback;
   final Map<String, Incident> _knownIncidents = {};
   final Map<String, Future<AlertDispatchResult>> _dispatches = {};
   final Set<String> _deleted = {};
@@ -113,19 +116,28 @@ class SunoRuntimeService extends ChangeNotifier {
     _changed();
   }
 
-  Future<LocationSnapshot?> refreshLocation({bool requestPermission = true}) {
+  /// [useCache] is for alert paths only: a short fresh-fix attempt that falls
+  /// back to the last cached fix, so an escalation still carries a location
+  /// with no internet and never waits on a permission dialog. Ordinary UI
+  /// lookups leave it false, so a stale fix is never shown as if it were live.
+  Future<LocationSnapshot?> refreshLocation({
+    bool requestPermission = true,
+    bool useCache = false,
+  }) {
     final pending = _locationRequest;
     if (pending != null) return pending;
-    final request = locationService
-        .currentLocation(requestPermission: requestPermission)
-        .then((value) {
-          location = value;
-          return value;
-        })
-        .whenComplete(() {
-          _locationRequest = null;
-          _changed();
-        });
+    final attempt = useCache
+        ? locationService.bestEffortLocation()
+        : locationService.currentLocation(
+            requestPermission: requestPermission,
+          );
+    final request = attempt.then((value) {
+      location = value;
+      return value;
+    }).whenComplete(() {
+      _locationRequest = null;
+      _changed();
+    });
     _locationRequest = request;
     _changed();
     return request;
@@ -139,7 +151,7 @@ class SunoRuntimeService extends ChangeNotifier {
   }
 
   Future<DetectionResult> runDetection(DetectionScenario scenario) async {
-    final position = await refreshLocation();
+    final position = await refreshLocation(useCache: true);
     final result = await switch (scenario) {
       DetectionScenario.low => _detectionEngine.simulateLowRiskDetection(),
       DetectionScenario.medium => _detectionEngine.simulateMediumDetection(),
@@ -553,42 +565,68 @@ class SunoRuntimeService extends ChangeNotifier {
         } catch (error) {
           debugPrint('SUNO could not read display name: $error');
         }
-        final sent = await service.sendAlert(
-          contactTokens: tokens,
-          payload: {
-            'incidentId': id,
-            'eventType': detection.eventType,
-            'riskScore': detection.riskScore.toString(),
-            'riskLevel': detection.riskLevel.wireValue,
-            'detectedAt': detection.detectedAt.toIso8601String(),
-            'isSimulated': detection.isSimulated.toString(),
-            if (detection.latitude != null)
-              'latitude': detection.latitude.toString(),
-            if (detection.longitude != null)
-              'longitude': detection.longitude.toString(),
-            if (detection.locationText != null)
-              'locationText': detection.locationText!,
-            if (service.deviceToken != null)
-              'senderToken': service.deviceToken!,
-            'senderName': ?myName,
-            // Drive the wording of the recipient's push banner only; in-app
-            // text always uses the recipient's own language. `lang` is the key
-            // the relay reads first, `languageCode` stays for the deployed
-            // build that knows only the old name.
-            'lang': LocaleController.instance.language.code,
-            'languageCode': LocaleController.instance.language.code,
-          },
-        );
+        final isCachedFix = location?.isCached == true;
+        final payload = <String, String>{
+          'incidentId': id,
+          'eventType': detection.eventType,
+          'riskScore': detection.riskScore.toString(),
+          'riskLevel': detection.riskLevel.wireValue,
+          'detectedAt': detection.detectedAt.toIso8601String(),
+          'isSimulated': detection.isSimulated.toString(),
+          if (detection.latitude != null)
+            'latitude': detection.latitude.toString(),
+          if (detection.longitude != null)
+            'longitude': detection.longitude.toString(),
+          if (detection.locationText != null)
+            'locationText': detection.locationText!,
+          if (service.deviceToken != null)
+            'senderToken': service.deviceToken!,
+          'senderName': ?myName,
+          // Drive the wording of the recipient's push banner only; in-app
+          // text always uses the recipient's own language. `lang` is the key
+          // the relay reads first, `languageCode` stays for the deployed
+          // build that knows only the old name.
+          'lang': LocaleController.instance.language.code,
+          'languageCode': LocaleController.instance.language.code,
+          // An SMS has no other way to admit that the pin might be old, and
+          // the relay ignores both keys, so push keeps rendering as before.
+          if (isCachedFix) 'locationIsCached': 'true',
+          if (isCachedFix)
+            'locationAgeMinutes': location!.age.inMinutes.toString(),
+        };
+        var sent = 0;
+        String? pushFailure;
+        try {
+          sent = await service
+              .sendAlert(contactTokens: tokens, payload: payload)
+              .timeout(const Duration(seconds: 8));
+        } catch (error) {
+          pushFailure = 'Push relay unreachable: $error';
+        }
+        var smsSent = 0;
+        if (sent < attempted) {
+          // Push did not reach everyone — offline, partial, or a misconfigured
+          // relay. SMS dials numbers rather than tokens, so this is also the
+          // only way to reach a contact whose token was never recorded.
+          final sms = await _smsFallback.sendAlert(
+            contacts: contacts.toList(),
+            payload: payload,
+          );
+          smsSent = sms.sent;
+        }
         if (sent < 0 || sent > attempted) {
           throw StateError('Invalid relay result');
         }
+        final delivered = sent + smsSent;
         result = AlertDispatchResult(
-          success: sent == attempted,
+          success: delivered >= attempted && attempted > 0,
           attemptedCount: attempted,
           sentCount: sent,
-          failedReason: sent == attempted
+          smsSentCount: smsSent,
+          failedReason: delivered >= attempted
               ? null
-              : 'FCM accepted $sent/$attempted alerts',
+              : (pushFailure ??
+                    'Delivered $delivered/$attempted contacts (push + SMS)'),
         );
       }
     } catch (_) {
@@ -606,7 +644,7 @@ class SunoRuntimeService extends ChangeNotifier {
           dispatchResult: result,
           updatedAt: DateTime.now(),
           status:
-              result.sentCount > 0 &&
+              result.totalDelivered > 0 &&
                   existing.status == IncidentStatus.alertTriggered
               ? IncidentStatus.contactNotified
               : existing.status,
@@ -626,7 +664,7 @@ class SunoRuntimeService extends ChangeNotifier {
       return _knownIncidents[id];
     }
     final future = () async {
-      final position = await refreshLocation();
+      final position = await refreshLocation(useCache: true);
       return _record(
         DetectionResult(
           eventType: 'Manual Silent Alert',

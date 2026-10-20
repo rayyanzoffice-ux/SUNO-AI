@@ -1,5 +1,6 @@
 export 'alerts/alert_service.dart';
 export 'alerts/fcm_alert_service.dart';
+export 'alerts/sms_fallback_service.dart';
 export 'audio/audio_preprocessor.dart';
 export 'audio/audio_waveform.dart';
 export 'audio/microphone_capture.dart';

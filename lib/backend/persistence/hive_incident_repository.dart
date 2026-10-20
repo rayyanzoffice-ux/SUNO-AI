@@ -21,6 +21,7 @@ Map<String, dynamic> _incidentToMap(Incident incident) => {
       'success': dispatch.success,
       'attemptedCount': dispatch.attemptedCount,
       'sentCount': dispatch.sentCount,
+      'smsSentCount': dispatch.smsSentCount,
       'failedReason': dispatch.failedReason,
     },
 };
@@ -53,6 +54,7 @@ Incident _incidentFromMap(Map<dynamic, dynamic> raw) {
             success: dispatch['success'] == true,
             attemptedCount: dispatch['attemptedCount'] as int,
             sentCount: dispatch['sentCount'] as int,
+            smsSentCount: dispatch['smsSentCount'] as int? ?? 0,
             failedReason: dispatch['failedReason'] as String?,
           ),
   );

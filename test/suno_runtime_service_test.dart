@@ -574,6 +574,75 @@ void main() {
     expect(incident.detectionResult.isSimulated, isFalse);
     expect(incident.detectionResult.latitude, 33.6844);
   });
+
+  /// A contact that has both a push token and a number, so either channel can
+  /// be observed on the same incident.
+  SunoRuntimeService makeDualChannelRuntime({
+    required FakeAlerts alerts,
+    required Map<String, String> dialed,
+  }) {
+    final runtime = SunoRuntimeService(
+      alertService: alerts,
+      locationService: FakeLocation(),
+      smsFallbackService: SmsFallbackService(
+        send: ({required phoneNumber, required message}) async {
+          dialed[phoneNumber] = message;
+          return true;
+        },
+      ),
+      trustedContactRepository: InMemoryTrustedContactRepository(
+        seed: const [
+          TrustedContact(
+            id: 'a',
+            name: 'Test contact',
+            phone: '+92 300-123-4567',
+            relationship: 'Friend',
+            fcmToken: 'test-token-a',
+          ),
+        ],
+      ),
+    );
+    addTearDown(runtime.dispose);
+    return runtime;
+  }
+
+  test('an unreachable relay still reaches the contact by SMS', () async {
+    final alerts = FakeAlerts()..sendFails = true;
+    final dialed = <String, String>{};
+    final runtime = makeDualChannelRuntime(alerts: alerts, dialed: dialed);
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    expect(dialed.keys, ['+923001234567']);
+    expect(dialed.values.single, contains('Distress Sound'));
+    final delivered = runtime.incidentById(incident.id)!;
+    expect(delivered.dispatchResult?.sentCount, 0);
+    expect(delivered.dispatchResult?.smsSentCount, 1);
+    expect(delivered.dispatchResult?.usedSmsFallback, isTrue);
+    expect(delivered.dispatchResult?.success, isTrue);
+    expect(delivered.dispatchResult?.failedReason, isNull);
+    expect(delivered.status, IncidentStatus.contactNotified);
+  });
+
+  test('a fully delivered push alert does not also send an SMS', () async {
+    final dialed = <String, String>{};
+    final runtime = makeDualChannelRuntime(
+      alerts: FakeAlerts(),
+      dialed: dialed,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    expect(dialed, isEmpty);
+    final delivered = runtime.incidentById(incident.id)!;
+    expect(delivered.dispatchResult?.sentCount, 1);
+    expect(delivered.dispatchResult?.usedSmsFallback, isFalse);
+    expect(delivered.status, IncidentStatus.contactNotified);
+  });
 }
 
 Future<void> finishDispatch(SunoRuntimeService runtime, String id) async {
@@ -615,6 +684,7 @@ class FakeAlerts implements AlertService {
       <({String incidentId, String message, String? lang})>[];
   Completer<int>? pending;
   bool responseFails = false;
+  bool sendFails = false;
   @override
   String? get deviceToken => 'synthetic-sender';
   @override
@@ -623,6 +693,7 @@ class FakeAlerts implements AlertService {
     required Map<String, String> payload,
   }) async {
     payloads.add(payload);
+    if (sendFails) throw StateError('Synthetic relay failure');
     return pending == null ? contactTokens.length : pending!.future;
   }
 

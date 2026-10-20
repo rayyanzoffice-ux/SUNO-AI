@@ -47,13 +47,13 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
     }
     if (dispatch.success) {
       return l10n.emergencyDispatchAwaiting(
-        dispatch.sentCount,
+        dispatch.totalDelivered,
         dispatch.attemptedCount,
       );
     }
     if (dispatch.partiallyDelivered) {
       return l10n.emergencyDispatchPartial(
-        dispatch.sentCount,
+        dispatch.totalDelivered,
         dispatch.attemptedCount,
         dispatch.failedCount,
       );

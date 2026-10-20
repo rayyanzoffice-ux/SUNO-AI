@@ -4,10 +4,12 @@ class AlertDispatchResult {
     required this.success,
     required this.attemptedCount,
     this.sentCount = 0,
+    this.smsSentCount = 0,
     this.failedReason,
   });
 
-  /// True only when every attempted contact was accepted by the relay/FCM.
+  /// True only when every attempted contact was reached by at least one
+  /// channel (push OR SMS).
   final bool success;
 
   /// Number of contacts SUNO tried to notify.
@@ -16,11 +18,18 @@ class AlertDispatchResult {
   /// Number of contacts the relay reports as successfully accepted by FCM.
   final int sentCount;
 
+  /// Number of contacts reached by the offline SMS fallback instead.
+  final int smsSentCount;
+
   final String? failedReason;
 
+  bool get usedSmsFallback => smsSentCount > 0;
+
+  int get totalDelivered => sentCount + smsSentCount;
+
   int get failedCount =>
-      attemptedCount > sentCount ? attemptedCount - sentCount : 0;
+      attemptedCount > totalDelivered ? attemptedCount - totalDelivered : 0;
 
   bool get partiallyDelivered =>
-      sentCount > 0 && sentCount < attemptedCount;
+      totalDelivered > 0 && totalDelivered < attemptedCount;
 }
