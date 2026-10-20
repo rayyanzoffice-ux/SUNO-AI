@@ -58,8 +58,7 @@ class LocalAlarmService {
       // Last-ditch fallback inside the last resort: if the notification
       // itself is unavailable, at least keep the device buzzing.
       try {
-        final bool? hasVibrator = await Vibration.hasVibrator();
-        if (hasVibrator ?? false) {
+        if (await Vibration.hasVibrator()) {
           await Vibration.vibrate(pattern: alarmVibration, repeat: 0);
         }
       } catch (_) {}
