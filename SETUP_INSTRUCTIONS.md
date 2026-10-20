@@ -9,7 +9,7 @@ flutter pub get
 
 Use Flutter stable with Dart 3.13.1 or newer within Dart 3.x, Java 17, and the Android SDK required by Flutter. Local verification uses Flutter 3.47.5 / Dart 3.13.4; CI follows Flutter stable. Run `flutter doctor -v` before building. Use `flutter pub get --enforce-lockfile` for repeatable dependency resolution once `pubspec.lock` includes every declared dependency — after adding `vibration`, run a plain `flutter pub get` and commit the refreshed lock first.
 
-`flutter_local_notifications` supplies Android notification channels and foreground notifications; `url_launcher` opens incident coordinates externally. Demo uses neither microphone capture nor model inference.
+`flutter_local_notifications` supplies Android notification channels and foreground notifications; `url_launcher` opens incident coordinates externally. Demo uses neither microphone capture nor model inference. The SMS fallback needs no extra package — it calls Android's native `SmsManager` — and the last-resort alarm plays the bundled `android/app/src/main/res/raw/suno_alarm.wav`.
 
 ---
 
@@ -43,14 +43,19 @@ If the file is around 411 bytes or `file` says XML/text, the download failed and
 <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 <uses-permission android:name="android.permission.VIBRATE"/>
 <uses-permission android:name="android.permission.INTERNET"/>
 <uses-permission android:name="android.permission.WAKE_LOCK"/>
+<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+<uses-permission android:name="android.permission.SEND_SMS"/>
 ```
 
 Demo requests foreground location, never microphone permission. Live requests microphone permission while the app is visible before starting capture. Location refreshes during Live do not repeatedly request permission. Android also requires `FOREGROUND_SERVICE_LOCATION`; the service declares `microphone|location|shortService`. Android 14+ uses a bounded short service for Demo countdown/dispatch without microphone access.
+
+`SEND_SMS` is optional and requested at runtime the first time a contact with a phone number is saved. Denying it disables only the offline SMS fallback; push notifications still work. There is no SMS gateway — messages go through the device's own SIM, so a phone with no SIM or no carrier signal cannot use this layer, and the OS accepting a send is not a delivery receipt. The last-resort alarm uses a dedicated `suno_local_alarm` notification channel; Android freezes a channel's sound after it is first created, so changing the bundled file requires uninstalling the app or using a new channel id.
 
 Enable GPS and notification permission on both test phones. Denied, disabled, or timed-out location must show unavailable instead of invented coordinates; alerts can still be attempted. Notification sound, vibration, full-screen display and background behavior depend on Android settings and device restrictions. The retained engine supports ordinary screen navigation/task removal while its service runs, but cannot guarantee survival after force-stop, process death, reboot or OEM termination.
 
@@ -156,7 +161,8 @@ field for hackathon testing.
 4. **Test FCM acceptance** sends a silent test. **FCM test accepted** is not proof of device receipt/display; verify a visible alert separately.
 5. In **Demo Mode**, check real GPS, select **CRITICAL**, and simulate distress. Confirm the same coordinates on the saved sender incident and received alert; pan/zoom and open the map externally.
 6. Respond on the contact phone and verify that only the matching incident changes on the sender. Reopen both apps and check history.
-7. Repeat medium safe, medium timeout without opening the safety notification, immediate escalation, Silent SOS, no contacts, expired token, offline tiles/relay, denied permissions and repeated taps. Test notifications foreground/background/cold-start and Live screen-off/task removal/reopening/explicit stop on the actual evaluation devices.
+7. Test the offline layers: save a contact that has a phone number and grant SMS permission, then enable airplane mode (or leave the relay unreachable) and trigger **CRITICAL**. Confirm the saved result counts an SMS, the text arrives with the sender, event, risk score and Google Maps link, and that a cached location is labelled as the last known fix with its age when no fresh GPS lock is possible. With no channel reaching anyone, confirm the local alarm loops and stops when the incident is resolved or cancelled. OS acceptance is not carrier delivery — read the message on the receiving phone.
+8. Repeat medium safe, medium timeout without opening the safety notification, immediate escalation, Silent SOS, no contacts, expired token, offline tiles/relay, denied permissions and repeated taps. Test notifications foreground/background/cold-start and Live screen-off/task removal/reopening/explicit stop on the actual evaluation devices.
 
 Passing automated tests alone does not establish demo readiness. Relay deployment and the two-phone acceptance checks are separate release gates.
 
@@ -231,6 +237,8 @@ The release APK will be at:
 build/app/outputs/flutter-apk/app-release.apk
 ```
 
+The build bundles `android/app/src/main/res/raw/suno_alarm.wav` (~2.7 MB), which raises the APK size. The file is already in the repository; there is no separate download step.
+
 To install and run on a connected device or emulator instead of building an APK:
 
 ```bash
@@ -248,8 +256,10 @@ cd SUNO-AI
 git add -A
 git status          # verify what's staged
 git commit -m "feat: describe your change"
-git push origin feat/integration
+git push origin main
 ```
+
+Pushes to `main` (and `feat/integration`) run `.github/workflows/build-apk.yml`: analyze, tests, release APK build, and an uploaded `SUNO-final-apk` artifact. Pushes to `fix/**` run `.github/workflows/test-branch.yml`, which runs analysis and tests only and does not build an APK.
 
 ---
 

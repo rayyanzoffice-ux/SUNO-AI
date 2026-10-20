@@ -12,10 +12,13 @@ SUNO is an Android-first Flutter prototype that uses on-device audio AI to detec
 - **Safety Check countdown** for medium-risk events — 45 seconds, buzzing the device when it appears whether or not a notification fired; the user can confirm they are safe.
 - **Emergency Alert** for critical risk, with location and event details.
 - **Trusted Contact notifications** via Firebase Cloud Messaging (FCM relay through Supabase Edge Functions).
+- **Offline alert layers** — when the push relay cannot reach a contact, SUNO sends a direct SMS from the phone's SIM radio to the contact's saved number. When neither push nor SMS reaches anyone, the phone itself sounds a looping local alarm.
+- **Last-known location** — the latest GPS fix is cached and refreshed every 30 minutes during Live monitoring. An alert without a fresh fix still carries the last known position, labelled with its age instead of pretending it is current.
 - **Two-way contact responses** — contacts who receive an alert can tap *I AM CHECKING ON THEM*, *THEY ARE SAFE*, or *UNABLE TO CONTACT*, and the response is relayed back to the sender's device.
 - **Silent SOS** manual trigger for situations where the user cannot make a sound.
 - **Incident history** persisted locally with Hive, with swipe-to-dismiss and clear-all support.
 - **Map preview** of incident location using MapTiler tiles when a `MAPTILER_KEY` is configured, falling back to OpenStreetMap tiles otherwise, with one-tap open in Google Maps.
+- **Eight languages** — English, Chinese, Hindi, Spanish, French, Urdu, Arabic, and Bengali, including right-to-left layouts and contact replies written in the sender's language.
 - **Contact token testing** — send a silent test and record FCM acceptance. Acceptance does not prove the other phone displayed or received a notification.
 
 ## On-device ML pipeline
@@ -40,17 +43,18 @@ The classifier was retrained on a cleaned dataset of 243 balanced audio clips an
 ```
 lib/
 ├── backend/
-│   ├── alerts/            # FCM alert service
+│   ├── alerts/            # FCM relay, SMS fallback, last-resort local alarm
 │   ├── audio/             # Microphone capture + preprocessing
 │   ├── contacts/          # Trusted contact repository contracts
 │   ├── detection/         # YAMNet/classifier adapters + detection repository
 │   ├── incidents/         # Incident repository contracts
-│   ├── location/          # GPS location service
+│   ├── location/          # GPS service + last-known location cache
 │   ├── ml/                # Continuous audio detector + YAMNet stage
 │   ├── motion/            # Accelerometer impact/stillness detector
-│   ├── persistence/       # Hive-backed repositories
+│   ├── persistence/       # Hive-backed repositories and cache boxes
 │   ├── risk/              # Risk scoring engine
 │   └── services/          # Android foreground service bridge
+├── core/                  # Config, routes, theme, localisation
 ├── models/                # DetectionResult, Incident, TrustedContact
 ├── screens/               # Home, Monitoring, Safety Check, Emergency Alert, etc.
 ├── services/              # SunoRuntimeService — app-level coordinator
@@ -69,6 +73,7 @@ lib/
 - Supabase Edge Functions for the FCM relay
 - `flutter_map` with MapTiler or OpenStreetMap tiles
 - `geolocator`, `sensors_plus`, `permission_handler`, `record`, `vibration`
+- `flutter_localizations` with eight ARB languages
 - `flutter_local_notifications`, `url_launcher`
 
 ## Setup
@@ -80,7 +85,7 @@ Quick start after setup:
 ```bash
 git clone https://github.com/rayyanzoffice-ux/SUNO-AI.git
 cd SUNO-AI
-git checkout feat/integration
+git checkout main
 flutter pub get
 flutter run --dart-define=SUNO_RELAY_AUTH_KEY="YOUR_DEMO_KEY"
 ```
@@ -91,7 +96,7 @@ has the Flutter SDK.
 
 ## Hackathon judges: install the APK
 
-Download [SUNO-final-apk.zip from successful build #33](https://github.com/rayyanzoffice-ux/SUNO-AI/actions/runs/36032438405), unzip it, and install `SUNO-final.apk` on an Android phone.
+Open the latest successful [Build SUNO APK workflow run](https://github.com/rayyanzoffice-ux/SUNO-AI/actions/workflows/build-apk.yml), download the `SUNO-final-apk` artifact, unzip it, and install `SUNO-final.apk` on an Android phone. Artifacts are kept for 30 days and downloading them requires signing in to GitHub.
 
 For a quick review, open **Start Monitoring → Demo Mode** and choose **LOW**. Demo does not use the microphone. Live Mode requires microphone permission. Demo medium timeouts and critical alerts can attempt real contact notifications, so only test those with consenting contacts configured. Push notification checks require the project's Firebase and relay setup.
 
@@ -102,8 +107,9 @@ For a quick review, open **Start Monitoring → Demo Mode** and choose **LOW**. 
 3. Select **LOW**, **MEDIUM**, or **CRITICAL** and press **Demo: Simulate Distress**. Only the danger input is simulated; GPS, storage, countdown and contact sends are real.
 4. Low creates no incident. Medium starts a persisted forty-five-second safety deadline immediately; **I AM SAFE** cancels and **CAN'T RESPOND** escalates. Timeout does not depend on keeping the safety screen open. Critical dispatches immediately.
 5. The alert stores one location snapshot, used in the contact payload and maps. Pan/zoom the map or use **OPEN** externally; this is location at alert time, not continuous remote tracking.
-6. Check the saved FCM acceptance/partial-failure result. On the other phone, visibly verify the notification and send a response; the sender updates the referenced incident, not an unrelated active alert.
-7. Reopen history to verify persistence. Separately test **Silent SOS** and **Live Mode**, which alone activates microphone capture and on-device inference.
+6. Check the saved delivery result. It now distinguishes push and SMS: on the other phone, visibly verify the notification and send a response; the sender updates the referenced incident, not an unrelated active alert.
+7. To exercise the offline layers, save a contact with a phone number, grant SMS permission, then enable airplane mode and trigger **CRITICAL**. The saved result should count an SMS send, and the contact receives a text with the sender, event, risk score and a Google Maps link. If neither push nor SMS reaches anyone, the phone itself plays the bundled alarm loop; resolving or cancelling the incident stops it. OS acceptance is not carrier delivery confirmation.
+8. Reopen history to verify persistence. Separately test **Silent SOS** and **Live Mode**, which alone activates microphone capture and on-device inference.
 
 Source checks do not establish device readiness. Before a regional demo, deploy the reviewed relay separately and verify two consenting Android phones: GPS/map opening, medium safe/timeout, critical, SOS, response routing, offline/denied-permission recovery and foreground/background/cold-start notifications. Live task removal, screen-off operation, reopening and explicit stop require checks on the actual devices. Force-stop, process death, reboot and arbitrary OEM restrictions are not covered by a background-survival guarantee.
 
@@ -114,6 +120,7 @@ SUNO is designed to be privacy-first:
 - All audio classification runs on the device.
 - Raw audio never leaves the phone.
 - Only incident metadata (event type, risk score, location coordinates, timestamp) is sent to trusted contacts when an alert is triggered.
+- If the push relay cannot reach contacts, the phone's own SIM may send an SMS. That message contains the sender name, event, risk score and a Google Maps link, and travels through the carrier network rather than SUNO's servers.
 - Contact responses (responder name, chosen status, short message) are relayed back to the original sender through the same FCM relay; no response data is stored on Supabase.
 
 ## License
