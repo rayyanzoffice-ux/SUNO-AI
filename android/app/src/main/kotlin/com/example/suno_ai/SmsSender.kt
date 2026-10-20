@@ -29,14 +29,15 @@ object SmsSender {
     fun send(context: Context, phoneNumber: String, message: String): Boolean {
         if (!hasPermission(context)) return false
         if (phoneNumber.isBlank()) return false
+        @Suppress("DEPRECATION")
+        val manager: SmsManager? =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.getSystemService(SmsManager::class.java)
+            } else {
+                SmsManager.getDefault()
+            }
+        if (manager == null) return false
         return try {
-            val manager: SmsManager =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    context.getSystemService(SmsManager::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    SmsManager.getDefault()
-                }
             val parts = manager.divideMessage(message)
             if (parts.size > 1) {
                 manager.sendMultipartTextMessage(phoneNumber, null, parts, null, null)
