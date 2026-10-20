@@ -1063,6 +1063,7 @@ class _UnavailableLocation extends LocationService {
   @override
   Future<LocationSnapshot?> currentLocation({
     bool requestPermission = true,
+    Duration timeLimit = const Duration(seconds: 10),
   }) async {
     status = LocationStatus.denied;
     return null;

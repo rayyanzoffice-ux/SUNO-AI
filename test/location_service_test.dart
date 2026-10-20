@@ -1,20 +1,33 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:suno_ai/backend/location/location_service.dart';
+import 'package:suno_ai/backend/persistence/app_storage.dart';
 
 void main() {
   late GeolocatorPlatform original;
   late _LocationPlatform platform;
   late LocationService service;
-  setUp(() {
+  late Directory hiveDir;
+  setUp(() async {
     original = GeolocatorPlatform.instance;
     platform = _LocationPlatform();
     GeolocatorPlatform.instance = platform;
     service = LocationService();
+    hiveDir = await Directory.systemTemp.createTemp(
+      'suno-location-cache-test-',
+    );
+    Hive.init(hiveDir.path);
+    await Hive.openBox<Map>('location_cache');
   });
-  tearDown(() => GeolocatorPlatform.instance = original);
+  tearDown(() async {
+    GeolocatorPlatform.instance = original;
+    await Hive.close();
+    await hiveDir.delete(recursive: true);
+  });
 
   test(
     'GPS preserves the platform timestamp and high accuracy settings',
@@ -86,6 +99,83 @@ void main() {
     platform.error = StateError('GPS unavailable');
     expect(await service.currentLocation(), isNull);
     expect(service.status, LocationStatus.unavailable);
+  });
+
+  test('a successful fix caches itself for a later offline alert', () async {
+    await service.currentLocation();
+    // The write is deliberately fire-and-forget, so give it room to land.
+    for (var i = 0; i < 50 && service.readCached() == null; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(service.readCached()?.capturedAt, platform.position.timestamp);
+  });
+
+  group('best effort location', () {
+    test('uses a fresh fix and marks it as not cached', () async {
+      final result = await service.bestEffortLocation();
+      expect(result?.isCached, isFalse);
+      expect(result?.latitude, 33.68);
+    });
+
+    test('falls back to the cached fix when GPS is denied', () async {
+      await service.refreshCacheQuietly();
+      platform.permission = LocationPermission.denied;
+      final result = await service.bestEffortLocation();
+      expect(result?.isCached, isTrue);
+      expect(result?.latitude, 33.68);
+      expect(service.status, LocationStatus.denied);
+    });
+
+    test('falls back to the cached fix when the fresh fix times out', () async {
+      await service.refreshCacheQuietly();
+      platform.error = TimeoutException('No GPS fix');
+      expect((await service.bestEffortLocation())?.isCached, isTrue);
+      expect(service.status, LocationStatus.timedOut);
+    });
+
+    test('returns null when both GPS and the cache are empty', () async {
+      platform.error = TimeoutException('No GPS fix');
+      expect(await service.bestEffortLocation(), isNull);
+    });
+
+    test('an unusable cache entry is treated as no cache at all', () async {
+      await locationCacheBox.put('last_known', {'latitude': 'not a number'});
+      expect(service.readCached(), isNull);
+      platform.error = StateError('GPS unavailable');
+      expect(await service.bestEffortLocation(), isNull);
+    });
+  });
+
+  test(
+    'quiet refresh warms the cache and keeps the old fix on failure',
+    () async {
+      expect(service.readCached(), isNull);
+      await service.refreshCacheQuietly();
+      expect(service.readCached()?.capturedAt, platform.position.timestamp);
+      expect(
+        service.status,
+        LocationStatus.idle,
+        reason: 'a background refresh must not drive the UI status',
+      );
+
+      platform.error = StateError('GPS unavailable');
+      await service.refreshCacheQuietly();
+      expect(service.readCached()?.capturedAt, platform.position.timestamp);
+
+      platform.error = null;
+      platform.position = makePosition(latitude: 8.51);
+      await service.refreshCacheQuietly();
+      expect(service.readCached()?.latitude, 8.51);
+      expect(service.readCached()?.isCached, isTrue);
+    },
+  );
+
+  test('quiet refresh never prompts for permission', () async {
+    platform.permission = LocationPermission.denied;
+    await service.refreshCacheQuietly();
+    expect(platform.prompts, 0);
+    expect(platform.fixes, 0);
+    expect(service.readCached(), isNull);
   });
 }
 

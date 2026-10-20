@@ -596,6 +596,7 @@ class FakeLocation extends LocationService {
   @override
   Future<LocationSnapshot?> currentLocation({
     bool requestPermission = true,
+    Duration timeLimit = const Duration(seconds: 10),
   }) async {
     status = available ? LocationStatus.ready : LocationStatus.denied;
     return available

@@ -49,6 +49,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
   YamNetStage? _yamnet;
   SunoAudioClassifier? _classifier;
   StreamSubscription<dynamic>? _levelsSubscription;
+  Timer? _locationCacheTimer;
   Future<void>? _startingTask;
   Future<void>? _stoppingTask;
   Future<void> _nativeWork = Future.value();
@@ -121,6 +122,10 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
       if (generation != _generation) return;
       await ForegroundServiceBridge.updateStatus(tr.notifListeningStatus);
       if (generation != _generation) return;
+      _locationCacheTimer ??= Timer.periodic(
+        const Duration(minutes: 30),
+        (_) => unawaited(runtime.locationService.refreshCacheQuietly()),
+      );
       _repo = repo;
       _microphone = microphone;
       _yamnet = yamnet;
@@ -277,6 +282,8 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _stopCapture() async {
+    _locationCacheTimer?.cancel();
+    _locationCacheTimer = null;
     active = false;
     final repo = _repo;
     final microphone = _microphone;
