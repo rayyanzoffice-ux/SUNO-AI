@@ -264,6 +264,10 @@
   "chanEmergencyDesc": "विश्वसनीय संपर्कों से आपातकालीन अलर्ट और उत्तर",
   "chanDangerName": "SUNO ने खतरा पाया",
   "chanDangerDesc": "इस डिवाइस पर सुरक्षा जांच और खतरा पहचान",
+  "chanLocalAlarmName": "SUNO लोकल अलार्म",
+  "chanLocalAlarmDesc": "जब SUNO डिवाइस के बाहर किसी तक नहीं पहुँच सका तब बजता है",
+  "notifTitleLocalAlarm": "SUNO: कोई नेटवर्क नहीं मिला",
+  "notifBodyLocalAlarm": "न सिग्नल, न SMS बैलेंस। पास के लोगों को चेताया जा रहा है। चुप करने के लिए टैप करें।",
 
   "statusSafetyCheckEscalated": "सुरक्षा जांच आपातकाल में बदल दी गई"
 }

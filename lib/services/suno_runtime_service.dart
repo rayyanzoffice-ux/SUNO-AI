@@ -26,6 +26,7 @@ class SunoRuntimeService extends ChangeNotifier {
     this._alertService,
     LocationService? locationService,
     SmsFallbackService? smsFallbackService,
+    LocalAlarmService? localAlarmService,
   }) : _detectionEngine = detectionEngine ?? DetectionEngine.instance,
        _safetyCheckEngine = safetyCheckEngine ?? SafetyCheckEngine(),
        _incidents = incidentRepository ?? InMemoryIncidentRepository(),
@@ -33,7 +34,8 @@ class SunoRuntimeService extends ChangeNotifier {
            trustedContactRepository ?? InMemoryTrustedContactRepository(),
        _profile = profileRepository ?? InMemoryProfileRepository(),
        locationService = locationService ?? LocationService(),
-       _smsFallback = smsFallbackService ?? const SmsFallbackService();
+       _smsFallback = smsFallbackService ?? const SmsFallbackService(),
+       _localAlarm = localAlarmService ?? const LocalAlarmService();
 
   static SunoRuntimeService instance = SunoRuntimeService();
   final DetectionEngine _detectionEngine;
@@ -44,6 +46,7 @@ class SunoRuntimeService extends ChangeNotifier {
   final AlertService? _alertService;
   final LocationService locationService;
   final SmsFallbackService _smsFallback;
+  final LocalAlarmService _localAlarm;
   final Map<String, Incident> _knownIncidents = {};
   final Map<String, Future<AlertDispatchResult>> _dispatches = {};
   final Set<String> _deleted = {};
@@ -301,6 +304,11 @@ class SunoRuntimeService extends ChangeNotifier {
       );
     });
     _changed();
+    if (status == IncidentStatus.resolved ||
+        status == IncidentStatus.cancelled) {
+      // Nothing else can silence a repeating alarm once the incident is over.
+      unawaited(_localAlarm.stop());
+    }
     return updated;
   }
 
@@ -618,6 +626,10 @@ class SunoRuntimeService extends ChangeNotifier {
           throw StateError('Invalid relay result');
         }
         final delivered = sent + smsSent;
+        if (delivered == 0 && attempted > 0) {
+          // Neither radio path worked, so alert whoever is near the phone.
+          unawaited(_localAlarm.sound(incidentId: id));
+        }
         result = AlertDispatchResult(
           success: delivered >= attempted && attempted > 0,
           attemptedCount: attempted,

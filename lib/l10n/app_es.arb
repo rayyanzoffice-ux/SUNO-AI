@@ -264,6 +264,10 @@
   "chanEmergencyDesc": "Alertas de emergencia y respuestas de tus contactos de confianza",
   "chanDangerName": "SUNO detectó un peligro",
   "chanDangerDesc": "Chequeos de seguridad y peligros detectados en este dispositivo",
+  "chanLocalAlarmName": "Alarma local de SUNO",
+  "chanLocalAlarmDesc": "Suena cuando SUNO no pudo avisar a nadie fuera del dispositivo",
+  "notifTitleLocalAlarm": "SUNO: no avisó a nadie",
+  "notifBodyLocalAlarm": "Sin señal o sin saldo de SMS. Avisando a quien esté cerca. Toca para silenciar.",
 
   "statusSafetyCheckEscalated": "El chequeo de seguridad pasó a emergencia"
 }

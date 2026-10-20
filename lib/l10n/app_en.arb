@@ -326,6 +326,10 @@
   "chanEmergencyDesc": "Emergency alerts and responses from trusted contacts",
   "chanDangerName": "SUNO Danger Detected",
   "chanDangerDesc": "Safety checks and danger detected on this device",
+  "chanLocalAlarmName": "SUNO Local Alarm",
+  "chanLocalAlarmDesc": "Sounds when SUNO could not reach anyone off-device",
+  "notifTitleLocalAlarm": "SUNO: no network reached",
+  "notifBodyLocalAlarm": "No signal or SMS balance. Alerting anyone nearby. Tap to silence.",
 
   "statusSafetyCheckEscalated": "Safety check escalated"
 }

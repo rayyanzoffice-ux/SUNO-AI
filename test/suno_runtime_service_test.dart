@@ -580,12 +580,16 @@ void main() {
   SunoRuntimeService makeDualChannelRuntime({
     required FakeAlerts alerts,
     required Map<String, String> dialed,
+    FakeLocalAlarm? alarm,
+    bool smsDelivers = true,
   }) {
     final runtime = SunoRuntimeService(
       alertService: alerts,
       locationService: FakeLocation(),
+      localAlarmService: alarm,
       smsFallbackService: SmsFallbackService(
         send: ({required phoneNumber, required message}) async {
+          if (!smsDelivers) return false;
           dialed[phoneNumber] = message;
           return true;
         },
@@ -642,6 +646,42 @@ void main() {
     expect(delivered.dispatchResult?.sentCount, 1);
     expect(delivered.dispatchResult?.usedSmsFallback, isFalse);
     expect(delivered.status, IncidentStatus.contactNotified);
+  });
+
+  test('a dispatch that reaches nobody alarms the phone itself', () async {
+    final alarm = FakeLocalAlarm();
+    final runtime = makeDualChannelRuntime(
+      alerts: FakeAlerts()..sendFails = true,
+      dialed: {},
+      alarm: alarm,
+      smsDelivers: false,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    expect(alarm.sounded, [incident.id]);
+    final stalled = runtime.incidentById(incident.id)!.dispatchResult!;
+    expect(stalled.totalDelivered, 0);
+
+    await runtime.updateStatus(IncidentStatus.resolved, null, incident.id);
+    expect(alarm.stops, 1);
+  });
+
+  test('an alarm stays silent while contacts are reached', () async {
+    final alarm = FakeLocalAlarm();
+    final runtime = makeDualChannelRuntime(
+      alerts: FakeAlerts(),
+      dialed: {},
+      alarm: alarm,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    expect(alarm.sounded, isEmpty);
   });
 }
 
@@ -714,6 +754,24 @@ class FakeAlerts implements AlertService {
       (incidentId: incidentId, message: message, lang: recipientLang),
     );
     if (responseFails) throw StateError('Synthetic response failure');
+  }
+}
+
+/// Records the last-resort alarm instead of posting a real notification.
+class FakeLocalAlarm extends LocalAlarmService {
+  FakeLocalAlarm();
+
+  final sounded = <String>[];
+  int stops = 0;
+
+  @override
+  Future<void> sound({required String incidentId}) async {
+    sounded.add(incidentId);
+  }
+
+  @override
+  Future<void> stop() async {
+    stops++;
   }
 }
 

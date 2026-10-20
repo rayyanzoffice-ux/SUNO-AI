@@ -264,6 +264,10 @@
   "chanEmergencyDesc": "বিশ্বস্ত যোগাযোগকারীদের কাছ থেকে জরুরি সতর্কতা ও উত্তর",
   "chanDangerName": "SUNO বিপদ শনাক্ত করেছে",
   "chanDangerDesc": "এই ডিভাইসে নিরাপত্তা চেক ও বিপদ শনাক্তকরণ",
+  "chanLocalAlarmName": "SUNO লোকাল অ্যালার্ম",
+  "chanLocalAlarmDesc": "SUNO যখন ডিভাইসের বাইরে কাউকে নাড়াতে পারে নি তখন বাজে",
+  "notifTitleLocalAlarm": "SUNO: কোনো নেটওয়ার্কে পৌঁছানো যায় নি",
+  "notifBodyLocalAlarm": "না সিগন্যাল, না SMS ব্যালেন্স। কাছের মানুষকে সতর্ক করা হচ্ছে। নীরব করতে ট্যাপ করুন।",
 
   "statusSafetyCheckEscalated": "নিরাপত্তা চেক জরুরি পর্যায়ে উন্নীত হয়েছে"
 }

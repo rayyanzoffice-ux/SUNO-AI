@@ -6,8 +6,11 @@ import '../core/l10n/l10n.dart';
 
 const emergencyChannelId = 'suno_alerts_v2';
 const detectionChannelId = 'suno_detection_v2';
+const localAlarmChannelId = 'suno_local_alarm';
+const localAlarmSound = RawResourceAndroidNotificationSound('suno_alarm');
 const _detectionNotificationId = 9001;
 final notificationVibration = Int64List.fromList([0, 400, 200, 400, 200, 800]);
+final alarmVibration = Int64List.fromList([0, 600, 300, 600]);
 final sunoNotifications = FlutterLocalNotificationsPlugin();
 
 Future<void> initDetectionNotificationChannel() async {
@@ -34,6 +37,19 @@ Future<void> initDetectionNotificationChannel() async {
       importance: Importance.max,
       enableVibration: true,
       vibrationPattern: notificationVibration,
+      playSound: true,
+    ),
+    // Android freezes a channel's sound once it exists, so the alarm loop is
+    // declared here rather than only on the notification that uses it.
+    AndroidNotificationChannel(
+      localAlarmChannelId,
+      tr.chanLocalAlarmName,
+      description: tr.chanLocalAlarmDesc,
+      importance: Importance.max,
+      sound: localAlarmSound,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
+      enableVibration: true,
+      vibrationPattern: alarmVibration,
       playSound: true,
     ),
   ]) {

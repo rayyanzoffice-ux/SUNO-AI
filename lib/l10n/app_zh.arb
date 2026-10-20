@@ -264,6 +264,10 @@
   "chanEmergencyDesc": "来自可信联系人的紧急警报与回复",
   "chanDangerName": "SUNO 检测到危险",
   "chanDangerDesc": "本设备上的安全确认与危险检测",
+  "chanLocalAlarmName": "SUNO 本机警报",
+  "chanLocalAlarmDesc": "仅在 SUNO 无法联系到设备外的人时发声",
+  "notifTitleLocalAlarm": "SUNO：未能通知任何人",
+  "notifBodyLocalAlarm": "无信号或无法发送短信。正在提醒身边的人。点按可静音。",
 
   "statusSafetyCheckEscalated": "安全检查已升级为紧急警报"
 }
