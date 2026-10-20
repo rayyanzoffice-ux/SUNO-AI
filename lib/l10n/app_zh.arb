@@ -173,6 +173,7 @@
   "contactsSaved": "可信联系人已保存在本机。",
   "contactsUpdated": "可信联系人已更新。",
   "contactsSaveFailed": "无法保存联系人。您填写的内容仍然保留，请重试。",
+  "contactsSmsPermissionNeeded": "发送短信权限未开启。请在 Android 设置中授予 SUNO，以便没有网络时仍能通过短信通知该联系人。",
   "contactsDeleteFailed": "无法删除联系人。请重试。",
   "contactsTestAccepted": "FCM 已接受发给 {name} 的静默测试。请分别在两台手机上确认能看到警报。",
   "contactsTestRejected": "{name} 的令牌被 FCM 拒绝。请检查令牌。",

@@ -217,6 +217,7 @@
   "contactsSaved": "Trusted contact saved locally.",
   "contactsUpdated": "Trusted contact updated.",
   "contactsSaveFailed": "Could not save the contact. Your entries are still here; please retry.",
+  "contactsSmsPermissionNeeded": "Send SMS permission is off. Grant it to SUNO in Android Settings so this contact can still be alerted by text when you have no internet.",
   "contactsDeleteFailed": "Could not delete the contact. Please retry.",
   "contactsTestAccepted": "FCM accepted the silent test for {name}. Verify visible alerts on both phones separately.",
   "@contactsTestAccepted": {

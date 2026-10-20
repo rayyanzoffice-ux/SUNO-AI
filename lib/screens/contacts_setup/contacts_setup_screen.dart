@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../backend/alerts/sms_permission.dart';
 import '../../core/l10n/l10n.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/time_format.dart';
@@ -30,6 +31,7 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
 
   String? _editingId;
   bool _saving = false;
+  bool _askedSmsPermission = false;
   final _testingIds = <String>{};
 
   @override
@@ -114,6 +116,26 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
     }
   }
 
+  /// Asks for `SEND_SMS` once per visit, and only for a contact that actually
+  /// has a number — that number is what the offline fallback dials. A refusal
+  /// is surfaced, never enforced: the push path still works without it.
+  Future<void> _ensureSmsPermissionOnce() async {
+    if (_askedSmsPermission) return;
+    _askedSmsPermission = true;
+    final bool granted;
+    try {
+      granted = await SmsPermission.ensureGranted();
+    } catch (_) {
+      // No permission plugin to talk to — say nothing rather than reporting a
+      // problem with the contact that has just been saved.
+      return;
+    }
+    if (granted || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.l10n.contactsSmsPermissionNeeded)),
+    );
+  }
+
   Future<void> save() async {
     if (_saving || (_editingId != null && _busy(_editingId!))) return;
     final token = fcmToken.text.trim();
@@ -171,6 +193,9 @@ class _ContactsSetupScreenState extends State<ContactsSetupScreen> {
           ),
         ),
       );
+      if (saved.phone.trim().isNotEmpty) {
+        await _ensureSmsPermissionOnce();
+      }
     } catch (_) {
       _showError((l10n) => l10n.contactsSaveFailed);
     } finally {

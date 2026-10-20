@@ -66,6 +66,21 @@ object SunoEngine {
                 }
             }
         }
+        MethodChannel(created.dartExecutor.binaryMessenger, "com.example.suno_ai/sms").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "send" -> {
+                    val phone = call.argument<String>("phone")
+                    val message = call.argument<String>("message")
+                    if (phone.isNullOrBlank() || message.isNullOrBlank()) {
+                        result.success(false)
+                    } else {
+                        result.success(SmsSender.send(app, phone, message))
+                    }
+                }
+                "hasPermission" -> result.success(SmsSender.hasPermission(app))
+                else -> result.notImplemented()
+            }
+        }
         created.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
         return created
     }

@@ -173,6 +173,7 @@
   "contactsSaved": "Contacto de confianza guardado localmente.",
   "contactsUpdated": "Contacto de confianza actualizado.",
   "contactsSaveFailed": "No se pudo guardar el contacto. Tus datos siguen aquí; inténtalo de nuevo.",
+  "contactsSmsPermissionNeeded": "El permiso para enviar SMS está desactivado. Concédeselo a SUNO en Ajustes de Android para avisar a este contacto por SMS cuando no tengas internet.",
   "contactsDeleteFailed": "No se pudo eliminar el contacto. Inténtalo de nuevo.",
   "contactsTestAccepted": "FCM aceptó la prueba silenciosa para {name}. Comprueba las alertas visibles en cada teléfono por separado.",
   "contactsTestRejected": "FCM rechazó el token de {name}. Revisa el token.",

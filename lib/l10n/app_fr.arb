@@ -173,6 +173,7 @@
   "contactsSaved": "Contact de confiance enregistré localement.",
   "contactsUpdated": "Contact de confiance mis à jour.",
   "contactsSaveFailed": "Impossible d’enregistrer le contact. Vos saisies sont toujours là ; réessayez.",
+  "contactsSmsPermissionNeeded": "L’autorisation d’envoyer des SMS est désactivée. Accordez-la à SUNO dans les paramètres Android pour que ce contact puisse être alerté par SMS sans internet.",
   "contactsDeleteFailed": "Impossible de supprimer le contact. Réessayez.",
   "contactsTestAccepted": "FCM a accepté le test silencieux pour {name}. Vérifiez les alertes visibles séparément sur les deux téléphones.",
   "contactsTestRejected": "Le jeton de {name} a été rejeté par FCM. Vérifiez le jeton.",
