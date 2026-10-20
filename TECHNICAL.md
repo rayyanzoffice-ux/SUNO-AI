@@ -296,8 +296,10 @@ The `SafetyCheckEngine` handles medium-risk detections with a **45-second countd
 The window is deliberately 45 seconds rather than 10: 10 seconds was too tight
 to notice the phone and answer it. It is not longer either — this countdown is
 the gate before trusted contacts are told something may be wrong, so stretching
-it (e.g. to 15 minutes) would delay real escalation. A false alarm noticed late
-is still recoverable through the Emergency screen's "I'm okay" action.
+it (e.g. to 15 minutes) would delay real escalation. A medium-risk false alarm is
+cancelled with **I AM SAFE** on the Safety Check screen; for a critical incident that
+has already dispatched, there is currently no self-service "I'm okay" action — the
+incident is closed when a trusted contact responds that they are safe.
 
 **Mechanism:**
 - Uses Dart's `Completer<SafetyCheckResult>` pattern
@@ -382,7 +384,7 @@ If `delivered == 0` and at least one contact was attempted, SUNO alerts the pers
 - A dedicated `suno_local_alarm` channel is registered at startup with `Importance.max`, `AudioAttributesUsage.alarm`, and `RawResourceAndroidNotificationSound('suno_alarm')`. Registering the sound on the channel (not only on the notification) matters because Android freezes channel settings after first creation.
 - The notification uses `FLAG_INSISTENT` (raw flag `4`), so the bundled sound loops until the notification is cancelled; it also requests a full-screen intent and vibrates.
 - Payload `type=emergency_alert&incidentId=...` opens the incident when tapped and is deliberately not treated as an inbound alert.
-- Resolving or cancelling the incident cancels the notification and any vibration. If showing the notification fails, the service falls back to raw vibration.
+- Resolving or cancelling the incident through `updateStatus()` cancels the notification and any vibration, and tapping or dismissing the notification itself silences it (the notification auto-cancels). If showing the notification fails, the service falls back to raw vibration.
 
 ### Incoming Alerts
 
