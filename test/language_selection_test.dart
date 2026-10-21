@@ -2,11 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suno_ai/backend/profile/locale_repository.dart';
 import 'package:suno_ai/core/l10n/app_locales.dart';
+import 'package:suno_ai/core/l10n/l10n.dart';
 import 'package:suno_ai/core/l10n/locale_controller.dart';
 import 'package:suno_ai/core/routes/app_routes.dart';
 import 'package:suno_ai/screens/language/language_selection_screen.dart';
 
-import 'helpers/test_app.dart';
+/// Mirrors production routing: the picker is a named route on top of Home, so
+/// Continue's `pushReplacementNamed('/')` lands on Home rather than rendering
+/// the picker again. `MaterialApp(home:)` cannot be combined with a `'/'`
+/// route, which is exactly what production uses for Home.
+Widget _pickerApp() => MaterialApp(
+  locale: SunoLanguages.english.locale,
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  initialRoute: '/language',
+  routes: {
+    AppRoutes.home: (_) => const Scaffold(body: Text('Home')),
+    '/language': (_) => const LanguageSelectionScreen(isFirstRun: true),
+  },
+);
 
 void main() {
   testWidgets('first-run Continue saves the language already on screen', (
@@ -20,14 +34,7 @@ void main() {
       );
     });
 
-    await tester.pumpWidget(
-      localizedTestApp(
-        const LanguageSelectionScreen(isFirstRun: true),
-        routes: {
-          AppRoutes.home: (_) => const Scaffold(body: Text('Home')),
-        },
-      ),
-    );
+    await tester.pumpWidget(_pickerApp());
 
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
@@ -46,14 +53,7 @@ void main() {
       );
     });
 
-    await tester.pumpWidget(
-      localizedTestApp(
-        const LanguageSelectionScreen(isFirstRun: true),
-        routes: {
-          AppRoutes.home: (_) => const Scaffold(body: Text('Home')),
-        },
-      ),
-    );
+    await tester.pumpWidget(_pickerApp());
 
     await tester.tap(find.text('Español'));
     await tester.pumpAndSettle();
@@ -77,14 +77,7 @@ void main() {
       );
     });
 
-    await tester.pumpWidget(
-      localizedTestApp(
-        const LanguageSelectionScreen(isFirstRun: true),
-        routes: {
-          AppRoutes.home: (_) => const Scaffold(body: Text('Home')),
-        },
-      ),
-    );
+    await tester.pumpWidget(_pickerApp());
 
     // The tile updates the controller in memory but its storage write fails,
     // so without a retry the next launch would show the picker again.

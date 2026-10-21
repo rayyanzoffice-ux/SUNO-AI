@@ -239,8 +239,11 @@ class SunoRuntimeService extends ChangeNotifier {
         .then((result) async {
           if (_disposed || _safetyIncidentId != incident.id) return;
           // The 45-second alarm ends with the countdown, whether the person
-          // confirmed safe, escalated, or let the timer run out.
-          await _stopCountdownAlarm();
+          // confirmed safe, escalated, or let the timer run out. Not awaited:
+          // notification/vibration cleanup must never delay saving the
+          // person's decision. stop() bumps its epoch synchronously, so no
+          // late sound can start after this point.
+          unawaited(_stopCountdownAlarm());
           if (result.outcome == SafetyCheckOutcome.cancelled) {
             _safetyIncidentId = null;
             return;
@@ -616,7 +619,8 @@ class SunoRuntimeService extends ChangeNotifier {
         // No channel exists now or after a restart, so there is nothing to
         // attempt and nothing worth saving. A token-only contact still enters
         // the dispatch below when Firebase is unavailable, so the outbox can
-        // deliver it on a later launch.
+        // deliver it on a later launch. The phone itself is the last resort.
+        unawaited(_localAlarm.sound(incidentId: id));
         result = AlertDispatchResult(
           success: false,
           attemptedCount: attempted,
