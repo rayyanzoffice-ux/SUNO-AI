@@ -41,6 +41,12 @@ void main() {
     unawaited(LocaleController.instance.setLanguage(SunoLanguages.english));
     SunoRuntimeService.instance = SunoRuntimeService(
       locationService: _UnavailableLocation(),
+      // The default demo contact has a phone but no push token, so a dispatch
+      // reaches the real SMS bridge. Tests own no SIM; without this stub the
+      // bridge's 10-second timeout outlives the widget tree.
+      smsFallbackService: SmsFallbackService(
+        send: ({required phoneNumber, required message}) async => false,
+      ),
     );
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
