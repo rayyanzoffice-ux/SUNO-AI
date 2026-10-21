@@ -17,12 +17,16 @@ void main() {
     IncidentRepository? incidents,
     FakeLocation? location,
     FakeAlerts? alerts,
+    FakeLocalAlarm? alarm,
+    AlertOutbox? outbox,
   }) {
     final runtime = SunoRuntimeService(
       safetyCheckEngine: safety,
       incidentRepository: incidents,
       locationService: location ?? FakeLocation(),
       alertService: alerts,
+      localAlarmService: alarm,
+      alertOutbox: outbox,
       trustedContactRepository: InMemoryTrustedContactRepository(
         seed: const [
           TrustedContact(
@@ -175,6 +179,61 @@ void main() {
       runtime.currentIncident?.detectionResult.riskLevel,
       RiskLevel.critical,
     );
+  });
+
+  test('the safety countdown starts the alarm immediately', () async {
+    final alarm = FakeLocalAlarm();
+    final runtime = makeRuntime(
+      safety: SafetyCheckEngine(
+        countdownDuration: const Duration(seconds: 5),
+      ),
+      alarm: alarm,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.medium),
+    ))!;
+    expect(alarm.sounded, [incident.id]);
+
+    runtime.confirmSafe(incident.id);
+    await runtime.safetyCheckCompleted;
+    expect(alarm.stops, 1);
+  });
+
+  test('the alarm stops when the countdown expires on its own', () async {
+    final alarm = FakeLocalAlarm();
+    final runtime = makeRuntime(
+      safety: SafetyCheckEngine(
+        countdownDuration: const Duration(milliseconds: 40),
+      ),
+      alarm: alarm,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.medium),
+    ))!;
+    expect(alarm.sounded, [incident.id]);
+
+    await runtime.safetyCheckCompleted;
+    await finishDispatch(runtime, incident.id);
+    expect(alarm.stops, greaterThanOrEqualTo(1));
+  });
+
+  test('the alarm stops when the person cannot respond', () async {
+    final alarm = FakeLocalAlarm();
+    final runtime = makeRuntime(
+      safety: SafetyCheckEngine(
+        countdownDuration: const Duration(seconds: 5),
+      ),
+      alarm: alarm,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.medium),
+    ))!;
+    expect(alarm.sounded, [incident.id]);
+
+    runtime.escalateSafetyCheck(incident.id);
+    await runtime.safetyCheckCompleted;
+    await finishDispatch(runtime, incident.id);
+    expect(alarm.stops, greaterThanOrEqualTo(1));
   });
 
   for (final safe in [true, false]) {
@@ -582,11 +641,13 @@ void main() {
     required Map<String, String> dialed,
     FakeLocalAlarm? alarm,
     bool smsDelivers = true,
+    AlertOutbox? outbox,
   }) {
     final runtime = SunoRuntimeService(
       alertService: alerts,
       locationService: FakeLocation(),
       localAlarmService: alarm,
+      alertOutbox: outbox,
       smsFallbackService: SmsFallbackService(
         send: ({required phoneNumber, required message}) async {
           if (!smsDelivers) return false;
@@ -617,11 +678,13 @@ void main() {
     Map<String, String>? dialed,
     FakeLocalAlarm? alarm,
     bool smsDelivers = true,
+    AlertOutbox? outbox,
   }) {
     final runtime = SunoRuntimeService(
       alertService: alerts,
       locationService: FakeLocation(),
       localAlarmService: alarm,
+      alertOutbox: outbox,
       smsFallbackService: SmsFallbackService(
         send: ({required phoneNumber, required message}) async {
           if (!smsDelivers) return false;
@@ -637,24 +700,148 @@ void main() {
     return runtime;
   }
 
-  test('an unreachable relay still reaches the contact by SMS', () async {
+  test(
+    'an unreachable relay falls back to SMS and queues the push half',
+    () async {
+      final alerts = FakeAlerts()..sendFails = true;
+      final dialed = <String, String>{};
+      final outbox = InMemoryAlertOutbox();
+      final runtime = makeDualChannelRuntime(
+        alerts: alerts,
+        dialed: dialed,
+        outbox: outbox,
+      );
+      final incident = (await runtime.recordDetection(
+        detection(RiskLevel.critical),
+      ))!;
+      await finishDispatch(runtime, incident.id);
+
+      expect(dialed.keys, ['+923001234567']);
+      expect(dialed.values.single, contains('Distress Sound'));
+      final delivered = runtime.incidentById(incident.id)!;
+      expect(delivered.dispatchResult?.sentCount, 0);
+      expect(delivered.dispatchResult?.smsSentCount, 1);
+      expect(delivered.dispatchResult?.usedSmsFallback, isTrue);
+      // Android accepted the SMS, but submission is not relay-confirmed push
+      // delivery, so this must not be reported as "reached".
+      expect(delivered.dispatchResult?.success, isFalse);
+      expect(delivered.dispatchResult?.queued, isTrue);
+      expect(delivered.status, IncidentStatus.alertTriggered);
+      expect((await outbox.getAll()).single.incidentId, incident.id);
+    },
+  );
+
+  test(
+    'no internet and a rejected SMS is saved, not reported as reached',
+    () async {
+      final alerts = FakeAlerts()..sendFails = true;
+      final alarm = FakeLocalAlarm();
+      final outbox = InMemoryAlertOutbox();
+      final runtime = makeDualChannelRuntime(
+        alerts: alerts,
+        dialed: {},
+        smsDelivers: false,
+        alarm: alarm,
+        outbox: outbox,
+      );
+      final incident = (await runtime.recordDetection(
+        detection(RiskLevel.critical),
+      ))!;
+      await finishDispatch(runtime, incident.id);
+
+      final failed = runtime.incidentById(incident.id)!;
+      expect(failed.dispatchResult?.success, isFalse);
+      expect(failed.dispatchResult?.sentCount, 0);
+      expect(failed.dispatchResult?.smsSentCount, 0);
+      expect(failed.dispatchResult?.totalDelivered, 0);
+      expect(failed.dispatchResult?.queued, isTrue);
+      expect(failed.status, IncidentStatus.alertTriggered);
+      expect(alarm.sounded, [incident.id]);
+      expect((await outbox.getAll()).single.incidentId, incident.id);
+
+      // The saved half is pushed once the relay is reachable again; the phone
+      // never pretends the failed SMS was delivered.
+      alerts.sendFails = false;
+      await runtime.retryPendingAlerts();
+      expect(await outbox.getAll(), isEmpty);
+      final delivered = runtime.incidentById(incident.id)!;
+      expect(delivered.dispatchResult?.sentCount, 1);
+      expect(delivered.dispatchResult?.success, isTrue);
+      expect(delivered.status, IncidentStatus.contactNotified);
+    },
+  );
+
+  test('a queued alert is sent automatically when the relay returns', () async {
     final alerts = FakeAlerts()..sendFails = true;
-    final dialed = <String, String>{};
-    final runtime = makeDualChannelRuntime(alerts: alerts, dialed: dialed);
+    final outbox = InMemoryAlertOutbox();
+    final runtime = makeDualChannelRuntime(
+      alerts: alerts,
+      dialed: {},
+      outbox: outbox,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+    expect(runtime.incidentById(incident.id)!.dispatchResult!.queued, isTrue);
+    expect(alerts.payloads, hasLength(1));
+
+    alerts.sendFails = false;
+    await runtime.retryPendingAlerts();
+
+    expect(alerts.payloads, hasLength(2));
+    expect(alerts.payloads.last['incidentId'], incident.id);
+    expect(await outbox.getAll(), isEmpty);
+    final delivered = runtime.incidentById(incident.id)!;
+    expect(delivered.dispatchResult?.sentCount, 1);
+    expect(delivered.dispatchResult?.success, isTrue);
+    expect(delivered.dispatchResult?.queued, isFalse);
+    expect(delivered.status, IncidentStatus.contactNotified);
+  });
+
+  test('a relay that answers "no" is not retried forever', () async {
+    final alerts = FakeAlerts()..acceptedSubset = <String>{};
+    final outbox = InMemoryAlertOutbox();
+    final runtime = makeDualChannelRuntime(
+      alerts: alerts,
+      dialed: {},
+      outbox: outbox,
+    );
     final incident = (await runtime.recordDetection(
       detection(RiskLevel.critical),
     ))!;
     await finishDispatch(runtime, incident.id);
 
-    expect(dialed.keys, ['+923001234567']);
-    expect(dialed.values.single, contains('Distress Sound'));
-    final delivered = runtime.incidentById(incident.id)!;
-    expect(delivered.dispatchResult?.sentCount, 0);
-    expect(delivered.dispatchResult?.smsSentCount, 1);
-    expect(delivered.dispatchResult?.usedSmsFallback, isTrue);
-    expect(delivered.dispatchResult?.success, isTrue);
-    expect(delivered.dispatchResult?.failedReason, isNull);
-    expect(delivered.status, IncidentStatus.contactNotified);
+    final result = runtime.incidentById(incident.id)!.dispatchResult!;
+    expect(result.success, isFalse);
+    expect(result.queued, isFalse);
+    expect(await outbox.getAll(), isEmpty);
+  });
+
+  test('resolving an incident drops its queued alert', () async {
+    final alerts = FakeAlerts()..sendFails = true;
+    final outbox = InMemoryAlertOutbox();
+    final runtime = makeContactRuntime(
+      alerts: alerts,
+      outbox: outbox,
+      contacts: const [
+        TrustedContact(
+          id: 'token-only',
+          name: 'Token only',
+          phone: '',
+          relationship: 'Friend',
+          fcmToken: 'test-token-a',
+        ),
+      ],
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+    expect(await outbox.getAll(), hasLength(1));
+
+    await runtime.updateStatus(IncidentStatus.resolved, null, incident.id);
+    expect(await outbox.getAll(), isEmpty);
   });
 
   test('a fully delivered push alert does not also send an SMS', () async {
@@ -735,8 +922,8 @@ void main() {
     expect(result.attemptedCount, 1);
     expect(result.sentCount, 0);
     expect(result.smsSentCount, 1);
-    expect(result.success, isTrue);
-    expect(runtime.incidentById(incident.id)!.status, IncidentStatus.contactNotified);
+    expect(result.success, isFalse);
+    expect(runtime.incidentById(incident.id)!.status, IncidentStatus.alertTriggered);
   });
 
   test('with no push service, a phone-only contact still gets SMS', () async {
@@ -762,7 +949,37 @@ void main() {
     final result = runtime.incidentById(incident.id)!.dispatchResult!;
     expect(result.attemptedCount, 1);
     expect(result.smsSentCount, 1);
-    expect(result.success, isTrue);
+    expect(result.success, isFalse);
+    expect(result.queued, isFalse);
+  });
+
+  test('a launch without a push service still saves the alert for later', () async {
+    final outbox = InMemoryAlertOutbox();
+    final runtime = makeContactRuntime(
+      alerts: null,
+      alarm: FakeLocalAlarm(),
+      outbox: outbox,
+      contacts: const [
+        TrustedContact(
+          id: 'token-only',
+          name: 'Token only',
+          phone: '',
+          relationship: 'Friend',
+          fcmToken: 'test-token-a',
+        ),
+      ],
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    // Firebase can fail to start when the app launches offline; the token is
+    // still worth saving because the next launch can deliver this alert.
+    final result = runtime.incidentById(incident.id)!.dispatchResult!;
+    expect(result.queued, isTrue);
+    expect(result.success, isFalse);
+    expect((await outbox.getAll()).single.incidentId, incident.id);
   });
 
   test('an unreachable contact still alarms the phone itself', () async {
@@ -825,7 +1042,12 @@ void main() {
     expect(result.attemptedCount, 2);
     expect(result.sentCount, 1);
     expect(result.smsSentCount, 1);
-    expect(result.success, isTrue);
+    expect(result.success, isFalse);
+    expect(result.queued, isFalse);
+    expect(
+      runtime.incidentById(incident.id)!.status,
+      IncidentStatus.contactNotified,
+    );
   });
 
   test('a contact resolving remotely stops the local alarm', () async {

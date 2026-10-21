@@ -47,7 +47,7 @@
   "@emergencyDispatchAwaiting": {
     "placeholders": { "sent": { "type": "int" }, "attempted": { "type": "int" } }
   },
-  "emergencyDispatchPartial": "Reached {sent} of {attempted} contacts. {failed} not reached.",
+  "emergencyDispatchPartial": "Reached {sent} of {attempted} contacts. {failed} not confirmed.",
   "@emergencyDispatchPartial": {
     "placeholders": {
       "sent": { "type": "int" },
@@ -55,9 +55,18 @@
       "failed": { "type": "int" }
     }
   },
-  "emergencySavedLocally": "Alert saved locally — contacts could not be reached ({reason}).",
+  "emergencySavedLocally": "No contact could be reached ({reason}).",
   "@emergencySavedLocally": {
     "placeholders": { "reason": { "type": "String" } }
+  },
+  "emergencySavedQueued": "No internet and no SMS could be sent. This alert is saved on your device and will be sent automatically when the connection returns.",
+  "emergencyDispatchSms": "SMS was submitted to {sent} of {attempted} contacts — delivery is not confirmed.",
+  "@emergencyDispatchSms": {
+    "placeholders": { "sent": { "type": "int" }, "attempted": { "type": "int" } }
+  },
+  "emergencyDispatchSmsQueued": "SMS was submitted to {sent} of {attempted} contacts; the push alert is saved and will retry automatically.",
+  "@emergencyDispatchSmsQueued": {
+    "placeholders": { "sent": { "type": "int" }, "attempted": { "type": "int" } }
   },
   "emergencyUnknownReason": "unknown reason",
   "emergencyIncidentResolved": "Incident resolved",

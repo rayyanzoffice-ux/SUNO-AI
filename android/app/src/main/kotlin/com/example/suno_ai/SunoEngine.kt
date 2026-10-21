@@ -3,6 +3,8 @@ package com.example.suno_ai
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.embedding.engine.dart.DartExecutor
@@ -74,7 +76,13 @@ object SunoEngine {
                     if (phone.isNullOrBlank() || message.isNullOrBlank()) {
                         result.success(false)
                     } else {
-                        result.success(SmsSender.send(app, phone, message))
+                        // Resolves after Android's SMS_SENT broadcast (or timeout),
+                        // so Dart never counts a merely queued SMS as delivered.
+                        SmsSender.send(app, phone, message) { accepted ->
+                            Handler(Looper.getMainLooper()).post {
+                                result.success(accepted)
+                            }
+                        }
                     }
                 }
                 "hasPermission" -> result.success(SmsSender.hasPermission(app))

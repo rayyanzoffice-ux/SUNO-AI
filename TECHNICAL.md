@@ -276,7 +276,7 @@ detected → safety_check → alert_triggered → contact_notified → contact_c
 | `detected` | Initial detection recorded |
 | `safety_check` | Medium-risk; awaiting user response |
 | `alert_triggered` | Escalated to emergency; contacts being notified |
-| `contact_notified` | At least one contact was reached by push or SMS |
+| `contact_notified` | At least one contact's push token was accepted by the relay. An SMS the OS accepted does not set this status on its own |
 | `contact_checking` | A contact has acknowledged they're checking |
 | `resolved` | Incident resolved |
 | `cancelled_by_user` | User dismissed/cancelled |
@@ -285,7 +285,7 @@ detected → safety_check → alert_triggered → contact_notified → contact_c
 
 - **`IncidentRepository`** — Abstract interface with `save()`, `update()`, `latest()`, `getAll()`, `remove()`, `clear()`
 - **`InMemoryIncidentRepository`** — List-backed, for demo/testing. Data lives only for the current session.
-- **`HiveIncidentRepository`** — Uses Hive box `incidents`. Serializes incidents to/from `Map<String, dynamic>`. Status stored as wire value string. Full CRUD with JSON round-tripping. The nested `dispatch` map persists `success`, `attemptedCount`, `sentCount`, `smsSentCount`, and `failedReason`; older records without the key still load, with `smsSentCount` defaulting to 0. Backward-compatible with previously stored incidents (defaults `origin` to `'self'`).
+- **`HiveIncidentRepository`** — Uses Hive box `incidents`. Serializes incidents to/from `Map<String, dynamic>`. Status stored as wire value string. Full CRUD with JSON round-tripping. The nested `dispatch` map persists `success`, `attemptedCount`, `sentCount`, `smsSentCount`, `queued`, and `failedReason`; older records without the key still load, with `smsSentCount` and `queued` defaulting to `false`/`0`. Backward-compatible with previously stored incidents (defaults `origin` to `'self'`).
 
 ---
 
@@ -312,6 +312,10 @@ incident is closed when a trusted contact responds that they are safe.
 - If the safety check times out, the `RiskEngine` adds **+20 points** to the risk score during escalation
 - The deadline is persisted on the `Incident` (`safetyCheckDeadline`) at detection time, so
   escalation depends on the clock, not on the Safety Check screen or app staying open
+- Starting the countdown also starts the audible alarm for the exact time remaining (45 seconds
+  for a new check, less when a persisted check is restored). The outcome handler stops it before
+  escalating, so **I AM SAFE**, **CAN'T RESPOND**, and timeout all silence it; if the escalation
+  then reaches nobody, the last-resort alarm deliberately starts again.
 
 **UI (`SafetyCheckScreen`):**
 - Animated countdown ring showing seconds remaining out of 45
@@ -329,10 +333,10 @@ Alerts flow through up to three layers, attempted in order:
 | Layer | Transport | Needs | Fires when |
 |---|---|---|---|
 | 1. Push | FCM via Supabase Edge Function | Internet, contact FCM token | Every dispatch |
-| 2. SMS | Device SIM via native `SmsManager` | `SEND_SMS`, contact phone number, carrier signal | Push reached fewer contacts than were attempted |
-| 3. Local alarm | Local notification + bundled sound | Notification permission (vibration fallback) | Neither push nor SMS reached anyone |
+| 2. SMS | Device SIM via native `SmsManager` | `SEND_SMS`, contact phone number, carrier signal | Push did not confirm every contact (relay unreachable, a partial result, or a contact with only a phone) |
+| 3. Local alarm | Local notification + bundled sound | Notification permission (vibration fallback) | Neither push nor SMS was accepted for anyone |
 
-`AlertDispatchResult` records the outcome on the incident: `attemptedCount`, `sentCount` (push), `smsSentCount`, `failedReason`, and the derived `totalDelivered` / `partiallyDelivered` / `usedSmsFallback`. `success` is true only when every attempted contact was reached by at least one channel. The incident moves to `contact_notified` when at least one contact was reached.
+`AlertDispatchResult` records the outcome on the incident: `attemptedCount`, `sentCount` (push tokens the relay accepted), `smsSentCount` (SMS the OS confirmed it submitted), `queued` (the push half is saved for retry), `failedReason`, and the derived `totalDelivered` / `partiallyDelivered` / `usedSmsFallback`. `success` is deliberately **push-only**: true when every attempted contact's token was accepted by the relay. Android confirming `SMS_SENT` proves the phone handed the message to the radio, not that the contact received it, so SMS never makes `success` true and never moves the incident to `contact_notified` by itself.
 
 ### Outgoing Push Alerts (`FcmAlertService`)
 
@@ -373,9 +377,9 @@ Triggered for every contact push did not reach — a relay timeout, an offline d
 - Every number receives the same plain-GSM-7 message, kept short to limit segments:
   `SUNO EMERGENCY: <sender> - <event> (risk N%). Location: https://maps.google.com/?q=<lat>,<lon>. Sent by SMS - SUNO could not reach the push alert.`
   When the location is cached the message says `(last known fix, Nm old)`; with no coordinates it says `Location unavailable.`
-- `SmsNativeBridge` calls `SmsSender.kt` over `com.example.suno_ai/sms`. The native side checks `SEND_SMS` through `PackageManager`, picks the platform `SmsManager` (or the deprecated default below API 31), splits long messages with `divideMessage()`, and returns true only when the OS accepted the send request.
-- No delivery receipt is requested. `smsSentCount` therefore means "handed to the radio", not "delivered to the contact".
-- Failures are swallowed into `false`; the dispatch never crashes because a SIM or permission is missing. Each bridge call has a 10-second timeout.
+- `SmsNativeBridge` calls `SmsSender.kt` over `com.example.suno_ai/sms`. The native side checks `SEND_SMS` through `PackageManager`, picks the platform `SmsManager` (or the deprecated default below API 31), splits long messages with `divideMessage()`, and registers a receiver for the per-part `SMS_SENT` `PendingIntent`s. It resolves `true` only when every part reports `Activity.RESULT_OK`. A generic failure, no service, radio off, or missing balance therefore resolves `false`; a 6-second wait that receives no broadcast also resolves `false`. The Dart bridge waits 9 seconds, leaving the native side time to report first.
+- No delivery receipt is requested. `smsSentCount` means "the OS confirmed it submitted the SMS", not "delivered to the contact".
+- Failures are swallowed into `false`; the dispatch never crashes because a SIM or balance is missing.
 
 ### Last-Resort Local Alarm (`LocalAlarmService`)
 
@@ -412,11 +416,31 @@ Three offline layers keep an alert useful when the network, relay, or contact to
 ### Last-Known Location Cache
 
 - Every successful `LocationService.currentLocation()` writes a `LocationSnapshot` (latitude, longitude, capture time) to Hive box `location_cache` under key `last_known`. The write is wrapped in try/catch: a failed cache write never interrupts detection or dispatch.
-- While Live monitoring is active, `MonitoringService` owns a 30-minute `Timer.periodic` that calls `LocationService.refreshCacheQuietly()`. It returns immediately unless location services are enabled and permission is already granted, so it never prompts and never changes the UI's `status`. Stopping monitoring cancels the timer.
+- While Live monitoring is active, `MonitoringService` owns a 30-minute `Timer.periodic` that calls `LocationService.refreshCacheQuietly()`. Every app resume also triggers one quiet refresh, so the cache keeps ageing truthfully when the timer is not running. The refresh returns immediately unless location services are enabled and permission is already granted, so it never prompts and never changes the UI's `status`. Stopping monitoring cancels the timer.
 - Alert paths call `refreshLocation(useCache: true)` → `LocationService.bestEffortLocation()`: a fresh high-accuracy fix with a 6-second limit and **no permission dialog**, then the cached snapshot if that fails.
 - A cached snapshot has `isCached == true`; its age is computed from the original capture time. The push payload gains `locationIsCached` / `locationAgeMinutes`, the SMS says `(last known fix, Nm old)`, and the in-app location shows the cached coordinates rather than an invented one.
 - Ordinary UI lookups still use permission-aware, non-cached requests, so a stale fix is never displayed as if it were live.
 - The cache is local-only and cleared only with app data.
+
+### Offline Alert Outbox
+
+A push alert raised with no internet must not be lost, and it must not be reported as delivered.
+
+- **Queue:** when the relay throws or times out, the runtime saves a `PendingAlert` (incident id,
+  the exact payload, the contact tokens, a timestamp, and an attempt count) to Hive box
+  `alert_outbox`. Queuing needs at least one FCM token; it also happens when Firebase failed to
+  initialise, which is common when the app launches offline, because the next launch can deliver
+  the saved alert. A relay that answers and rejects every token is *not* queued: retrying an
+  invalid token cannot succeed.
+- **Retry:** `startPendingAlertRetries()` runs at launch, `retryPendingAlerts()` runs on every app
+  resume, and a one-minute timer covers a connection that returns while the app stays open. An
+  entry is removed once the relay accepts at least one token (and the incident's dispatch result is
+  updated), once the relay answers with no accepted tokens, or when the incident is resolved,
+  cancelled, deleted, or history is cleared.
+- **Scope:** only the push half is retried. Re-sending SMS automatically could duplicate messages
+  the OS already submitted, so SMS remains a single best-effort attempt.
+- **Wording:** while queued, the Emergency screen says the alert is saved on the device and will be
+  sent automatically; if an SMS was submitted first, it says so and marks delivery as unconfirmed.
 
 ### SMS Permission
 
@@ -431,17 +455,19 @@ Three offline layers keep an alert useful when the network, relay, or contact to
 1. Collect the trusted contacts in scope (all of them, or the single `onlyContactId` when the alert targets one person). `attemptedCount` is the number of contacts, not the number of tokens, because each contact can be reached on either channel.
 2. Send push for the distinct tokens with an 8-second timeout. A thrown error becomes an empty accepted set with `pushFailure`.
 3. Map the accepted tokens back to contacts: a contact counts as reached by push only when its own token was accepted in this attempt.
-4. Run the SMS fallback for every contact not reached by push, including a contact with no token at all.
-5. If `delivered == 0` and `attempted > 0`, start the local alarm.
-6. Persist `AlertDispatchResult`; set `contact_notified` when at least one contact was reached.
+4. Save the push half in the outbox when push failed and tokens exist — before SMS, so a long row of SMS timeouts or a process kill cannot lose it.
+5. Run the SMS fallback for every contact not reached by push, including a contact with no token at all.
+6. If `delivered == 0` and `attempted > 0`, start the local alarm.
+7. Persist `AlertDispatchResult`. Set `contact_notified` only when at least one push token was accepted; an SMS-only result stays `alert_triggered` because submission is not delivery.
 
-Two guards set `failedReason` without pretending a channel ran: an empty contact list reports `No trusted contacts to notify`, and a dispatch with no push service and no phone number reports `No contacts with a push token or phone number`.
+Two guards set `failedReason` without pretending a channel ran: an empty contact list reports `No trusted contacts to notify`, and a dispatch whose contacts have neither a token nor a phone number reports `No contacts with a push token or phone number`. A contact with a token is queued even when Firebase is unavailable, because the next launch can deliver it.
 
 ### Known Limitations
 
 - **`attemptedCount` counts contacts, so it can exceed distinct tokens.** Two contacts sharing one FCM token are both credited when that token is accepted, even though they received a single push. This is intentional: the channel did reach both people.
-- **SMS is best-effort.** The OS accepting `sendTextMessage` is not carrier delivery; there is no delivery receipt.
-- **Shared phone numbers are counted once.** Numbers are de-duplicated before sending, so two contacts with the same number produce one SMS but only one delivery credit; the dispatch can report `partiallyDelivered` even though both contacts were reached.
+- **SMS is best-effort.** The OS confirming `SMS_SENT` means the radio accepted the message; it is not a carrier delivery receipt, so SMS-only dispatches are not labelled "reached".
+- **Queued alerts retry push only.** A phone-only contact cannot have its SMS retried automatically; a second automatic attempt could duplicate a message the OS already submitted.
+- **Shared phone numbers are counted once.** Numbers are de-duplicated before sending, so two contacts with the same number produce one SMS and one submission credit; the stored result can therefore look lower than the number of people whose phone may have received the text.
 - **The alarm depends on device state.** It cannot override a muted media stream, Do Not Disturb policy, or a user who cannot hear the phone. Android freezes channel sound and name after first creation, so editing the bundled WAV requires uninstalling the app or changing the channel id.
 - **A stale cache stays stale.** If SUNO never ran Live with location permission, or location stayed disabled, the cache is empty and alerts report location unavailable. `locationAgeMinutes` makes staleness visible, but does not bound it.
 
@@ -648,14 +674,15 @@ The analyze command is deliberately non-fatal for infos and warnings; it current
 |---|---|
 | `risk_engine_test.dart` | Risk scoring logic, boundary conditions |
 | `suno_audio_classifier_contract_test.dart` | ML model contract: labels metadata and bundled model asset |
-| `suno_runtime_service_test.dart` | Incident lifecycle, safety deadlines, responses, payload contents, SMS fallback and local alarm |
+| `suno_runtime_service_test.dart` | Incident lifecycle, safety deadlines, responses, payload contents, SMS fallback, saved-alert retry and the countdown/local alarms |
 | `audio_pipeline_test.dart` | Resampling across uneven chunks, reset, debounce, motion consumption and sensor failure |
 | `location_service_test.dart` | Permission/disabled/timeout handling, fix caching, `bestEffortLocation`, quiet refresh |
 | `sms_fallback_service_test.dart` | Number cleaning/deduplication, OS-acceptance counting, GSM-7 message content, cached-fix age |
 | `fcm_alert_service_test.dart` | Token normalization/batching, acceptance accounting, oversized/invalid relay responses |
 | `alert_surfacing_test.dart` | Which received critical alert is surfaced, selection window, payload for the alert screen |
-| `persistence_test.dart` | Hive round-trips and corrupt inbox messages |
+| `persistence_test.dart` | Hive round-trips (incidents and the queued-alert outbox) and corrupt inbox messages |
 | `locale_controller_test.dart` | First-run language choice, persistence, bad codes, reply language |
+| `language_selection_test.dart` | First-run Continue and tile selection both persist the chosen language |
 | `l10n_arb_parity_test.dart` | All eight ARB files have exactly the English key set |
 | `localized_render_test.dart` | All eight languages render without overflow, including RTL |
 | `time_format_test.dart` | Localized digits and dates, shared ASCII helpers |
@@ -688,7 +715,7 @@ Values injected via `--dart-define` at build time:
 | Fresh fix before falling back to cache | 6 seconds | `LocationService.bestEffortLocation()` |
 | Detection location freshness | 60 seconds | `LiveDetectionRepository` |
 | Push dispatch timeout | 8 seconds | `SunoRuntimeService._dispatch()` |
-| SMS bridge timeout per number | 10 seconds | `SmsNativeBridge` |
+| SMS bridge timeout per number | 9 seconds (Dart) / 6 seconds (native `SMS_SENT` wait) | `SmsNativeBridge`, `SmsSender.kt` |
 | Relay limits | 10 tokens, 16 payload keys, 16 KiB body, 256-character text | `send-alert/index.ts` |
 | Local alarm channel / notification id | `suno_local_alarm` / `0x50A0` | `detection_notification_service.dart`, `local_alarm_service.dart` |
 

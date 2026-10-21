@@ -40,7 +40,18 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   }
 
   /// Leaves the picker: to Home on first run, back to Settings otherwise.
-  void _continue() {
+  ///
+  /// On first run the language already on screen (the phone's own language
+  /// when it is supported) is persisted even if no tile was tapped, so pressing
+  /// Continue is itself a choice and the picker does not return next launch.
+  /// The write is repeated even when a tile was tapped: the controller marks a
+  /// choice in memory before storage succeeds, and this is the last chance to
+  /// retry a failed write before the next launch shows the picker again.
+  Future<void> _continue() async {
+    if (widget.isFirstRun) {
+      await _controller.setLanguage(_controller.language);
+    }
+    if (!mounted) return;
     if (widget.isFirstRun) {
       Navigator.pushReplacementNamed(context, AppRoutes.home);
     } else {

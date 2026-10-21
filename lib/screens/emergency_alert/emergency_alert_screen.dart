@@ -45,17 +45,34 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
     if (dispatch == null) {
       return l10n.emergencyNoDeliveryResult;
     }
+    if (dispatch.queued) {
+      return dispatch.smsSentCount > 0
+          ? l10n.emergencyDispatchSmsQueued(
+              dispatch.smsSentCount,
+              dispatch.attemptedCount,
+            )
+          : l10n.emergencySavedQueued;
+    }
     if (dispatch.success) {
       return l10n.emergencyDispatchAwaiting(
         dispatch.totalDelivered,
         dispatch.attemptedCount,
       );
     }
-    if (dispatch.partiallyDelivered) {
+    if (dispatch.sentCount > 0) {
+      // Push confirmed for some contacts; the rest may have an SMS on the way,
+      // but nothing else is confirmed.
       return l10n.emergencyDispatchPartial(
-        dispatch.totalDelivered,
+        dispatch.sentCount,
         dispatch.attemptedCount,
-        dispatch.failedCount,
+        dispatch.attemptedCount - dispatch.sentCount,
+      );
+    }
+    if (dispatch.smsSentCount > 0) {
+      // The OS accepted the SMS, but the carrier has not confirmed delivery.
+      return l10n.emergencyDispatchSms(
+        dispatch.smsSentCount,
+        dispatch.attemptedCount,
       );
     }
     return l10n.emergencySavedLocally(
@@ -189,7 +206,10 @@ class _EmergencyAlertScreenState extends State<EmergencyAlertScreen> {
                         if (incident.status != IncidentStatus.resolved &&
                             incident.status != IncidentStatus.cancelled &&
                             !runtime.isDispatching(incident.id) &&
-                            (incident.dispatchResult?.success != true))
+                            incident.dispatchResult?.success != true &&
+                            // A retry would SMS everyone a second time; the
+                            // saved push alert already retries on its own.
+                            (incident.dispatchResult?.smsSentCount ?? 0) == 0)
                           TextButton(
                             onPressed: () async {
                               try {

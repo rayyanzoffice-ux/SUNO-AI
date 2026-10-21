@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:suno_ai/backend/alerts/alert_outbox.dart';
+import 'package:suno_ai/backend/persistence/hive_alert_outbox.dart';
 import 'package:suno_ai/backend/persistence/hive_incident_repository.dart';
 import 'package:suno_ai/models/alert_dispatch_result.dart';
 import 'package:suno_ai/models/detection_result.dart';
@@ -117,6 +119,42 @@ void main() {
             .senderLang,
         isNull,
       );
+    },
+  );
+
+  test(
+    'Hive outbox keeps a queued alert across a restart and survives bad rows',
+    () async {
+      Hive.init(directory.path);
+      await Hive.openBox<Map>('alert_outbox');
+      const outbox = HiveAlertOutbox();
+      await outbox.save(
+        PendingAlert(
+          incidentId: 'offline-1',
+          payload: const {
+            'incidentId': 'offline-1',
+            'eventType': 'Distress Sound',
+            'latitude': '33.6844',
+          },
+          tokens: const ['token-a', 'token-b'],
+          createdAt: DateTime.utc(2026, 10, 21),
+          attempts: 2,
+        ),
+      );
+      await Hive.close();
+      await Hive.openBox<Map>('alert_outbox');
+      final restored = (await outbox.getAll()).single;
+      expect(restored.incidentId, 'offline-1');
+      expect(restored.payload['eventType'], 'Distress Sound');
+      expect(restored.tokens, ['token-a', 'token-b']);
+      expect(restored.createdAt, DateTime.utc(2026, 10, 21));
+      expect(restored.attempts, 2);
+
+      await Hive.box<Map>('alert_outbox').put('broken', {'incidentId': 'x'});
+      expect((await outbox.getAll()).single.incidentId, 'offline-1');
+
+      await outbox.remove('offline-1');
+      expect(await outbox.getAll(), isEmpty);
     },
   );
 

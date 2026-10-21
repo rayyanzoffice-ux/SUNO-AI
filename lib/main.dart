@@ -10,6 +10,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'app.dart';
 import 'backend/alerts/fcm_alert_service.dart';
 import 'backend/persistence/app_storage.dart';
+import 'backend/persistence/hive_alert_outbox.dart';
 import 'backend/persistence/hive_incident_repository.dart';
 import 'backend/persistence/hive_locale_repository.dart';
 import 'backend/persistence/hive_profile_repository.dart';
@@ -239,6 +240,11 @@ Future<void> _onResumed() async {
   await _drainInbox();
   _flushNavigation();
   await _surfaceUnseenAlert();
+  // A queued alert from an offline moment may be deliverable now, and the
+  // location cache must keep ageing truthfully while the app sits in the
+  // background (the 30-minute timer only runs during Live monitoring).
+  await SunoRuntimeService.instance.retryPendingAlerts();
+  unawaited(SunoRuntimeService.instance.locationService.refreshCacheQuietly());
 }
 
 class _AppLifecycle extends WidgetsBindingObserver {
@@ -290,9 +296,11 @@ Future<void> main() async {
     trustedContactRepository: const HiveTrustedContactRepository(),
     profileRepository: const HiveProfileRepository(),
     alertService: alertService,
+    alertOutbox: const HiveAlertOutbox(),
   );
   SunoRuntimeService.instance = runtime;
   await runtime.restoreLatestIncident();
+  runtime.startPendingAlertRetries();
   if (!firebaseReady) {
     runtime.reportError(tr.errorPushUnavailable);
   }

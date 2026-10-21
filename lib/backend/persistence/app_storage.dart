@@ -4,6 +4,7 @@ const _boxIncidents = 'incidents';
 const _boxContacts = 'contacts';
 const _boxProfile = 'profile';
 const _boxLocationCache = 'location_cache';
+const _boxAlertOutbox = 'alert_outbox';
 
 Future<void> initStorage() async {
   await Hive.initFlutter();
@@ -11,9 +12,11 @@ Future<void> initStorage() async {
   await Hive.openBox<Map>(_boxContacts);
   await Hive.openBox<String>(_boxProfile);
   await Hive.openBox<Map>(_boxLocationCache);
+  await Hive.openBox<Map>(_boxAlertOutbox);
 }
 
 Box<Map> get incidentBox => Hive.box<Map>(_boxIncidents);
 Box<Map> get contactBox => Hive.box<Map>(_boxContacts);
 Box<String> get profileBox => Hive.box<String>(_boxProfile);
 Box<Map> get locationCacheBox => Hive.box<Map>(_boxLocationCache);
+Box<Map> get alertOutboxBox => Hive.box<Map>(_boxAlertOutbox);

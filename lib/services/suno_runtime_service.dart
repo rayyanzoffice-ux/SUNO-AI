@@ -27,6 +27,7 @@ class SunoRuntimeService extends ChangeNotifier {
     LocationService? locationService,
     SmsFallbackService? smsFallbackService,
     LocalAlarmService? localAlarmService,
+    AlertOutbox? alertOutbox,
   }) : _detectionEngine = detectionEngine ?? DetectionEngine.instance,
        _safetyCheckEngine = safetyCheckEngine ?? SafetyCheckEngine(),
        _incidents = incidentRepository ?? InMemoryIncidentRepository(),
@@ -35,7 +36,8 @@ class SunoRuntimeService extends ChangeNotifier {
        _profile = profileRepository ?? InMemoryProfileRepository(),
        locationService = locationService ?? LocationService(),
        _smsFallback = smsFallbackService ?? const SmsFallbackService(),
-       _localAlarm = localAlarmService ?? const LocalAlarmService();
+       _localAlarm = localAlarmService ?? LocalAlarmService(),
+       _alertOutbox = alertOutbox ?? InMemoryAlertOutbox();
 
   static SunoRuntimeService instance = SunoRuntimeService();
   final DetectionEngine _detectionEngine;
@@ -47,6 +49,7 @@ class SunoRuntimeService extends ChangeNotifier {
   final LocationService locationService;
   final SmsFallbackService _smsFallback;
   final LocalAlarmService _localAlarm;
+  final AlertOutbox _alertOutbox;
   final Map<String, Incident> _knownIncidents = {};
   final Map<String, Future<AlertDispatchResult>> _dispatches = {};
   final Set<String> _deleted = {};
@@ -56,6 +59,9 @@ class SunoRuntimeService extends ChangeNotifier {
   Future<void>? _safetyTask;
   String? _safetyIncidentId;
   bool _safetySaveFailed = false;
+  Timer? _alarmStopTimer;
+  Timer? _retryTimer;
+  bool _retryingOutbox = false;
   bool _disposed = false;
 
   Incident? currentIncident;
@@ -219,6 +225,12 @@ class SunoRuntimeService extends ChangeNotifier {
         incident.safetyCheckDeadline ??
         incident.createdAt.add(_safetyCheckEngine.countdownDuration);
     final remaining = deadline.difference(DateTime.now());
+    // The countdown is audible: the alarm runs for exactly the time left on
+    // the timer and is stopped by the outcome handler below.
+    _startCountdownAlarm(
+      incident.id,
+      remaining.isNegative ? Duration.zero : remaining,
+    );
     _safetyTask = _safetyCheckEngine
         .startCountdown(
           incident.detectionResult,
@@ -226,6 +238,9 @@ class SunoRuntimeService extends ChangeNotifier {
         )
         .then((result) async {
           if (_disposed || _safetyIncidentId != incident.id) return;
+          // The 45-second alarm ends with the countdown, whether the person
+          // confirmed safe, escalated, or let the timer run out.
+          await _stopCountdownAlarm();
           if (result.outcome == SafetyCheckOutcome.cancelled) {
             _safetyIncidentId = null;
             return;
@@ -305,6 +320,10 @@ class SunoRuntimeService extends ChangeNotifier {
     });
     _changed();
     _maybeStopAlarm(status);
+    if (status == IncidentStatus.resolved ||
+        status == IncidentStatus.cancelled) {
+      unawaited(_removeQueuedAlert(id));
+    }
     return updated;
   }
 
@@ -312,8 +331,27 @@ class SunoRuntimeService extends ChangeNotifier {
   void _maybeStopAlarm(IncidentStatus status) {
     if (status == IncidentStatus.resolved ||
         status == IncidentStatus.cancelled) {
+      _alarmStopTimer?.cancel();
+      _alarmStopTimer = null;
       unawaited(_localAlarm.stop());
     }
+  }
+
+  void _startCountdownAlarm(String incidentId, Duration remaining) {
+    _alarmStopTimer?.cancel();
+    _alarmStopTimer = null;
+    if (remaining <= Duration.zero) return;
+    unawaited(_localAlarm.sound(incidentId: incidentId));
+    _alarmStopTimer = Timer(remaining, () {
+      _alarmStopTimer = null;
+      unawaited(_localAlarm.stop());
+    });
+  }
+
+  Future<void> _stopCountdownAlarm() async {
+    _alarmStopTimer?.cancel();
+    _alarmStopTimer = null;
+    await _localAlarm.stop();
   }
 
   Future<List<Incident>> getIncidentHistory() => _serialize(() async {
@@ -334,6 +372,7 @@ class SunoRuntimeService extends ChangeNotifier {
       _knownIncidents.remove(id);
       if (currentIncident?.id == id) currentIncident = null;
     });
+    await _removeQueuedAlert(id);
     _changed();
   }
 
@@ -350,6 +389,7 @@ class SunoRuntimeService extends ChangeNotifier {
       currentIncident = null;
       receivedAlert = null;
     });
+    await _clearOutbox();
     _changed();
   }
 
@@ -572,8 +612,11 @@ class SunoRuntimeService extends ChangeNotifier {
           attemptedCount: 0,
           failedReason: 'No trusted contacts to notify',
         );
-      } else if (service == null && !hasAnyPhone) {
-        // No way to reach anyone on any channel.
+      } else if (tokens.isEmpty && !hasAnyPhone) {
+        // No channel exists now or after a restart, so there is nothing to
+        // attempt and nothing worth saving. A token-only contact still enters
+        // the dispatch below when Firebase is unavailable, so the outbox can
+        // deliver it on a later launch.
         result = AlertDispatchResult(
           success: false,
           attemptedCount: attempted,
@@ -626,6 +669,8 @@ class SunoRuntimeService extends ChangeNotifier {
           } catch (error) {
             pushFailure = 'Push relay unreachable: $error';
           }
+        } else if (tokens.isNotEmpty) {
+          pushFailure = 'Push service unavailable';
         }
         // A contact counts as reached by push only when its own token was
         // accepted this attempt, so a partial relay result is handled per
@@ -637,6 +682,27 @@ class SunoRuntimeService extends ChangeNotifier {
             })
             .map((contact) => contact.id)
             .toSet();
+        if (pushReachedContactIds.isNotEmpty) {
+          // A later retry of the same incident must not resend an alert that
+          // already reached someone.
+          unawaited(_removeQueuedAlert(id));
+        }
+        // Save the push half before attempting SMS: the outbox write is fast,
+        // while a row of SMS timeouts can take seconds per number, and a
+        // process kill in that window must not lose the alert. SMS cannot be
+        // retried this way: a second attempt could duplicate every message
+        // the OS already submitted. This queues even when Firebase failed to
+        // initialise — often caused by launching offline — because the next
+        // launch with a live push service is when the alert can go out.
+        final queued =
+            tokens.isNotEmpty &&
+                acceptedTokens.isEmpty &&
+                pushFailure != null &&
+                await _queueAlert(
+                  incidentId: id,
+                  payload: payload,
+                  tokens: tokens,
+                );
         // Every contact not confirmed reached by push — including one with no
         // token at all — is a candidate for SMS.
         final needsSms = contacts
@@ -656,14 +722,15 @@ class SunoRuntimeService extends ChangeNotifier {
           unawaited(_localAlarm.sound(incidentId: id));
         }
         result = AlertDispatchResult(
-          success: delivered >= attempted && attempted > 0,
+          success: pushReachedContactIds.length >= attempted && attempted > 0,
           attemptedCount: attempted,
           sentCount: pushReachedContactIds.length,
           smsSentCount: smsSent,
-          failedReason: delivered >= attempted
+          queued: queued,
+          failedReason: pushReachedContactIds.length >= attempted
               ? null
               : (pushFailure ??
-                    'Delivered $delivered/$attempted contacts (push + SMS)'),
+                    'No contact was confirmed; the relay accepted no push token and no SMS was submitted'),
         );
       }
     } catch (_) {
@@ -680,8 +747,10 @@ class SunoRuntimeService extends ChangeNotifier {
         existing.copyWith(
           dispatchResult: result,
           updatedAt: DateTime.now(),
+          // Only a push the relay accepted is treated as the contact being
+          // notified. An SMS the OS queued may still fail at the carrier.
           status:
-              result.totalDelivered > 0 &&
+              result.sentCount > 0 &&
                   existing.status == IncidentStatus.alertTriggered
               ? IncidentStatus.contactNotified
               : existing.status,
@@ -689,6 +758,183 @@ class SunoRuntimeService extends ChangeNotifier {
       );
     });
     return result;
+  }
+
+  Future<bool> _queueAlert({
+    required String incidentId,
+    required Map<String, String> payload,
+    required List<String> tokens,
+  }) async {
+    try {
+      await _alertOutbox.save(
+        PendingAlert(
+          incidentId: incidentId,
+          payload: payload,
+          tokens: tokens,
+          createdAt: DateTime.now(),
+        ),
+      );
+      _ensureRetryTimer();
+      return true;
+    } catch (error) {
+      debugPrint('SUNO could not save the alert for retry: $error');
+      return false;
+    }
+  }
+
+  Future<void> _removeQueuedAlert(String incidentId) async {
+    try {
+      await _alertOutbox.remove(incidentId);
+    } catch (error) {
+      debugPrint('SUNO could not clear the saved alert: $error');
+    }
+  }
+
+  Future<void> _clearOutbox() async {
+    try {
+      await _alertOutbox.clear();
+    } catch (error) {
+      debugPrint('SUNO could not clear saved alerts: $error');
+    }
+  }
+
+  /// Retries saved alerts on launch, on resume, and every minute while any
+  /// remain. Safe to call more than once.
+  void startPendingAlertRetries() {
+    _ensureRetryTimer();
+    unawaited(retryPendingAlerts());
+  }
+
+  void _ensureRetryTimer() {
+    if (_disposed || _retryTimer != null) return;
+    _retryTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      unawaited(retryPendingAlerts());
+    });
+  }
+
+  /// Sends every saved alert again. Entries that the relay accepted are
+  /// removed; entries still offline stay for the next attempt; entries whose
+  /// incident was deleted or closed are dropped.
+  Future<void> retryPendingAlerts() async {
+    if (_disposed || _retryingOutbox) return;
+    final service = _alertService;
+    if (service == null) return;
+    List<PendingAlert> pending;
+    try {
+      pending = await _alertOutbox.getAll();
+    } catch (error) {
+      debugPrint('SUNO could not read saved alerts: $error');
+      return;
+    }
+    if (pending.isEmpty) {
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      return;
+    }
+    _retryingOutbox = true;
+    try {
+      for (final alert in pending) {
+        if (_disposed) return;
+        if (await _queuedAlertIsStale(alert)) {
+          await _removeQueuedAlert(alert.incidentId);
+          continue;
+        }
+        Set<String> accepted;
+        try {
+          accepted = await service
+              .sendAlert(contactTokens: alert.tokens, payload: alert.payload)
+              .timeout(const Duration(seconds: 8));
+        } catch (error) {
+          debugPrint('SUNO alert retry still offline: $error');
+          try {
+            await _alertOutbox.save(
+              alert.copyWith(attempts: alert.attempts + 1),
+            );
+          } catch (_) {}
+          continue;
+        }
+        // The relay answered; retrying the same tokens again would only
+        // repeat the rejection.
+        await _removeQueuedAlert(alert.incidentId);
+        if (accepted.isEmpty) continue;
+        try {
+          await _recordRetriedDelivery(alert.incidentId, accepted);
+        } catch (error) {
+          debugPrint('SUNO could not store the retried delivery: $error');
+        }
+      }
+    } finally {
+      _retryingOutbox = false;
+    }
+    try {
+      if ((await _alertOutbox.getAll()).isEmpty) {
+        _retryTimer?.cancel();
+        _retryTimer = null;
+      }
+    } catch (_) {}
+  }
+
+  Future<bool> _queuedAlertIsStale(PendingAlert alert) async {
+    if (_deleted.contains(alert.incidentId)) return true;
+    final incident = _knownIncidents[alert.incidentId];
+    if (incident != null &&
+        (incident.status == IncidentStatus.resolved ||
+            incident.status == IncidentStatus.cancelled)) {
+      return true;
+    }
+    try {
+      return await _incidents.isDeleted(alert.incidentId);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Folds a delayed push acceptance into the incident's stored result.
+  Future<void> _recordRetriedDelivery(
+    String incidentId,
+    Set<String> acceptedTokens,
+  ) async {
+    final contacts = await _contacts.getAll();
+    final reached = contacts
+        .where((contact) {
+          final token = contact.fcmToken?.trim();
+          return token != null && acceptedTokens.contains(token);
+        })
+        .length;
+    if (reached == 0) return;
+    await _serialize(() async {
+      final existing = _knownIncidents[incidentId];
+      if (existing == null ||
+          existing.status == IncidentStatus.resolved ||
+          existing.status == IncidentStatus.cancelled) {
+        return;
+      }
+      final previous = existing.dispatchResult;
+      final attempted = previous?.attemptedCount ?? contacts.length;
+      final smsSent = previous?.smsSentCount ?? 0;
+      // A shared token can match more stored contacts than the dispatch
+      // targeted; never let the credited count exceed the denominator.
+      final credited = reached > attempted ? attempted : reached;
+      final delivered = credited + smsSent;
+      await _storeUpdate(
+        existing.copyWith(
+          dispatchResult: AlertDispatchResult(
+            success: credited >= attempted && attempted > 0,
+            attemptedCount: attempted,
+            sentCount: credited,
+            smsSentCount: smsSent,
+            failedReason: delivered >= attempted
+                ? null
+                : 'Some contacts were not confirmed after the retry',
+          ),
+          updatedAt: DateTime.now(),
+          status: existing.status == IncidentStatus.alertTriggered
+              ? IncidentStatus.contactNotified
+              : existing.status,
+        ),
+      );
+    });
+    _changed();
   }
 
   Future<Incident?> triggerManualAlert({String? onlyContactId}) async {
@@ -764,6 +1010,9 @@ class SunoRuntimeService extends ChangeNotifier {
       _maybeStopAlarm(nextStatus);
       return true;
     });
+    if (updated == true && status == 'resolved') {
+      unawaited(_removeQueuedAlert(incidentId));
+    }
     _changed();
     return updated;
   }
@@ -772,6 +1021,11 @@ class SunoRuntimeService extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _safetyIncidentId = null;
+    _alarmStopTimer?.cancel();
+    _alarmStopTimer = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    unawaited(_localAlarm.stop());
     _safetyCheckEngine.dispose();
     super.dispose();
   }

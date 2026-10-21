@@ -21,8 +21,12 @@ class SmsNativeBridge {
     }
   }
 
-  /// Sends one SMS. Returns false (never throws) on any failure — missing
-  /// permission, no SIM, platform not supported, or a native exception.
+  /// Sends one SMS.
+  ///
+  /// Returns true only when Android's SMS_SENT broadcast reports success for
+  /// the whole message. `false` (never throws) covers missing permission, no
+  /// SIM, no balance, no signal, platform not supported, or a native
+  /// exception — none of which are proof the contact received anything.
   static Future<bool> send({
     required String phoneNumber,
     required String message,
@@ -34,7 +38,8 @@ class SmsNativeBridge {
             'phone': phoneNumber,
             'message': message,
           })
-          .timeout(const Duration(seconds: 10));
+          // Native waits 6s for SMS_SENT; leave room for channel overhead.
+          .timeout(const Duration(seconds: 9));
       return result ?? false;
     } catch (_) {
       return false;

@@ -1,3 +1,4 @@
+export 'alerts/alert_outbox.dart';
 export 'alerts/alert_service.dart';
 export 'alerts/fcm_alert_service.dart';
 export 'alerts/local_alarm_service.dart';
@@ -20,6 +21,7 @@ export 'ml/continuous_audio_detector.dart';
 export 'ml/yamnet_stage.dart';
 export 'motion/impact_stillness_detector.dart';
 export 'persistence/app_storage.dart';
+export 'persistence/hive_alert_outbox.dart';
 export 'persistence/hive_incident_repository.dart';
 export 'persistence/hive_profile_repository.dart';
 export 'persistence/hive_trusted_contact_repository.dart';
