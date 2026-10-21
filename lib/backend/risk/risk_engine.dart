@@ -3,7 +3,14 @@ import '../../models/detection_result.dart';
 /// Audio class labels that carry distress evidence.
 /// ambient_safe is intentionally absent — confidence for that class never
 /// contributes to the risk score, preventing false alarms from background noise.
-const _distressClasses = {'distress_voice', 'alarm_siren', 'breaking_crash'};
+///
+/// Exposed so the detection pipeline can require one of these before motion is
+/// allowed to open the safety-check pathway on its own.
+const distressAudioClasses = {
+  'distress_voice',
+  'alarm_siren',
+  'breaking_crash',
+};
 
 class RiskWeights {
   const RiskWeights._();
@@ -49,7 +56,7 @@ class RiskEngine {
     required bool impactDetected,
     required bool stillnessDetected,
   }) {
-    final audioScore = _distressClasses.contains(detectedClass)
+    final audioScore = distressAudioClasses.contains(detectedClass)
         ? _distressScoreFor(confidence)
         : 0;
     final score = _clampScore(

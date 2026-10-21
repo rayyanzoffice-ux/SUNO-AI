@@ -17,7 +17,16 @@ void main() {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     respond = (request, body) async {
       final count = (body['contactTokens'] as List?)?.length ?? 1;
-      request.response.write(jsonEncode({'sent': count, 'attempted': count}));
+      request.response.write(
+        jsonEncode({
+          'sent': count,
+          'attempted': count,
+          'results': List.generate(
+            count,
+            (_) => {'ok': true, 'status': 200},
+          ),
+        }),
+      );
     };
     server.listen((request) async {
       final data = await request.fold<List<int>>(
@@ -49,7 +58,7 @@ void main() {
         contactTokens: [...tokens, ' ${tokens.first} '],
         payload: {},
       ),
-      12,
+      tokens.toSet(),
     );
     expect(bodies.map((b) => (b['contactTokens'] as List).length), [10, 2]);
     expect(bodies.first['contactTokens'], tokens.take(10).toList());
@@ -62,7 +71,7 @@ void main() {
         contactTokens: tokens,
         payload: {'eventType': 'test'},
       ),
-      8,
+      tokens.toSet(),
     );
     expect(bodies.length, 2);
     expect(sizes.every((size) => size <= 16384), isTrue);
@@ -71,33 +80,42 @@ void main() {
   test(
     'acceptance from an earlier batch survives a later HTTP failure',
     () async {
+      final tokens = List.generate(
+        11,
+        (i) => 'synthetic-recipient-token-$i',
+      );
       respond = (request, body) async {
         if (bodies.length == 1) {
-          request.response.write(jsonEncode({'sent': 9, 'attempted': 10}));
+          request.response.write(
+            jsonEncode({
+              'sent': 9,
+              'attempted': 10,
+              'results': [
+                for (var i = 0; i < 10; i++)
+                  {'ok': i < 9, 'status': i < 9 ? 200 : 400},
+              ],
+            }),
+          );
         } else {
           request.response.statusCode = 503;
           request.response.write('upstream-private-details');
         }
       };
       expect(
-        await service.sendAlert(
-          contactTokens: List.generate(
-            11,
-            (i) => 'synthetic-recipient-token-$i',
-          ),
-          payload: {},
-        ),
-        9,
+        await service.sendAlert(contactTokens: tokens, payload: {}),
+        tokens.take(9).toSet(),
       );
     },
   );
 
   test('invalid acceptance accounting is rejected', () async {
     for (final result in [
-      {'sent': 2, 'attempted': 1},
-      {'sent': -1, 'attempted': 1},
-      {'sent': '1', 'attempted': 1},
-      {'sent': 1, 'attempted': 2},
+      {'sent': 2, 'attempted': 1, 'results': [{'ok': true}, {'ok': true}]},
+      {'sent': -1, 'attempted': 1, 'results': [{'ok': true}]},
+      {'sent': '1', 'attempted': 1, 'results': [{'ok': true}]},
+      {'sent': 1, 'attempted': 1, 'results': [{'ok': false}]},
+      {'sent': 1, 'attempted': 1, 'results': <Object>[]},
+      {'sent': 1, 'attempted': 1},
     ]) {
       respond = (request, body) async =>
           request.response.write(jsonEncode(result));

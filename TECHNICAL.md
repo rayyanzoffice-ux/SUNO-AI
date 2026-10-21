@@ -337,11 +337,11 @@ Alerts flow through up to three layers, attempted in order:
 ### Outgoing Push Alerts (`FcmAlertService`)
 
 1. `SunoRuntimeService.dispatchIncident()` gathers the trusted contacts' non-empty FCM tokens and de-duplicates them.
-2. `FcmAlertService.sendAlert()` batches tokens within the relay's ten-token limit and POSTs to the Supabase Edge Function with an 8-second timeout.
+2. `FcmAlertService.sendAlert()` batches tokens within the relay's ten-token and 16KB limits and POSTs to the Supabase Edge Function with an 8-second timeout. It returns the set of tokens the relay accepted, read from the per-token `results` array in request order, so acceptance is tracked per contact rather than as one aggregate number.
 3. The payload carries `incidentId`, `eventType`, `riskScore`, `riskLevel`, `detectedAt`, `isSimulated`, optional `latitude` / `longitude` / `locationText`, `senderToken`, `senderName`, `lang` (with legacy `languageCode`), and — when the fix came from the cache — `locationIsCached` plus `locationAgeMinutes`. That is at most 15 keys, inside the relay's 16-key cap.
 4. Requests authenticate with the `X-SUNO-Relay-Key` header.
 
-A zero or invalid relay acceptance count is treated as push failure, not success.
+A zero or invalid relay acceptance count is treated as push failure, not success: a response whose `sent` / `attempted` / `results` disagree is rejected with a `StateError`. Acceptance collected from earlier batches is kept when a later batch fails, so a partial result is never discarded because of a subsequent error.
 
 ### Supabase Edge Function (`send-alert/index.ts`)
 
@@ -367,7 +367,7 @@ A zero or invalid relay acceptance count is treated as push failure, not success
 
 ### SMS Fallback (`SmsFallbackService`)
 
-Triggered whenever push acceptance is below the attempted token count — a relay timeout, an offline device, a partial failure, or a contact who has a number but no recorded token.
+Triggered for every contact push did not reach — a relay timeout, an offline device, a partial failure, or a contact who has a number but no recorded token.
 
 - Phone numbers are reduced to digits plus one leading `+`; blanks are skipped and duplicate numbers are sent once.
 - Every number receives the same plain-GSM-7 message, kept short to limit segments:
@@ -384,7 +384,7 @@ If `delivered == 0` and at least one contact was attempted, SUNO alerts the pers
 - A dedicated `suno_local_alarm` channel is registered at startup with `Importance.max`, `AudioAttributesUsage.alarm`, and `RawResourceAndroidNotificationSound('suno_alarm')`. Registering the sound on the channel (not only on the notification) matters because Android freezes channel settings after first creation.
 - The notification uses `FLAG_INSISTENT` (raw flag `4`), so the bundled sound loops until the notification is cancelled; it also requests a full-screen intent and vibrates.
 - Payload `type=emergency_alert&incidentId=...` opens the incident when tapped and is deliberately not treated as an inbound alert.
-- Resolving or cancelling the incident through `updateStatus()` cancels the notification and any vibration, and tapping or dismissing the notification itself silences it (the notification auto-cancels). If showing the notification fails, the service falls back to raw vibration.
+- Resolving or cancelling the incident through `updateStatus()` cancels the notification and any vibration, and tapping or dismissing the notification itself silences it (the notification auto-cancels). A contact response applied remotely (`applyContactResponse`) stops it too once the new status is persisted, but only for `resolved` — a "checking on them" response leaves the alarm sounding. If showing the notification fails, the service falls back to raw vibration.
 
 ### Incoming Alerts
 
@@ -428,17 +428,20 @@ Three offline layers keep an alert useful when the network, relay, or contact to
 
 `SunoRuntimeService._dispatch()`:
 
-1. Collect unique push tokens. `attemptedCount` is the number of unique tokens.
-2. Send push with an 8-second timeout; a thrown error becomes `sent = 0` with `pushFailure`.
-3. If `sent < attempted`, run the SMS fallback for every contact with a phone number.
-4. If `sent + smsSent == 0` and `attempted > 0`, start the local alarm.
-5. Persist `AlertDispatchResult`; set `contact_notified` when at least one contact was reached.
+1. Collect the trusted contacts in scope (all of them, or the single `onlyContactId` when the alert targets one person). `attemptedCount` is the number of contacts, not the number of tokens, because each contact can be reached on either channel.
+2. Send push for the distinct tokens with an 8-second timeout. A thrown error becomes an empty accepted set with `pushFailure`.
+3. Map the accepted tokens back to contacts: a contact counts as reached by push only when its own token was accepted in this attempt.
+4. Run the SMS fallback for every contact not reached by push, including a contact with no token at all.
+5. If `delivered == 0` and `attempted > 0`, start the local alarm.
+6. Persist `AlertDispatchResult`; set `contact_notified` when at least one contact was reached.
+
+Two guards set `failedReason` without pretending a channel ran: an empty contact list reports `No trusted contacts to notify`, and a dispatch with no push service and no phone number reports `No contacts with a push token or phone number`.
 
 ### Known Limitations
 
-- **`attemptedCount` is token-based.** If no contact record has an FCM token, the push branch is skipped before the SMS fallback can run, so SMS and the local alarm are not attempted in that configuration. A contact with only a phone number is reached by SMS only when at least one other contact has a token.
+- **`attemptedCount` counts contacts, so it can exceed distinct tokens.** Two contacts sharing one FCM token are both credited when that token is accepted, even though they received a single push. This is intentional: the channel did reach both people.
 - **SMS is best-effort.** The OS accepting `sendTextMessage` is not carrier delivery; there is no delivery receipt.
-- **Partial push failures duplicate messages.** When push reaches some contacts, SMS still goes to every contact with a number, including those already reached by push.
+- **Shared phone numbers are counted once.** Numbers are de-duplicated before sending, so two contacts with the same number produce one SMS but only one delivery credit; the dispatch can report `partiallyDelivered` even though both contacts were reached.
 - **The alarm depends on device state.** It cannot override a muted media stream, Do Not Disturb policy, or a user who cannot hear the phone. Android freezes channel sound and name after first creation, so editing the bundled WAV requires uninstalling the app or changing the channel id.
 - **A stale cache stays stale.** If SUNO never ran Live with location permission, or location stayed disabled, the cache is empty and alerts report location unavailable. `locationAgeMinutes` makes staleness visible, but does not bound it.
 

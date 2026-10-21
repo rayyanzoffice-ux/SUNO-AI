@@ -52,12 +52,12 @@ class FcmAlertService implements AlertService {
   String? get deviceToken => _deviceToken;
 
   @override
-  Future<int> sendAlert({
+  Future<Set<String>> sendAlert({
     required List<String> contactTokens,
     required Map<String, String> payload,
   }) async {
     final tokens = contactTokens.map((token) => token.trim()).toSet().toList();
-    if (tokens.isEmpty) return 0;
+    if (tokens.isEmpty) return <String>{};
     if (tokens.any((token) => token.length < 21 || token.length > 4096)) {
       throw StateError(
         'A contact token is invalid. Update it in Trusted Contacts.',
@@ -78,7 +78,7 @@ class FcmAlertService implements AlertService {
       }
     }
     if (batch.isNotEmpty) batches.add(batch);
-    var accepted = 0;
+    final accepted = <String>{};
     Object? failure;
     for (final recipients in batches) {
       try {
@@ -86,16 +86,46 @@ class FcmAlertService implements AlertService {
           'contactTokens': recipients,
           'payload': payload,
         });
-        accepted += _acceptedCount(result, recipients.length);
+        accepted.addAll(_acceptedTokens(result, recipients));
       } catch (error) {
         failure = error;
       }
     }
     // An unsuccessful later batch must not erase already accepted deliveries.
-    if (accepted == 0 && failure != null) {
+    if (accepted.isEmpty && failure != null) {
       throw StateError(
         'Alert relay unavailable. Check connectivity and configuration.',
       );
+    }
+    return accepted;
+  }
+
+  /// Matches the relay's per-delivery `results` array back to the token list
+  /// sent in this batch. `deliveries` is built from the same deduplicated
+  /// token list, in order, so the arrays line up.
+  Set<String> _acceptedTokens(
+    Map<String, dynamic> result,
+    List<String> sentTokens,
+  ) {
+    final sent = result['sent'];
+    final attempted = result['attempted'];
+    final results = result['results'];
+    if (sent is! int ||
+        attempted is! int ||
+        attempted != sentTokens.length ||
+        sent < 0 ||
+        sent > attempted ||
+        results is! List ||
+        results.length != sentTokens.length) {
+      throw StateError('Alert relay returned an invalid acceptance count.');
+    }
+    final accepted = <String>{};
+    for (var i = 0; i < sentTokens.length; i++) {
+      final entry = results[i];
+      if (entry is Map && entry['ok'] == true) accepted.add(sentTokens[i]);
+    }
+    if (accepted.length != sent) {
+      throw StateError('Alert relay returned an invalid acceptance count.');
     }
     return accepted;
   }

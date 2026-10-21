@@ -136,9 +136,15 @@ class LiveDetectionRepository implements DetectionRepository {
         : event.detectedAt.difference(motion.capturedAt);
     final fresh =
         age != null && !age.isNegative && age <= const Duration(seconds: 5);
-    final impact = fresh && motion!.impactDetected;
-    final stillness = fresh && motion!.stillnessDetected;
-    _motion = null;
+    // Motion only ever contributes alongside a validated danger-class sound.
+    // ambient_safe (or any future non-distress label) must never open the
+    // safety-check pathway on motion evidence alone, and must not consume
+    // motion that a real distress sound arriving moments later still needs.
+    final consumesMotion =
+        fresh && distressAudioClasses.contains(event.label);
+    final impact = consumesMotion && motion!.impactDetected;
+    final stillness = consumesMotion && motion!.stillnessDetected;
+    if (consumesMotion) _motion = null;
     final assessment = _riskEngine.evaluateDetection(
       detectedClass: event.label,
       confidence: event.confidence,

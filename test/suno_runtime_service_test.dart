@@ -253,7 +253,7 @@ void main() {
   test(
     'duplicate detection and dispatch calls do not create or send twice',
     () async {
-      final alerts = FakeAlerts()..pending = Completer<int>();
+      final alerts = FakeAlerts()..pending = Completer<Set<String>>();
       final runtime = makeRuntime(alerts: alerts);
       final results = await Future.wait([
         runtime.recordDetection(detection(RiskLevel.critical)),
@@ -266,7 +266,7 @@ void main() {
       expect(identical(first, second), isTrue);
       await Future<void>.delayed(Duration.zero);
       expect(alerts.payloads.length, 1);
-      alerts.pending!.complete(1);
+      alerts.pending!.complete({'test-token-a'});
       await first;
       expect(
         runtime.incidentById(id)?.dispatchResult?.partiallyDelivered,
@@ -610,6 +610,33 @@ void main() {
     return runtime;
   }
 
+  /// A runtime with an arbitrary contact list and a recording SMS sender.
+  SunoRuntimeService makeContactRuntime({
+    required FakeAlerts? alerts,
+    required List<TrustedContact> contacts,
+    Map<String, String>? dialed,
+    FakeLocalAlarm? alarm,
+    bool smsDelivers = true,
+  }) {
+    final runtime = SunoRuntimeService(
+      alertService: alerts,
+      locationService: FakeLocation(),
+      localAlarmService: alarm,
+      smsFallbackService: SmsFallbackService(
+        send: ({required phoneNumber, required message}) async {
+          if (!smsDelivers) return false;
+          dialed?[phoneNumber] = message;
+          return true;
+        },
+      ),
+      trustedContactRepository: InMemoryTrustedContactRepository(
+        seed: contacts,
+      ),
+    );
+    addTearDown(runtime.dispose);
+    return runtime;
+  }
+
   test('an unreachable relay still reaches the contact by SMS', () async {
     final alerts = FakeAlerts()..sendFails = true;
     final dialed = <String, String>{};
@@ -683,6 +710,179 @@ void main() {
 
     expect(alarm.sounded, isEmpty);
   });
+
+  test('a contact with a phone but no token is reached by SMS', () async {
+    final dialed = <String, String>{};
+    final runtime = makeContactRuntime(
+      alerts: FakeAlerts(),
+      dialed: dialed,
+      contacts: const [
+        TrustedContact(
+          id: 'phone-only',
+          name: 'Phone only',
+          phone: '+92 300-123-4567',
+          relationship: 'Friend',
+        ),
+      ],
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    expect(dialed.keys, ['+923001234567']);
+    final result = runtime.incidentById(incident.id)!.dispatchResult!;
+    expect(result.attemptedCount, 1);
+    expect(result.sentCount, 0);
+    expect(result.smsSentCount, 1);
+    expect(result.success, isTrue);
+    expect(runtime.incidentById(incident.id)!.status, IncidentStatus.contactNotified);
+  });
+
+  test('with no push service, a phone-only contact still gets SMS', () async {
+    final dialed = <String, String>{};
+    final runtime = makeContactRuntime(
+      alerts: null,
+      dialed: dialed,
+      contacts: const [
+        TrustedContact(
+          id: 'phone-only',
+          name: 'Phone only',
+          phone: '+92 300-123-4567',
+          relationship: 'Friend',
+        ),
+      ],
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    expect(dialed.keys, ['+923001234567']);
+    final result = runtime.incidentById(incident.id)!.dispatchResult!;
+    expect(result.attemptedCount, 1);
+    expect(result.smsSentCount, 1);
+    expect(result.success, isTrue);
+  });
+
+  test('an unreachable contact still alarms the phone itself', () async {
+    final alarm = FakeLocalAlarm();
+    final runtime = makeContactRuntime(
+      alerts: FakeAlerts(),
+      alarm: alarm,
+      contacts: const [
+        TrustedContact(
+          id: 'unreachable',
+          name: 'No channel',
+          phone: '',
+          relationship: 'Friend',
+        ),
+      ],
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    expect(alarm.sounded, [incident.id]);
+    final result = runtime.incidentById(incident.id)!.dispatchResult!;
+    expect(result.attemptedCount, 1);
+    expect(result.totalDelivered, 0);
+    expect(result.success, isFalse);
+    expect(runtime.incidentById(incident.id)!.status, IncidentStatus.alertTriggered);
+  });
+
+  test('a partial push sends SMS only to the contact push missed', () async {
+    final alerts = FakeAlerts()..acceptedSubset = {'test-token-a'};
+    final dialed = <String, String>{};
+    final runtime = makeContactRuntime(
+      alerts: alerts,
+      dialed: dialed,
+      contacts: const [
+        TrustedContact(
+          id: 'a',
+          name: 'Reached by push',
+          phone: '+92 300-000-0001',
+          relationship: 'Friend',
+          fcmToken: 'test-token-a',
+        ),
+        TrustedContact(
+          id: 'b',
+          name: 'Missed by push',
+          phone: '+92 300-000-0002',
+          relationship: 'Friend',
+          fcmToken: 'test-token-b',
+        ),
+      ],
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+
+    expect(dialed.keys, ['+923000000002']);
+    final result = runtime.incidentById(incident.id)!.dispatchResult!;
+    expect(result.attemptedCount, 2);
+    expect(result.sentCount, 1);
+    expect(result.smsSentCount, 1);
+    expect(result.success, isTrue);
+  });
+
+  test('a contact resolving remotely stops the local alarm', () async {
+    final alarm = FakeLocalAlarm();
+    final runtime = makeDualChannelRuntime(
+      alerts: FakeAlerts()..sendFails = true,
+      dialed: {},
+      alarm: alarm,
+      smsDelivers: false,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+    expect(alarm.sounded, [incident.id]);
+    expect(alarm.stops, 0);
+
+    final applied = await runtime.applyContactResponse(
+      incidentId: incident.id,
+      responderName: 'Your contact',
+      status: 'resolved',
+      message: 'They are safe',
+    );
+
+    expect(applied, isTrue);
+    expect(alarm.stops, 1);
+    expect(runtime.incidentById(incident.id)?.status, IncidentStatus.resolved);
+  });
+
+  test('a contactChecking response does not stop the alarm', () async {
+    final alarm = FakeLocalAlarm();
+    final runtime = makeDualChannelRuntime(
+      alerts: FakeAlerts()..sendFails = true,
+      dialed: {},
+      alarm: alarm,
+      smsDelivers: false,
+    );
+    final incident = (await runtime.recordDetection(
+      detection(RiskLevel.critical),
+    ))!;
+    await finishDispatch(runtime, incident.id);
+    expect(alarm.sounded, [incident.id]);
+
+    final applied = await runtime.applyContactResponse(
+      incidentId: incident.id,
+      responderName: 'Your contact',
+      status: 'contactChecking',
+      message: 'Checking on you',
+    );
+
+    expect(applied, isTrue);
+    expect(alarm.stops, 0);
+    expect(
+      runtime.incidentById(incident.id)?.status,
+      IncidentStatus.contactChecking,
+    );
+  });
 }
 
 Future<void> finishDispatch(SunoRuntimeService runtime, String id) async {
@@ -722,19 +922,23 @@ class FakeAlerts implements AlertService {
   final payloads = <Map<String, String>>[];
   final responses =
       <({String incidentId, String message, String? lang})>[];
-  Completer<int>? pending;
+  Completer<Set<String>>? pending;
+  Set<String>? acceptedSubset;
   bool responseFails = false;
   bool sendFails = false;
   @override
   String? get deviceToken => 'synthetic-sender';
   @override
-  Future<int> sendAlert({
+  Future<Set<String>> sendAlert({
     required List<String> contactTokens,
     required Map<String, String> payload,
   }) async {
     payloads.add(payload);
     if (sendFails) throw StateError('Synthetic relay failure');
-    return pending == null ? contactTokens.length : pending!.future;
+    if (pending != null) return pending!.future;
+    final all = contactTokens.toSet();
+    final subset = acceptedSubset;
+    return subset == null ? all : all.intersection(subset);
   }
 
   @override

@@ -1031,10 +1031,10 @@ class _TestAlerts implements AlertService {
   @override
   String get deviceToken => 'synthetic-device-token-12345';
   @override
-  Future<int> sendAlert({
+  Future<Set<String>> sendAlert({
     required List<String> contactTokens,
     required Map<String, String> payload,
-  }) async => contactTokens.length;
+  }) async => contactTokens.toSet();
   @override
   Future<bool> sendTestMessage(String token) async {
     if (failTest) throw StateError('Relay unavailable');

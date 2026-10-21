@@ -198,6 +198,96 @@ void main() {
     });
   }
 
+  testWidgets('ambient_safe with impact and stillness never reaches detection', (
+    tester,
+  ) async {
+    final motion = StreamController<UserAccelerometerEvent>();
+    final microphone = _Microphone();
+    final detections = <DetectionResult>[];
+    final repository = LiveDetectionRepository(
+      yamnet: _Yamnet(),
+      classifier: _Classifier()..label = 'ambient_safe',
+      microphone: microphone,
+      locationService: LocationService(),
+      motionEvents: motion.stream,
+      onError: (error) => fail('$error'),
+      onDetection: detections.add,
+    );
+    await repository.startMonitoring();
+    motion.add(UserAccelerometerEvent(20, 0, 0, DateTime.now()));
+    motion.add(UserAccelerometerEvent(0, 0, 0, DateTime.now()));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+
+    final frame = AudioWaveform(
+      samples: const [],
+      sampleRate: 16000,
+      capturedAt: DateTime.now().add(const Duration(milliseconds: 1)),
+    );
+    for (var i = 0; i < 3; i++) {
+      microphone.controller.add(frame);
+    }
+    await tester.pump();
+
+    expect(detections, isEmpty);
+    await tester.runAsync(repository.stopMonitoring);
+    await tester.runAsync(() async {
+      await microphone.controller.close();
+      await motion.close();
+    });
+  });
+
+  testWidgets('an ambient event does not consume motion for a later scream', (
+    tester,
+  ) async {
+    final motion = StreamController<UserAccelerometerEvent>();
+    final microphone = _Microphone();
+    final classifier = _Classifier()..label = 'ambient_safe';
+    final detections = <DetectionResult>[];
+    final repository = LiveDetectionRepository(
+      yamnet: _Yamnet(),
+      classifier: classifier,
+      microphone: microphone,
+      locationService: LocationService(),
+      motionEvents: motion.stream,
+      onError: (error) => fail('$error'),
+      onDetection: detections.add,
+    );
+    await repository.startMonitoring();
+    motion.add(UserAccelerometerEvent(20, 0, 0, DateTime.now()));
+    motion.add(UserAccelerometerEvent(0, 0, 0, DateTime.now()));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+
+    final frame = AudioWaveform(
+      samples: const [],
+      sampleRate: 16000,
+      capturedAt: DateTime.now().add(const Duration(milliseconds: 1)),
+    );
+    for (var i = 0; i < 3; i++) {
+      microphone.controller.add(frame);
+    }
+    await tester.pump();
+    expect(detections, isEmpty);
+
+    classifier.label = 'distress_voice';
+    for (var i = 0; i < 3; i++) {
+      microphone.controller.add(frame);
+    }
+    await tester.pump();
+
+    expect(detections.single.impactDetected, isTrue);
+    expect(detections.single.stillnessDetected, isTrue);
+    expect(detections.single.riskScore, 95);
+    expect(detections.single.riskLevel, RiskLevel.critical);
+
+    await tester.runAsync(repository.stopMonitoring);
+    await tester.runAsync(() async {
+      await microphone.controller.close();
+      await motion.close();
+    });
+  });
+
   testWidgets('motion sensor failure leaves audio detection running', (
     tester,
   ) async {

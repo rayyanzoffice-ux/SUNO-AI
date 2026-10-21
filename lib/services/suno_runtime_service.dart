@@ -304,12 +304,16 @@ class SunoRuntimeService extends ChangeNotifier {
       );
     });
     _changed();
+    _maybeStopAlarm(status);
+    return updated;
+  }
+
+  /// Nothing else can silence a repeating alarm once the incident is over.
+  void _maybeStopAlarm(IncidentStatus status) {
     if (status == IncidentStatus.resolved ||
         status == IncidentStatus.cancelled) {
-      // Nothing else can silence a repeating alarm once the incident is over.
       unawaited(_localAlarm.stop());
     }
-    return updated;
   }
 
   Future<List<Incident>> getIncidentHistory() => _serialize(() async {
@@ -549,21 +553,31 @@ class SunoRuntimeService extends ChangeNotifier {
     try {
       final contacts = (await _contacts.getAll()).where(
         (contact) => onlyContactId == null || contact.id == onlyContactId,
-      );
+      ).toList();
       final tokens = contacts
           .map((contact) => contact.fcmToken?.trim())
           .whereType<String>()
           .where((token) => token.isNotEmpty)
           .toSet()
           .toList();
-      attempted = tokens.length;
-      if (service == null || tokens.isEmpty) {
+      final hasAnyPhone = contacts.any(
+        (contact) => contact.phone.trim().isNotEmpty,
+      );
+      // Every contact in scope is a dispatch target on some channel, so the
+      // denominator is contacts rather than push tokens.
+      attempted = contacts.length;
+      if (contacts.isEmpty) {
+        result = const AlertDispatchResult(
+          success: false,
+          attemptedCount: 0,
+          failedReason: 'No trusted contacts to notify',
+        );
+      } else if (service == null && !hasAnyPhone) {
+        // No way to reach anyone on any channel.
         result = AlertDispatchResult(
           success: false,
           attemptedCount: attempted,
-          failedReason: service == null
-              ? 'Alert service unavailable'
-              : 'No contacts with a push token',
+          failedReason: 'No contacts with a push token or phone number',
         );
       } else {
         final detection = incident.detectionResult;
@@ -574,6 +588,7 @@ class SunoRuntimeService extends ChangeNotifier {
           debugPrint('SUNO could not read display name: $error');
         }
         final isCachedFix = location?.isCached == true;
+        final senderToken = service?.deviceToken;
         final payload = <String, String>{
           'incidentId': id,
           'eventType': detection.eventType,
@@ -587,8 +602,7 @@ class SunoRuntimeService extends ChangeNotifier {
             'longitude': detection.longitude.toString(),
           if (detection.locationText != null)
             'locationText': detection.locationText!,
-          if (service.deviceToken != null)
-            'senderToken': service.deviceToken!,
+          if (senderToken != null) 'senderToken': senderToken,
           'senderName': ?myName,
           // Drive the wording of the recipient's push banner only; in-app
           // text always uses the recipient's own language. `lang` is the key
@@ -602,30 +616,41 @@ class SunoRuntimeService extends ChangeNotifier {
           if (isCachedFix)
             'locationAgeMinutes': location!.age.inMinutes.toString(),
         };
-        var sent = 0;
+        Set<String> acceptedTokens = const <String>{};
         String? pushFailure;
-        try {
-          sent = await service
-              .sendAlert(contactTokens: tokens, payload: payload)
-              .timeout(const Duration(seconds: 8));
-        } catch (error) {
-          pushFailure = 'Push relay unreachable: $error';
+        if (service != null && tokens.isNotEmpty) {
+          try {
+            acceptedTokens = await service
+                .sendAlert(contactTokens: tokens, payload: payload)
+                .timeout(const Duration(seconds: 8));
+          } catch (error) {
+            pushFailure = 'Push relay unreachable: $error';
+          }
         }
+        // A contact counts as reached by push only when its own token was
+        // accepted this attempt, so a partial relay result is handled per
+        // contact rather than as an aggregate count.
+        final pushReachedContactIds = contacts
+            .where((contact) {
+              final token = contact.fcmToken?.trim();
+              return token != null && acceptedTokens.contains(token);
+            })
+            .map((contact) => contact.id)
+            .toSet();
+        // Every contact not confirmed reached by push — including one with no
+        // token at all — is a candidate for SMS.
+        final needsSms = contacts
+            .where((contact) => !pushReachedContactIds.contains(contact.id))
+            .toList();
         var smsSent = 0;
-        if (sent < attempted) {
-          // Push did not reach everyone — offline, partial, or a misconfigured
-          // relay. SMS dials numbers rather than tokens, so this is also the
-          // only way to reach a contact whose token was never recorded.
+        if (needsSms.isNotEmpty) {
           final sms = await _smsFallback.sendAlert(
-            contacts: contacts.toList(),
+            contacts: needsSms,
             payload: payload,
           );
           smsSent = sms.sent;
         }
-        if (sent < 0 || sent > attempted) {
-          throw StateError('Invalid relay result');
-        }
-        final delivered = sent + smsSent;
+        final delivered = pushReachedContactIds.length + smsSent;
         if (delivered == 0 && attempted > 0) {
           // Neither radio path worked, so alert whoever is near the phone.
           unawaited(_localAlarm.sound(incidentId: id));
@@ -633,7 +658,7 @@ class SunoRuntimeService extends ChangeNotifier {
         result = AlertDispatchResult(
           success: delivered >= attempted && attempted > 0,
           attemptedCount: attempted,
-          sentCount: sent,
+          sentCount: pushReachedContactIds.length,
           smsSentCount: smsSent,
           failedReason: delivered >= attempted
               ? null
@@ -735,6 +760,8 @@ class SunoRuntimeService extends ChangeNotifier {
           updatedAt: DateTime.now(),
         ),
       );
+      // Only stop once the resolution is actually persisted.
+      _maybeStopAlarm(nextStatus);
       return true;
     });
     _changed();

@@ -43,11 +43,11 @@
   "emergencyContactResolved": "A contact marked this incident as resolved.",
   "emergencySending": "Sending alerts to your trusted contacts…",
   "emergencyNoDeliveryResult": "No confirmed delivery result. Check your contacts and retry if needed.",
-  "emergencyDispatchAwaiting": "FCM accepted {sent} of {attempted} alerts. Awaiting a contact response.",
+  "emergencyDispatchAwaiting": "Reached {sent} of {attempted} contacts. Awaiting a contact response.",
   "@emergencyDispatchAwaiting": {
     "placeholders": { "sent": { "type": "int" }, "attempted": { "type": "int" } }
   },
-  "emergencyDispatchPartial": "FCM accepted {sent} of {attempted} alerts. {failed} failed.",
+  "emergencyDispatchPartial": "Reached {sent} of {attempted} contacts. {failed} not reached.",
   "@emergencyDispatchPartial": {
     "placeholders": {
       "sent": { "type": "int" },
@@ -149,7 +149,7 @@
   "historyStatusResolved": "Resolved — confirmed safe",
   "historyStatusUserSafe": "User confirmed safe",
   "historyStatusEscalationNeeded": "Escalation needed",
-  "historyStatusFcmAccepted": "FCM accepted alert",
+  "historyStatusContactReached": "Contact notified",
   "historyStatusSafetyPending": "Safety check pending",
   "historyStatusMonitoring": "Monitoring",
   "historyTodayAt": "Today · {time}",

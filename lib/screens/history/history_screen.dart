@@ -371,7 +371,7 @@ class _HistoryCard extends StatelessWidget {
         IncidentStatus.resolved => l10n.historyStatusResolved,
         IncidentStatus.cancelled => l10n.historyStatusUserSafe,
         IncidentStatus.alertTriggered => l10n.historyStatusEscalationNeeded,
-        IncidentStatus.contactNotified => l10n.historyStatusFcmAccepted,
+        IncidentStatus.contactNotified => l10n.historyStatusContactReached,
         IncidentStatus.safetyCheck => l10n.historyStatusSafetyPending,
         IncidentStatus.monitoring => l10n.historyStatusMonitoring,
       };
