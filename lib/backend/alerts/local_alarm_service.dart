@@ -50,7 +50,8 @@ class LocalAlarmService {
             AndroidFlutterLocalNotificationsPlugin
           >();
       if (await android?.areNotificationsEnabled() == false) {
-        await _vibrate(epoch);
+        // The native player already vibrates; only a failed tune needs this.
+        if (!audible) await _vibrate(epoch);
         return;
       }
     } catch (_) {
