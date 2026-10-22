@@ -230,6 +230,7 @@
   "monitoringStartFailed": "تعذَّر بدء المراقبة المباشرة. تحقَّق من إذن الميكروفون ودعم الجهاز، ثم أعد المحاولة.",
   "monitoringStopCaptureFailed": "لم يكتمل إيقاف التقاط الصوت.",
   "monitoringClassifierReleaseFailed": "لم يمكن تحرير مصنِّف الصوت. أعد تشغيل SUNO.",
+  "monitoringProcessorFailed": "توقَّفت مراقبة الصوت لأن معالج الصوت تعطَّل. أعد تشغيل SUNO.",
   "monitoringProcessorReleaseFailed": "لم يمكن تحرير معالج الصوت. أعد تشغيل SUNO.",
   "monitoringMicrophoneReleaseFailed": "لم يمكن تحرير الميكروفون. أعد تشغيل SUNO قبل الاستماع مرة أخرى.",
   "monitoringAndroidStopFailed": "لم يمكن إيقاف خدمة Android. تحقق من إشعار النظام وأعد تشغيل SUNO.",

@@ -298,6 +298,7 @@
   "monitoringStartFailed": "Live monitoring could not start. Check microphone permission and device support, then retry.",
   "monitoringStopCaptureFailed": "Could not finish stopping audio capture.",
   "monitoringClassifierReleaseFailed": "Could not release the audio classifier. Restart SUNO.",
+  "monitoringProcessorFailed": "Audio monitoring stopped because the audio processor failed. Restart SUNO.",
   "monitoringProcessorReleaseFailed": "Could not release the audio processor. Restart SUNO.",
   "monitoringMicrophoneReleaseFailed": "Could not release the microphone. Restart SUNO before listening again.",
   "monitoringAndroidStopFailed": "Could not stop the Android service. Check the system notification and restart SUNO.",

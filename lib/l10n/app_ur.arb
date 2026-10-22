@@ -230,6 +230,7 @@
   "monitoringStartFailed": "لائیو مانیٹرنگ شروع نہیں ہو سکی۔ مائیک اجازت اور ڈیوائس سپورٹ چیک کریں، پھر دوبارہ کوشش کریں۔",
   "monitoringStopCaptureFailed": "آڈیو کیپچر بند کرنا مکمل نہیں ہو سکا۔",
   "monitoringClassifierReleaseFailed": "آڈیو کلاسیفائر خارج نہیں ہو سکا۔ SUNO دوبارہ چلائیں۔",
+  "monitoringProcessorFailed": "آڈیو پروسیسر ناکام ہونے کی وجہ سے آڈیو مانیٹرنگ رک گئی۔ SUNO دوبارہ چلائیں۔",
   "monitoringProcessorReleaseFailed": "آڈیو پروسیسر خارج نہیں ہو سکا۔ SUNO دوبارہ چلائیں۔",
   "monitoringMicrophoneReleaseFailed": "مائیک خارج نہیں ہو سکا۔ دوبارہ سننے سے پہلے SUNO دوبارہ چلائیں۔",
   "monitoringAndroidStopFailed": "Android سروس بند نہیں ہو سکی۔ سسٹم اطلاع دیکھیں اور SUNO دوبارہ چلائیں۔",

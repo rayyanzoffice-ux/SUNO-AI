@@ -230,6 +230,7 @@
   "monitoringStartFailed": "无法启动实时监听。请检查麦克风权限和设备支持，然后重试。",
   "monitoringStopCaptureFailed": "无法完成停止音频采集。",
   "monitoringClassifierReleaseFailed": "无法释放音频分类器。请重启 SUNO。",
+  "monitoringProcessorFailed": "音频处理器发生故障，音频监听已停止。请重启 SUNO。",
   "monitoringProcessorReleaseFailed": "无法释放音频处理器。请重启 SUNO。",
   "monitoringMicrophoneReleaseFailed": "无法释放麦克风。请重启 SUNO 后再监听。",
   "monitoringAndroidStopFailed": "无法停止 Android 服务。请检查系统通知并重启 SUNO。",

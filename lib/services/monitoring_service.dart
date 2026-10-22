@@ -174,12 +174,10 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _onError(Object err) {
-    // Permanent diagnostic: the user-facing banner below is deliberately
-    // generic, so without this line the real cause is unrecoverable on device.
+    // The banner stays generic so a raw exception never reaches the screen;
+    // this log line is what keeps the cause recoverable on a device without adb.
     debugPrint('SUNO_DEBUG audio onError: $err');
-    // DIAGNOSTIC BUILD ONLY: `$err` is exposed on the banner because the test
-    // phone has no adb access. Drop it back to the generic text for demos.
-    error = 'Audio monitoring stopped because the audio processor failed: $err';
+    error = tr.monitoringProcessorFailed;
     unawaited(stop());
   }
 

@@ -230,6 +230,7 @@
   "monitoringStartFailed": "Impossible de démarrer la surveillance en direct. Vérifiez l’autorisation du micro et la compatibilité de l’appareil, puis réessayez.",
   "monitoringStopCaptureFailed": "Impossible d’arrêter complètement la capture audio.",
   "monitoringClassifierReleaseFailed": "Impossible de libérer le classifieur audio. Redémarrez SUNO.",
+  "monitoringProcessorFailed": "La surveillance audio s’est arrêtée car le processeur audio a échoué. Redémarrez SUNO.",
   "monitoringProcessorReleaseFailed": "Impossible de libérer le processeur audio. Redémarrez SUNO.",
   "monitoringMicrophoneReleaseFailed": "Impossible de libérer le micro. Redémarrez SUNO avant de réécouter.",
   "monitoringAndroidStopFailed": "Impossible d’arrêter le service Android. Vérifiez la notification système et redémarrez SUNO.",

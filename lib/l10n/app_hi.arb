@@ -230,6 +230,7 @@
   "monitoringStartFailed": "लाइव मॉनिटरिंग शुरू नहीं हो सकी। माइक अनुमति और डिवाइस सहायता जाँचें, फिर कोशिश करें।",
   "monitoringStopCaptureFailed": "ऑडियो कैप्चर बंद करना पूरा नहीं हो सका।",
   "monitoringClassifierReleaseFailed": "ऑडियो क्लासिफायर रिलीज़ नहीं हो सका। SUNO फिर से चालू करें।",
+  "monitoringProcessorFailed": "ऑडियो प्रोसेसर विफल होने के कारण ऑडियो मॉनिटरिंग रुक गई। SUNO फिर से चालू करें।",
   "monitoringProcessorReleaseFailed": "ऑडियो प्रोसेसर रिलीज़ नहीं हो सका। SUNO फिर से चालू करें।",
   "monitoringMicrophoneReleaseFailed": "माइक रिलीज़ नहीं हो सका। फिर से सुनने से पहले SUNO फिर से चालू करें।",
   "monitoringAndroidStopFailed": "Android सेवा बंद नहीं हो सकी। सिस्टम सूचना जाँचें और SUNO फिर से चालू करें।",

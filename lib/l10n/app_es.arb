@@ -230,6 +230,7 @@
   "monitoringStartFailed": "No se pudo iniciar el monitoreo en vivo. Verifica el permiso del micrófono y la compatibilidad del dispositivo, e inténtalo de nuevo.",
   "monitoringStopCaptureFailed": "No se pudo terminar de detener la captura de audio.",
   "monitoringClassifierReleaseFailed": "No se pudo liberar el clasificador de audio. Reinicia SUNO.",
+  "monitoringProcessorFailed": "El monitoreo de audio se detuvo porque el procesador de audio falló. Reinicia SUNO.",
   "monitoringProcessorReleaseFailed": "No se pudo liberar el procesador de audio. Reinicia SUNO.",
   "monitoringMicrophoneReleaseFailed": "No se pudo liberar el micrófono. Reinicia SUNO antes de volver a escuchar.",
   "monitoringAndroidStopFailed": "No se pudo detener el servicio de Android. Revisa la notificación del sistema y reinicia SUNO.",
