@@ -102,6 +102,11 @@ Future<void> _openPayload(
   _log('open payload source=$source type=$kind incident=$incidentId');
   try {
     await _drainInbox();
+    // The local alarm loops natively until it is acknowledged; a tap on its
+    // notification is that acknowledgement.
+    if (data['alarm'] == '1') {
+      await SunoRuntimeService.instance.silenceLocalAlarm();
+    }
     await _acceptPayload(data);
     if (data.containsKey('incidentId') && data['type'] != 'test') {
       if (!_pendingNavigation.any(

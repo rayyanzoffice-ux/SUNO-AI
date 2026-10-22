@@ -89,10 +89,11 @@ SUNO-AI/
 ├── android/app/src/main/
 │   ├── AndroidManifest.xml
 │   ├── kotlin/com/example/suno_ai/
+│   │   ├── AlarmPlayer.kt             # Native alarm-stream MediaPlayer
 │   │   ├── MainActivity.kt
 │   │   ├── MonitoringForegroundService.kt
 │   │   ├── SmsSender.kt               # Native SmsManager bridge
-│   │   └── SunoEngine.kt              # Retained FlutterEngine + method channel
+│   │   └── SunoEngine.kt              # Retained FlutterEngine + method channels
 │   └── res/raw/
 │       └── suno_alarm.wav             # Last-resort alarm loop
 ├── assets/ml/
@@ -334,7 +335,7 @@ Alerts flow through up to three layers, attempted in order:
 |---|---|---|---|
 | 1. Push | FCM via Supabase Edge Function | Internet, contact FCM token | Every dispatch |
 | 2. SMS | Device SIM via native `SmsManager` | `SEND_SMS`, contact phone number, carrier signal | Push did not confirm every contact (relay unreachable, a partial result, or a contact with only a phone) |
-| 3. Local alarm | Local notification + bundled sound | Notification permission (vibration fallback) | Neither push nor SMS was accepted for anyone |
+| 3. Local alarm | Native alarm-stream playback + notification card | Alarm volume (vibration fallback; notification permission only for the card) | Neither push nor SMS was accepted for anyone |
 
 `AlertDispatchResult` records the outcome on the incident: `attemptedCount`, `sentCount` (push tokens the relay accepted), `smsSentCount` (SMS the OS confirmed it submitted), `queued` (the push half is saved for retry), `failedReason`, and the derived `totalDelivered` / `partiallyDelivered` / `usedSmsFallback`. `success` is deliberately **push-only**: true when every attempted contact's token was accepted by the relay. Android confirming `SMS_SENT` proves the phone handed the message to the radio, not that the contact received it, so SMS never makes `success` true and never moves the incident to `contact_notified` by itself.
 
@@ -385,11 +386,12 @@ Triggered for every contact push did not reach — a relay timeout, an offline d
 
 If `delivered == 0` and at least one contact was attempted, SUNO alerts the person next to the phone.
 
-- A dedicated `suno_local_alarm_v2` channel is registered at startup with `Importance.max`, `AudioAttributesUsage.alarm`, and `RawResourceAndroidNotificationSound('suno_alarm')`. Registering the sound on the channel (not only on the notification) matters because Android freezes channel settings after first creation. The `_v2` id exists because the original channel was created while the WAV was missing from the APK; a new id is the only way to give existing installs a sound.
-- `res/raw/suno_alarm.wav` is referenced from Dart **by name only**, so R8/resource shrinking removed it from release APKs and left the channel pointing at a missing URI. `res/raw/keep.xml` (`tools:keep="@raw/suno_alarm"`) pins it in the build. The file is 16-bit PCM so every Android version can decode it.
-- The notification uses `FLAG_INSISTENT` (raw flag `4`), so the bundled sound loops until the notification is cancelled; it also requests a full-screen intent and vibrates.
-- Payload `type=emergency_alert&incidentId=...` opens the incident when tapped and is deliberately not treated as an inbound alert.
-- Resolving or cancelling the incident through `updateStatus()` cancels the notification and any vibration, and tapping or dismissing the notification itself silences it (the notification auto-cancels). A contact response applied remotely (`applyContactResponse`) stops it too once the new status is persisted, but only for `resolved` — a "checking on them" response leaves the alarm sounding. If showing the notification fails, the service falls back to raw vibration.
+- The tune is played by `AlarmPlayer.kt` (a looping `MediaPlayer` on `AudioAttributes.USAGE_ALARM`) over the `com.example.suno_ai/alarm` channel. Playback lives in the app process and ignores notification permission and activity visibility, so it stays audible with SUNO in the background or its task swiped away: the pending safety check keeps `MonitoringForegroundService` (`stopWithTask="false"`) running, and the cached `FlutterEngine` keeps the isolate alive. `start()` returns `false` when the WAV cannot be decoded, and Dart then vibrates instead.
+- The `suno_local_alarm_v3` channel is registered at startup with `Importance.max` and vibration but **no sound**. The notification supplies the visible card, full-screen intent and vibration, while the tune comes from the native player, so the two can never overlap. Android freezes channel settings after first creation, which is why each change to the sound strategy needs a new channel id.
+- `res/raw/suno_alarm.wav` is referenced from Kotlin (`R.raw.suno_alarm`) and from Dart by name, so R8/resource shrinking can remove it from release APKs. `res/raw/keep.xml` (`tools:keep="@raw/suno_alarm"`) pins it in the build. The file is 16-bit PCM so every Android version can decode it.
+- The countdown passes the remaining time as `durationMs`; the native player also stops itself at that deadline, so a throttled Dart isolate cannot leave the alarm ringing past the 45 seconds. The notification adds `FLAG_INSISTENT` (raw flag `4`) so its vibration repeats until the alarm is acknowledged.
+- Payload `type=emergency_alert&incidentId=...&alarm=1` opens the incident when tapped and tells `main.dart` to stop the native loop. It is deliberately not treated as an inbound alert.
+- Resolving or cancelling the incident through `updateStatus()` cancels the notification, stops the native player and cancels vibration. `applyContactResponse` stops it too once the new status is persisted, but only for `resolved` — a "checking on them" response leaves the alarm sounding. A force-stop from Android settings kills the process, so no alarm layer can sound in that state even though the countdown keeps its deadline.
 
 ### Incoming Alerts
 
@@ -718,7 +720,7 @@ Values injected via `--dart-define` at build time:
 | Push dispatch timeout | 8 seconds | `SunoRuntimeService._dispatch()` |
 | SMS bridge timeout per number | 9 seconds (Dart) / 6 seconds (native `SMS_SENT` wait) | `SmsNativeBridge`, `SmsSender.kt` |
 | Relay limits | 10 tokens, 16 payload keys, 16 KiB body, 256-character text | `send-alert/index.ts` |
-| Local alarm channel / notification id | `suno_local_alarm_v2` / `0x50A0` | `detection_notification_service.dart`, `local_alarm_service.dart` |
+| Local alarm channel / notification id | `suno_local_alarm_v3` / `0x50A0` | `detection_notification_service.dart`, `local_alarm_service.dart`, `AlarmPlayer.kt` |
 
 ### Model Configuration (`labels.json`)
 

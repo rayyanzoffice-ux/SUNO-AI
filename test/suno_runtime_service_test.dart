@@ -193,6 +193,10 @@ void main() {
       detection(RiskLevel.medium),
     ))!;
     expect(alarm.sounded, [incident.id]);
+    // The native player stops itself after this duration, so a backgrounded
+    // isolate cannot leave the alarm ringing past the countdown.
+    expect(alarm.durations.single, isNotNull);
+    expect(alarm.durations.single! <= const Duration(seconds: 5), isTrue);
 
     runtime.confirmSafe(incident.id);
     await runtime.safetyCheckCompleted;
@@ -1188,11 +1192,13 @@ class FakeLocalAlarm extends LocalAlarmService {
   FakeLocalAlarm();
 
   final sounded = <String>[];
+  final durations = <Duration?>[];
   int stops = 0;
 
   @override
-  Future<void> sound({required String incidentId}) async {
+  Future<void> sound({required String incidentId, Duration? duration}) async {
     sounded.add(incidentId);
+    durations.add(duration);
   }
 
   @override

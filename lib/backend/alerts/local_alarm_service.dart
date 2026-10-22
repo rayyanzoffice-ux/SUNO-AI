@@ -1,21 +1,21 @@
-import 'dart:typed_data';
-
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:vibration/vibration.dart';
 
 import '../../core/l10n/l10n.dart';
 import '../../services/detection_notification_service.dart'
-    show
-        alarmVibration,
-        localAlarmChannelId,
-        localAlarmSound,
-        sunoNotifications;
+    show alarmVibration, localAlarmChannelId, sunoNotifications;
+import 'native_alarm_player.dart';
 
-/// Last-resort alert for a device that reached nobody: a loud notification
-/// that repeats until it is tapped, plus vibration. Both run entirely on the
-/// phone, so they still work with no SIM, no signal and no SMS balance.
+/// Audible safety alarm. The tune plays natively on Android's alarm stream, so
+/// it is heard while SUNO is in the background or its task has been swiped
+/// away; the notification supplies the visible card and full-screen intent,
+/// and vibration backs up both. Everything runs on the phone, so it still
+/// works with no SIM, no signal and no SMS balance.
 class LocalAlarmService {
-  LocalAlarmService();
+  LocalAlarmService({NativeAlarmPlayer? player})
+    : _player = player ?? NativeAlarmPlayer();
+
+  final NativeAlarmPlayer _player;
 
   // A fixed id keeps a second failed dispatch from stacking alarms.
   static const _notificationId = 0x50A0;
@@ -30,12 +30,20 @@ class LocalAlarmService {
   /// has just posted.
   int _soundSerial = 0;
 
-  Future<void> sound({required String incidentId}) async {
+  Future<void> sound({required String incidentId, Duration? duration}) async {
     final epoch = _stopEpoch;
     final serial = ++_soundSerial;
-    // Android 13+ can silently drop a notification (and its sound) when the
-    // permission is denied: show() still completes, so the catch below would
-    // never run. Probe first and vibrate instead, otherwise the alarm is mute.
+    // Native audio ignores notification permission and the activity lifetime,
+    // which are exactly the two things that can silence a notification sound.
+    final audible = await _player.start(duration: duration);
+    if (epoch != _stopEpoch) {
+      // stop() ran while the bridge was starting; do not leave it ringing.
+      await _player.stop();
+      return;
+    }
+    // Android 13+ can silently drop a notification (and its vibration) when
+    // the permission is denied: show() still completes, so the catch below
+    // would never run. Probe first and buzz directly instead.
     try {
       final android = sunoNotifications
           .resolvePlatformSpecificImplementation<
@@ -62,23 +70,22 @@ class LocalAlarmService {
             importance: Importance.max,
             priority: Priority.max,
             category: AndroidNotificationCategory.alarm,
-            audioAttributesUsage: AudioAttributesUsage.alarm,
-            sound: localAlarmSound,
-            playSound: true,
+            // The tune comes from NativeAlarmPlayer; a second sound from the
+            // channel would overlap it.
+            playSound: false,
             enableVibration: true,
             vibrationPattern: alarmVibration,
             fullScreenIntent: true,
-            // NotificationCompat.FLAG_INSISTENT: repeat the sound and
-            // vibration until this notification is tapped or cancelled.
-            additionalFlags: Int32List.fromList(<int>[4]),
           ),
         ),
         // Same shape as a detection alert so a tap opens that incident; an
         // unknown type here would be filed as an alert from someone else.
+        // `alarm=1` tells the tap handler to stop the native tune.
         payload: Uri(
           queryParameters: {
             'type': 'emergency_alert',
             'incidentId': incidentId,
+            'alarm': '1',
           },
         ).query,
       );
@@ -87,6 +94,7 @@ class LocalAlarmService {
       // Only the newest sound may clean up, or this cancel would silence the
       // alarm that superseded it.
       if (epoch != _stopEpoch && serial == _soundSerial) await _cancel();
+      if (!audible) await _vibrate(epoch);
     } catch (_) {
       // Last-ditch fallback inside the last resort: if the notification
       // itself is unavailable, at least keep the device buzzing.
@@ -106,6 +114,7 @@ class LocalAlarmService {
   }
 
   Future<void> _cancel() async {
+    await _player.stop();
     try {
       await sunoNotifications.cancel(_notificationId);
     } catch (_) {}

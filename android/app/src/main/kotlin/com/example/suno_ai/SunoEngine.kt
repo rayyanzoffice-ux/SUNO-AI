@@ -89,6 +89,19 @@ object SunoEngine {
                 else -> result.notImplemented()
             }
         }
+        MethodChannel(created.dartExecutor.binaryMessenger, "com.example.suno_ai/alarm").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "start" -> {
+                    val durationMs = call.argument<Number>("durationMs")?.toLong() ?: 0L
+                    result.success(AlarmPlayer.start(app, durationMs))
+                }
+                "stop" -> {
+                    AlarmPlayer.stop()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         created.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
         return created
     }

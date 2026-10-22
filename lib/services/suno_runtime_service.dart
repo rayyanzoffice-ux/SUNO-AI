@@ -344,7 +344,9 @@ class SunoRuntimeService extends ChangeNotifier {
     _alarmStopTimer?.cancel();
     _alarmStopTimer = null;
     if (remaining <= Duration.zero) return;
-    unawaited(_localAlarm.sound(incidentId: incidentId));
+    // The native player also stops itself after `remaining`, so the alarm ends
+    // with the countdown even if this isolate is throttled in the background.
+    unawaited(_localAlarm.sound(incidentId: incidentId, duration: remaining));
     _alarmStopTimer = Timer(remaining, () {
       _alarmStopTimer = null;
       unawaited(_localAlarm.stop());
@@ -356,6 +358,9 @@ class SunoRuntimeService extends ChangeNotifier {
     _alarmStopTimer = null;
     await _localAlarm.stop();
   }
+
+  /// Stops the on-device alarm when its notification is tapped.
+  Future<void> silenceLocalAlarm() => _stopCountdownAlarm();
 
   Future<List<Incident>> getIncidentHistory() => _serialize(() async {
     final history = await _incidents.getAll();
