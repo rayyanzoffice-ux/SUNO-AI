@@ -1,0 +1,48 @@
+{
+  "policy_version": "2026-10-22-v2-curated",
+  "purpose": "Training data gate only; NOT deployed TFLite model labels",
+  "enabled_alert_folders": [
+    "a01_scream_loud",
+    "a03_glass_break"
+  ],
+  "excluded_alert_folders": {
+    "a02_help_shout": "needs genuine consenting urgent human recordings",
+    "a04_crash_heavy": "old title-matched import rejected; only same-source provisional crash samples",
+    "a05_alarm_home": "outdoor sirens rejected; 7 candidate alarms unverified",
+    "a06_gunshot_blast": "phase 2 optional; excluded from v2"
+  },
+  "high_risk_negative_folders": [
+    "n01_scream_light",
+    "n02_cry_whimper",
+    "n06_speech_loud",
+    "n07_tv_media",
+    "n10_blast_lookalike",
+    "n18_angry_argument"
+  ],
+  "excluded_path_fragments": [
+    "_QUARANTINE",
+    "_ARCHIVES",
+    "DO_NOT_TRAIN",
+    "_REVIEW_"
+  ],
+  "human_review_required": true,
+  "required_audio_format": {
+    "sample_rate_hz": 16000,
+    "channels": 1,
+    "bit_depth": 16
+  },
+  "proposed_new_head_labels": [
+    "ambient_safe",
+    "scream_loud",
+    "glass_break"
+  ],
+  "deployed_head_label_count": 4,
+  "new_head_label_count": 3,
+  "do_not_activate_until": [
+    "human review",
+    "source-disjoint validation",
+    "retrained three-output TFLite model",
+    "Dart mapping and risk engine aligned to ordered head labels",
+    "real-device false-alert testing"
+  ]
+}
