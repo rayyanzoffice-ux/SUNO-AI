@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The alarm is referenced by name from Dart, not from Kotlin, so the
+     resource shrinker cannot see the reference and removes the WAV. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/suno_alarm" />

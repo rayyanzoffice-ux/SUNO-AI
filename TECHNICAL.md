@@ -385,7 +385,8 @@ Triggered for every contact push did not reach — a relay timeout, an offline d
 
 If `delivered == 0` and at least one contact was attempted, SUNO alerts the person next to the phone.
 
-- A dedicated `suno_local_alarm` channel is registered at startup with `Importance.max`, `AudioAttributesUsage.alarm`, and `RawResourceAndroidNotificationSound('suno_alarm')`. Registering the sound on the channel (not only on the notification) matters because Android freezes channel settings after first creation.
+- A dedicated `suno_local_alarm_v2` channel is registered at startup with `Importance.max`, `AudioAttributesUsage.alarm`, and `RawResourceAndroidNotificationSound('suno_alarm')`. Registering the sound on the channel (not only on the notification) matters because Android freezes channel settings after first creation. The `_v2` id exists because the original channel was created while the WAV was missing from the APK; a new id is the only way to give existing installs a sound.
+- `res/raw/suno_alarm.wav` is referenced from Dart **by name only**, so R8/resource shrinking removed it from release APKs and left the channel pointing at a missing URI. `res/raw/keep.xml` (`tools:keep="@raw/suno_alarm"`) pins it in the build. The file is 16-bit PCM so every Android version can decode it.
 - The notification uses `FLAG_INSISTENT` (raw flag `4`), so the bundled sound loops until the notification is cancelled; it also requests a full-screen intent and vibrates.
 - Payload `type=emergency_alert&incidentId=...` opens the incident when tapped and is deliberately not treated as an inbound alert.
 - Resolving or cancelling the incident through `updateStatus()` cancels the notification and any vibration, and tapping or dismissing the notification itself silences it (the notification auto-cancels). A contact response applied remotely (`applyContactResponse`) stops it too once the new status is persisted, but only for `resolved` — a "checking on them" response leaves the alarm sounding. If showing the notification fails, the service falls back to raw vibration.
@@ -717,7 +718,7 @@ Values injected via `--dart-define` at build time:
 | Push dispatch timeout | 8 seconds | `SunoRuntimeService._dispatch()` |
 | SMS bridge timeout per number | 9 seconds (Dart) / 6 seconds (native `SMS_SENT` wait) | `SmsNativeBridge`, `SmsSender.kt` |
 | Relay limits | 10 tokens, 16 payload keys, 16 KiB body, 256-character text | `send-alert/index.ts` |
-| Local alarm channel / notification id | `suno_local_alarm` / `0x50A0` | `detection_notification_service.dart`, `local_alarm_service.dart` |
+| Local alarm channel / notification id | `suno_local_alarm_v2` / `0x50A0` | `detection_notification_service.dart`, `local_alarm_service.dart` |
 
 ### Model Configuration (`labels.json`)
 

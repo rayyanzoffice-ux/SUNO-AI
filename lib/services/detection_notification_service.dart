@@ -6,7 +6,10 @@ import '../core/l10n/l10n.dart';
 
 const emergencyChannelId = 'suno_alerts_v2';
 const detectionChannelId = 'suno_detection_v2';
-const localAlarmChannelId = 'suno_local_alarm';
+// v2: the original channel was created with a sound URI that resolved to
+// nothing (the WAV was stripped from the APK), and Android never re-reads a
+// channel's sound after creation. A new id is the only way to repair installs.
+const localAlarmChannelId = 'suno_local_alarm_v2';
 const localAlarmSound = RawResourceAndroidNotificationSound('suno_alarm');
 const _detectionNotificationId = 9001;
 final notificationVibration = Int64List.fromList([0, 400, 200, 400, 200, 800]);
