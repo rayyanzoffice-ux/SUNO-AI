@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:vibration/vibration.dart';
 
 import '../../models/incident.dart';
 import '../../core/l10n/l10n.dart';
@@ -36,23 +35,6 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> {
       (_) => _refresh(),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
-    unawaited(_buzzOnce());
-  }
-
-  /// Vibrates once when this screen first appears, regardless of whether a
-  /// system notification was also shown. Covers the case where the app is
-  /// in the foreground and no notification fires, and matches the pattern
-  /// already used for SUNO's alert notifications elsewhere in the app.
-  Future<void> _buzzOnce() async {
-    try {
-      final hasVibrator = await Vibration.hasVibrator();
-      if (hasVibrator ?? false) {
-        await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 800]);
-      }
-    } catch (_) {
-      // The buzz is best-effort — a device or test environment without the
-      // vibration plugin must not break the safety countdown itself.
-    }
   }
 
   void _refresh() {

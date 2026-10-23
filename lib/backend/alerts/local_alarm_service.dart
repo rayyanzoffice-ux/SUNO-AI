@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:vibration/vibration.dart';
 
@@ -30,30 +32,34 @@ class LocalAlarmService {
   /// has just posted.
   int _soundSerial = 0;
 
+  /// Safety net so vibration ends with the countdown even if the runtime
+  /// service's stop timer is delayed.
+  Timer? _vibrationStopTimer;
+
   Future<void> sound({required String incidentId, Duration? duration}) async {
     final epoch = _stopEpoch;
     final serial = ++_soundSerial;
     // Native audio ignores notification permission and the activity lifetime,
     // which are exactly the two things that can silence a notification sound.
-    final audible = await _player.start(duration: duration);
+    await _player.start(duration: duration);
     if (epoch != _stopEpoch) {
       // stop() ran while the bridge was starting; do not leave it ringing.
       await _player.stop();
       return;
     }
-    // Android 13+ can silently drop a notification (and its vibration) when
-    // the permission is denied: show() still completes, so the catch below
-    // would never run. Probe first and buzz directly instead.
+    // Vibration runs alongside the tune and the notification and must not
+    // depend on either succeeding: a silenced phone or a denied notification
+    // permission are exactly the cases where it matters most.
+    unawaited(_vibrate(epoch, serial, duration));
+    // Android 13+ can silently drop a notification when the permission is
+    // denied: show() still completes, so the catch below would never run.
+    // Probe first and skip the notification; vibration already started.
     try {
       final android = sunoNotifications
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
           >();
-      if (await android?.areNotificationsEnabled() == false) {
-        // The native player already vibrates; only a failed tune needs this.
-        if (!audible) await _vibrate(epoch);
-        return;
-      }
+      if (await android?.areNotificationsEnabled() == false) return;
     } catch (_) {
       // A failed probe must not silence the alarm; try the notification.
     }
@@ -95,26 +101,40 @@ class LocalAlarmService {
       // Only the newest sound may clean up, or this cancel would silence the
       // alarm that superseded it.
       if (epoch != _stopEpoch && serial == _soundSerial) await _cancel();
-      if (!audible) await _vibrate(epoch);
     } catch (_) {
-      // Last-ditch fallback inside the last resort: if the notification
-      // itself is unavailable, at least keep the device buzzing.
-      await _vibrate(epoch);
+      // The visible card is best-effort; the tune and vibration already run.
     }
   }
 
-  Future<void> _vibrate(int epoch) async {
+  Future<void> _vibrate(int epoch, int serial, Duration? duration) async {
     try {
       if (!await Vibration.hasVibrator()) return;
       if (epoch != _stopEpoch) return;
       await Vibration.vibrate(pattern: alarmVibration, repeat: 0);
-      // stop() already ran its own Vibration.cancel while the plugin call was
-      // starting up, so cancel this late start too.
-      if (epoch != _stopEpoch) await Vibration.cancel();
+      if (epoch != _stopEpoch) {
+        // stop() already ran its own Vibration.cancel while the plugin call
+        // was starting up, so cancel this late start too.
+        await Vibration.cancel();
+        return;
+      }
+      if (duration != null) {
+        // Belt-and-suspenders: the runtime service's stop timer normally ends
+        // this, but a throttled isolate must not let vibration outlast the
+        // countdown.
+        _vibrationStopTimer?.cancel();
+        _vibrationStopTimer = Timer(duration, () {
+          _vibrationStopTimer = null;
+          if (epoch == _stopEpoch && serial == _soundSerial) {
+            unawaited(Vibration.cancel());
+          }
+        });
+      }
     } catch (_) {}
   }
 
   Future<void> _cancel() async {
+    _vibrationStopTimer?.cancel();
+    _vibrationStopTimer = null;
     await _player.stop();
     try {
       await sunoNotifications.cancel(_notificationId);
