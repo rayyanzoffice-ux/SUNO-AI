@@ -205,7 +205,7 @@ void main() {
       final results = <DetectionResult>[];
       final repository = LiveDetectionRepository(
         yamnet: _Yamnet(),
-        classifier: _Classifier()..label = 'distress_voice',
+        classifier: _Classifier()..label = 'breaking_crash',
         microphone: microphone,
         locationService: LocationService(),
         motionEvents: motion.stream,
@@ -296,7 +296,7 @@ void main() {
     });
   });
 
-  testWidgets('an ambient event does not consume motion for a later scream', (
+  testWidgets('an ambient event does not consume motion for a later impact', (
     tester,
   ) async {
     final motion = StreamController<UserAccelerometerEvent>();
@@ -329,7 +329,7 @@ void main() {
     await tester.pump();
     expect(detections, isEmpty);
 
-    classifier.label = 'distress_voice';
+    classifier.label = 'breaking_crash';
     for (var i = 0; i < 3; i++) {
       microphone.controller.add(frame);
     }
@@ -347,6 +347,49 @@ void main() {
     });
   });
 
+  testWidgets('one v1 voice event waits for a repeat before alerting', (
+    tester,
+  ) async {
+    final microphone = _Microphone();
+    final detections = <DetectionResult>[];
+    final repository = LiveDetectionRepository(
+      yamnet: _Yamnet(),
+      classifier: _Classifier()..label = 'distress_voice',
+      microphone: microphone,
+      locationService: LocationService(),
+      onError: (error) => fail('$error'),
+      onDetection: detections.add,
+    );
+    await repository.startMonitoring();
+
+    var time = DateTime.now();
+    void feed(int frames) {
+      for (var i = 0; i < frames; i++) {
+        time = time.add(const Duration(seconds: 1));
+        microphone.controller.add(
+          AudioWaveform(
+            samples: const [],
+            sampleRate: 16000,
+            capturedAt: time,
+          ),
+        );
+      }
+    }
+
+    feed(3); // one debounced voice event
+    await tester.pump();
+    expect(detections, isEmpty);
+
+    feed(7); // cooldown 6 frames + 1: a second event inside the 10s window
+    await tester.pump();
+    expect(detections, hasLength(1));
+    expect(detections.single.riskScore, 50);
+    expect(detections.single.riskLevel, RiskLevel.medium);
+
+    await tester.runAsync(repository.stopMonitoring);
+    await tester.runAsync(microphone.controller.close);
+  });
+
   testWidgets('motion sensor failure leaves audio detection running', (
     tester,
   ) async {
@@ -357,7 +400,7 @@ void main() {
     final audioErrors = <Object>[];
     final repository = LiveDetectionRepository(
       yamnet: _Yamnet(),
-      classifier: _Classifier()..label = 'distress_voice',
+      classifier: _Classifier()..label = 'breaking_crash',
       microphone: microphone,
       locationService: LocationService(),
       motionEvents: motion.stream,

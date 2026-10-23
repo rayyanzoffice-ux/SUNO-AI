@@ -16,6 +16,12 @@ import 'loudness_gate.dart';
 import 'suno_audio_classifier.dart';
 import 'v2_audio_classifier.dart';
 
+/// v1 voice and alarm classes need a second detection inside the pattern
+/// window before they open the safety check. One ~2 s loud sound (a shout, a
+/// laugh, a TV line) is too ambiguous to act on alone. A real impact is
+/// meaningful on one hit, so `breaking_crash` stays exempt.
+const _v1RepeatRequiredClasses = <String>{'distress_voice', 'alarm_siren'};
+
 class LiveDetectionRepository implements DetectionRepository {
   LiveDetectionRepository({
     required this.yamnet,
@@ -158,6 +164,12 @@ class LiveDetectionRepository implements DetectionRepository {
     if (_modelV2) {
       _onAudioEventV2(event);
       return;
+    }
+    if (_v1RepeatRequiredClasses.contains(event.label)) {
+      _patternTracker.record(event);
+      if (!_patternTracker.hasRepeated(event.label, minRepeats: 2)) {
+        return; // first hit noted; wait for a second inside the window
+      }
     }
     final motion = _motion;
     final age = motion == null
