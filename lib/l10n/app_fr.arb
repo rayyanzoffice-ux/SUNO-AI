@@ -26,6 +26,7 @@
   "eventDistressSound": "Son de détresse",
   "eventEmergencyAlarm": "Alarme d’urgence",
   "eventImpactBreaking": "Choc / bruit de bris",
+  "eventGunshotSound": "Son de coup de feu",
   "eventAmbientSound": "Son ambiant",
   "eventPossibleDistress": "Son de détresse possible",
   "eventDistressImpact": "Son de détresse + choc",

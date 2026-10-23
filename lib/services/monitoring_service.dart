@@ -4,10 +4,13 @@ import 'package:flutter/widgets.dart';
 
 import '../backend/audio/microphone_capture.dart';
 import '../backend/audio/microphone_permission.dart';
+import '../backend/detection/classifier_labels.dart';
 import '../backend/detection/live_detection_repository.dart';
 import '../backend/detection/suno_audio_classifier.dart';
+import '../backend/detection/v2_audio_classifier.dart';
 import '../backend/ml/yamnet_stage.dart';
 import '../backend/services/foreground_service_bridge.dart';
+import '../config/model_config.dart';
 import '../core/l10n/l10n.dart';
 import '../models/detection_result.dart';
 import '../models/incident.dart';
@@ -85,6 +88,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
     MicrophoneCapture? microphone;
     YamNetStage? yamnet;
     SunoAudioClassifier? classifier;
+    ClassifierLabels? labelSet;
     LiveDetectionRepository? repo;
     var transferred = false;
     try {
@@ -106,7 +110,13 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
       microphone = MicrophoneCapture();
       yamnet = await YamNetStage.load();
       if (generation != _generation) return;
-      classifier = await SunoAudioClassifier.load();
+      if (useModelV2) {
+        final v2 = await V2AudioClassifier.load();
+        classifier = v2;
+        labelSet = v2.labelSet;
+      } else {
+        classifier = await SunoAudioClassifier.load();
+      }
       if (generation != _generation) return;
       repo = LiveDetectionRepository(
         yamnet: yamnet,
@@ -117,6 +127,8 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
         onDetection: _onDetection,
         onError: _onError,
         onMotionError: _onMotionError,
+        modelV2: useModelV2,
+        labelSet: labelSet,
       );
       await repo.startMonitoring();
       if (generation != _generation) return;
@@ -137,7 +149,10 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
       }, onError: (Object _) {});
       transferred = true;
       active = true;
-    } catch (startError, startStack) {
+    } catch (startError) {
+      // Keep the cause recoverable on a device without adb; the UI stays
+      // generic. A missing v2 asset fails here, not in the classifier.
+      debugPrint('SUNO_DEBUG monitoring start failed: $startError');
       if (generation == _generation) error = tr.monitoringStartFailed;
     } finally {
       if (!transferred) {

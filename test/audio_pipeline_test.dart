@@ -86,6 +86,65 @@ void main() {
     expect(events.length, 3);
   });
 
+  test('v2 averages every YAMNet frame, v1 keeps the first frame', () {
+    final waveform = AudioWaveform(
+      samples: const [],
+      sampleRate: 16000,
+      capturedAt: DateTime(2026),
+    );
+    final frames = [
+      YamNetEmbedding(embedding: List.filled(1024, 2), frameIndex: 0),
+      YamNetEmbedding(embedding: List.filled(1024, 4), frameIndex: 1),
+    ];
+
+    final averaged = _Classifier();
+    ContinuousAudioDetector(
+      yamnet: _Yamnet(frames: frames),
+      classifier: averaged,
+      sustainFrames: 1,
+      averageEmbeddings: true,
+      onEvent: (_) {},
+    ).process(waveform);
+    expect(averaged.embeddings.single, hasLength(1024));
+    expect(averaged.embeddings.single.first, 3.0);
+    expect(averaged.embeddings.single.last, 3.0);
+
+    final firstOnly = _Classifier();
+    ContinuousAudioDetector(
+      yamnet: _Yamnet(frames: frames),
+      classifier: firstOnly,
+      sustainFrames: 1,
+      onEvent: (_) {},
+    ).process(waveform);
+    expect(firstOnly.embeddings.single.first, 2.0);
+  });
+
+  test('no-effect v2 classes do not start the alert cooldown', () {
+    final classifier = _Classifier();
+    final events = <AudioEvent>[];
+    final detector = ContinuousAudioDetector(
+      yamnet: _Yamnet(),
+      classifier: classifier,
+      sustainFrames: 1,
+      cooldownFrames: 3,
+      isAlertLabel: (label) => label == 'a01_scream_loud',
+      onEvent: events.add,
+    );
+    final waveform = AudioWaveform(
+      samples: const [],
+      sampleRate: 16000,
+      capturedAt: DateTime(2026),
+    );
+    classifier.label = 'n01_quiet_room';
+    detector.process(waveform);
+    classifier.label = 'a01_scream_loud';
+    detector.process(waveform);
+    expect(events.map((e) => e.label), [
+      'n01_quiet_room',
+      'a01_scream_loud',
+    ]);
+  });
+
   testWidgets('impact without subsequent sensor samples is not stillness', (
     tester,
   ) async {
@@ -349,27 +408,32 @@ class _Microphone extends Fake implements MicrophoneCapture {
 }
 
 class _Yamnet implements YamNetStage {
+  _Yamnet({List<YamNetEmbedding>? frames}) : _frames = frames;
+  final List<YamNetEmbedding>? _frames;
   @override
-  List<YamNetEmbedding> embed(AudioWaveform waveform) => [
-    YamNetEmbedding(embedding: List.filled(1024, 0), frameIndex: 0),
-  ];
+  List<YamNetEmbedding> embed(AudioWaveform waveform) =>
+      _frames ??
+      [YamNetEmbedding(embedding: List.filled(1024, 0), frameIndex: 0)];
   @override
   void close() {}
 }
 
 class _Classifier implements SunoAudioClassifier {
   String label = 'ambient_safe';
+  final List<List<double>> embeddings = [];
   @override
   double get confidenceThreshold => .3;
   @override
   List<String> get labels => SunoAudioClassifier.expectedLabels;
   @override
-  SunoClassification classifyEmbedding(List<double> embedding) =>
-      SunoClassification(
-        label: label,
-        confidence: .9,
-        index: labels.indexOf(label),
-      );
+  SunoClassification classifyEmbedding(List<double> embedding) {
+    embeddings.add(embedding);
+    return SunoClassification(
+      label: label,
+      confidence: .9,
+      index: labels.indexOf(label),
+    );
+  }
   @override
   void close() {}
 }

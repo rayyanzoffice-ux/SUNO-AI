@@ -42,3 +42,7 @@ flutter:
     - assets/ml/suno_audio_classifier.tflite
     - assets/ml/labels.json
     - assets/ml/yamnet.tflite
+    # Uncomment both lines after Part A produces these files, then set
+    # useModelV2 = true in lib/config/model_config.dart.
+    # - assets/ml/suno_audio_classifier_v2.tflite
+    # - assets/ml/labels_v2.json

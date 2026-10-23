@@ -9,11 +9,16 @@ class SunoClassification {
     required this.label,
     required this.confidence,
     required this.index,
+    this.secondConfidence = 0,
   });
 
   final String label;
   final double confidence;
   final int index;
+
+  /// Score of the runner-up class. The v2 pipeline uses it for the margin
+  /// rule; v1 leaves it at the default.
+  final double secondConfidence;
 }
 
 /// Runtime adapter for the exported SUNO classifier head.

@@ -26,6 +26,7 @@
   "eventDistressSound": "صوت استغاثة",
   "eventEmergencyAlarm": "إنذار طوارئ",
   "eventImpactBreaking": "صوت اصطدام / تحطّم",
+  "eventGunshotSound": "صوت إطلاق نار",
   "eventAmbientSound": "صوت محيط",
   "eventPossibleDistress": "صوت استغاثة محتمل",
   "eventDistressImpact": "صوت استغاثة + اصطدام",

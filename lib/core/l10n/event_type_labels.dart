@@ -12,6 +12,7 @@ String localizedEventType(AppLocalizations l10n, String raw) =>
       'Distress Sound' => l10n.eventDistressSound,
       'Emergency Alarm' => l10n.eventEmergencyAlarm,
       'Impact / Breaking Sound' => l10n.eventImpactBreaking,
+      'Gunshot Sound' => l10n.eventGunshotSound,
       'Ambient Sound' => l10n.eventAmbientSound,
       'Possible Distress Sound' => l10n.eventPossibleDistress,
       'Distress Sound + Impact' => l10n.eventDistressImpact,

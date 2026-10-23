@@ -26,6 +26,7 @@
   "eventDistressSound": "پریشانی کی آواز",
   "eventEmergencyAlarm": "ایمرجنسی الارم",
   "eventImpactBreaking": "ٹکراؤ / ٹوٹنے کی آواز",
+  "eventGunshotSound": "گولی چلنے کی آواز",
   "eventAmbientSound": "ماحول کی آواز",
   "eventPossibleDistress": "ممکنہ پریشانی کی آواز",
   "eventDistressImpact": "پریشانی کی آواز + ٹکراؤ",

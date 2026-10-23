@@ -1,4 +1,5 @@
 import '../../models/detection_result.dart';
+import '../detection/classifier_labels.dart';
 
 /// Audio class labels that carry distress evidence.
 /// ambient_safe is intentionally absent — confidence for that class never
@@ -40,6 +41,25 @@ class RiskAssessment {
       'RiskAssessment(riskScore: $riskScore, riskLevel: ${riskLevel.wireValue})';
 }
 
+/// Audio score for a v2 class.
+///
+/// Returns 0 for every class whose trained alert weight is 0 (all `n*`
+/// classes) and for any confidence below that class's trained threshold. The
+/// per-class threshold matters: a class can be the model's top prediction and
+/// still be too weak to count as an alert.
+int alertWeightFor(
+  String label,
+  double confidence,
+  ClassifierLabels labels,
+) {
+  final meta = labels.classMeta[label];
+  if (meta == null || meta.alertWeight == 0) return 0;
+  if (confidence < meta.threshold) return 0;
+  return confidence >= RiskWeights.highConfidenceThreshold
+      ? meta.alertWeight
+      : (meta.alertWeight * 0.7).round();
+}
+
 /// Deterministic, class-aware risk-scoring engine.
 ///
 /// ambient_safe never contributes audio score regardless of confidence,
@@ -70,6 +90,42 @@ class RiskEngine {
   RiskAssessment escalateForNoResponse(RiskAssessment previous) {
     final score =
         _clampScore(previous.riskScore + RiskWeights.noResponseToSafetyCheck);
+    return RiskAssessment(riskScore: score, riskLevel: _levelFor(score));
+  }
+
+  /// Scores a v2 detection from the trained class metadata.
+  ///
+  /// A class that passes its trained threshold always reaches at least the
+  /// medium band, because the guide's plan is that one confirmed alert opens
+  /// the safety-check countdown. Weights alone cannot guarantee that: a03 and
+  /// a05 carry 35 while [RiskThresholds.mediumFloor] is 40.
+  ///
+  /// [forceCritical] is set by the pattern layer when repeated or compound
+  /// alert evidence should bypass the countdown. It deliberately ignores the
+  /// additive score: that evidence is qualitatively stronger than one window.
+  RiskAssessment evaluateV2Detection({
+    required String detectedClass,
+    required double confidence,
+    required bool impactDetected,
+    required bool stillnessDetected,
+    required ClassifierLabels labels,
+    bool forceCritical = false,
+  }) {
+    final audioScore = alertWeightFor(detectedClass, confidence, labels);
+    final rawScore = _clampScore(
+      audioScore +
+          (impactDetected ? RiskWeights.impactDetected : 0) +
+          (stillnessDetected ? RiskWeights.stillnessDetected : 0),
+    );
+    if (forceCritical) {
+      return const RiskAssessment(
+        riskScore: RiskThresholds.maxScore,
+        riskLevel: RiskLevel.critical,
+      );
+    }
+    final score = audioScore > 0 && rawScore < RiskThresholds.mediumFloor
+        ? RiskThresholds.mediumFloor
+        : rawScore;
     return RiskAssessment(riskScore: score, riskLevel: _levelFor(score));
   }
 

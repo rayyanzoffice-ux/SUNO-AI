@@ -33,6 +33,7 @@
   "eventDistressSound": "Distress Sound",
   "eventEmergencyAlarm": "Emergency Alarm",
   "eventImpactBreaking": "Impact / Breaking Sound",
+  "eventGunshotSound": "Gunshot Sound",
   "eventAmbientSound": "Ambient Sound",
   "eventPossibleDistress": "Possible Distress Sound",
   "eventDistressImpact": "Distress Sound + Impact",

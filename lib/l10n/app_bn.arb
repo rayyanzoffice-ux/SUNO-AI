@@ -26,6 +26,7 @@
   "eventDistressSound": "বিপদের শব্দ",
   "eventEmergencyAlarm": "জরুরি অ্যালার্ম",
   "eventImpactBreaking": "আঘাত / ভাঙার শব্দ",
+  "eventGunshotSound": "গুলি চালানোর শব্দ",
   "eventAmbientSound": "পরিবেশের শব্দ",
   "eventPossibleDistress": "সম্ভাব্য বিপদের শব্দ",
   "eventDistressImpact": "বিপদের শব্দ + আঘাত",

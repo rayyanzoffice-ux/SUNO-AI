@@ -26,6 +26,7 @@
   "eventDistressSound": "Sonido de auxilio",
   "eventEmergencyAlarm": "Alarma de emergencia",
   "eventImpactBreaking": "Impacto / sonido de rotura",
+  "eventGunshotSound": "Sonido de disparo",
   "eventAmbientSound": "Sonido ambiente",
   "eventPossibleDistress": "Posible sonido de auxilio",
   "eventDistressImpact": "Sonido de auxilio + impacto",

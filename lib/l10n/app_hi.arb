@@ -26,6 +26,7 @@
   "eventDistressSound": "संकट की आवाज़",
   "eventEmergencyAlarm": "आपातकालीन अलार्म",
   "eventImpactBreaking": "टक्कर / टूटने की आवाज़",
+  "eventGunshotSound": "गोली चलने की आवाज़",
   "eventAmbientSound": "आसपास की आवाज़",
   "eventPossibleDistress": "संभावित संकट की आवाज़",
   "eventDistressImpact": "संकट की आवाज़ + टक्कर",

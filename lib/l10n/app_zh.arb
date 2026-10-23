@@ -26,6 +26,7 @@
   "eventDistressSound": "求救声",
   "eventEmergencyAlarm": "紧急警报声",
   "eventImpactBreaking": "撞击/破碎声",
+  "eventGunshotSound": "枪声",
   "eventAmbientSound": "环境声音",
   "eventPossibleDistress": "疑似求救声",
   "eventDistressImpact": "求救声 + 撞击",
