@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suno_ai/backend/detection/alert_pattern_tracker.dart';
 import 'package:suno_ai/backend/detection/classifier_labels.dart';
-import 'package:suno_ai/backend/detection/continuous_audio_detector.dart';
 import 'package:suno_ai/backend/detection/loudness_gate.dart';
 import 'package:suno_ai/backend/detection/v2_audio_classifier.dart';
+import 'package:suno_ai/backend/ml/continuous_audio_detector.dart';
 import 'package:suno_ai/backend/risk/risk_engine.dart';
 import 'package:suno_ai/models/detection_result.dart';
 

@@ -1,4 +1,4 @@
-import 'continuous_audio_detector.dart';
+import '../ml/continuous_audio_detector.dart';
 
 /// Rejects alert sounds that are not clearly louder than the room.
 ///

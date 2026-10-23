@@ -1,5 +1,5 @@
+import '../ml/continuous_audio_detector.dart';
 import 'classifier_labels.dart';
-import 'continuous_audio_detector.dart';
 
 /// Keeps the last [window] of confirmed alert events and answers two
 /// questions: has one class repeated enough to count as sustained evidence,
