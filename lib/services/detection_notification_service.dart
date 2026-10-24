@@ -6,14 +6,14 @@ import '../core/l10n/l10n.dart';
 
 const emergencyChannelId = 'suno_alerts_v2';
 const detectionChannelId = 'suno_detection_v2';
-// v3: the tune is played by AlarmPlayer on the alarm audio stream, which does
-// not depend on notification permission or the activity being visible. The
-// channel is silent so the two can never overlap. A new id is required because
-// Android freezes a channel's sound after creation.
-const localAlarmChannelId = 'suno_local_alarm_v3';
+// v4: sound and vibration both come from AlarmPlayer, so they do not depend on
+// notification permission or the activity being visible. The channel is silent
+// and does not vibrate: Android replaces any ongoing vibration with a
+// notification's vibration, which would cut the countdown waveform to a single
+// pulse. A new id is required because Android freezes channel settings.
+const localAlarmChannelId = 'suno_local_alarm_v4';
 const _detectionNotificationId = 9001;
 final notificationVibration = Int64List.fromList([0, 400, 200, 400, 200, 800]);
-final alarmVibration = Int64List.fromList([0, 600, 300, 600]);
 final sunoNotifications = FlutterLocalNotificationsPlugin();
 
 Future<void> initDetectionNotificationChannel() async {
@@ -42,15 +42,14 @@ Future<void> initDetectionNotificationChannel() async {
       vibrationPattern: notificationVibration,
       playSound: true,
     ),
-    // Silent on purpose: the tune comes from AlarmPlayer, so muting the
-    // notification stream cannot silence the alarm. Vibration stays here.
+    // Silent and still on purpose: tune and vibration come from AlarmPlayer.
+    // A notification vibration would cancel that ongoing waveform.
     AndroidNotificationChannel(
       localAlarmChannelId,
       tr.chanLocalAlarmName,
       description: tr.chanLocalAlarmDesc,
       importance: Importance.max,
-      enableVibration: true,
-      vibrationPattern: alarmVibration,
+      enableVibration: false,
       playSound: false,
     ),
   ]) {
@@ -66,6 +65,9 @@ Future<void> showFullScreenDetectionNotification({
   required String title,
   required String body,
   required bool isCritical,
+  // The safety countdown already rings and vibrates through AlarmPlayer; a
+  // vibration here would replace that waveform with one pulse.
+  bool safetyCheck = false,
 }) async {
   await sunoNotifications.show(
     _detectionNotificationId,
@@ -73,14 +75,15 @@ Future<void> showFullScreenDetectionNotification({
     body,
     NotificationDetails(
       android: AndroidNotificationDetails(
-        detectionChannelId,
-        tr.chanDangerName,
+        safetyCheck ? localAlarmChannelId : detectionChannelId,
+        safetyCheck ? tr.chanLocalAlarmName : tr.chanDangerName,
+        channelDescription: safetyCheck ? tr.chanLocalAlarmDesc : null,
         importance: Importance.max,
         priority: Priority.high,
         fullScreenIntent: true,
-        enableVibration: true,
-        vibrationPattern: notificationVibration,
-        playSound: true,
+        enableVibration: !safetyCheck,
+        vibrationPattern: safetyCheck ? null : notificationVibration,
+        playSound: !safetyCheck,
         category: AndroidNotificationCategory.alarm,
       ),
     ),

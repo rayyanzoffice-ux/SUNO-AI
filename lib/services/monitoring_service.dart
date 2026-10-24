@@ -254,6 +254,7 @@ class MonitoringService extends ChangeNotifier with WidgetsBindingObserver {
                   ? tr.notifBodyCheckDelivery
                   : tr.notifBodyRespondInTime,
               isCritical: completed,
+              safetyCheck: !completed,
             ).catchError((Object _) {
               error = tr.monitoringNotificationsUnavailable;
               _changed();

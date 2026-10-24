@@ -5,7 +5,7 @@ import 'package:vibration/vibration.dart';
 
 import '../../core/l10n/l10n.dart';
 import '../../services/detection_notification_service.dart'
-    show alarmVibration, localAlarmChannelId, sunoNotifications;
+    show localAlarmChannelId, sunoNotifications;
 import 'native_alarm_player.dart';
 
 /// Audible safety alarm. The tune plays natively on Android's alarm stream, so
@@ -21,6 +21,9 @@ class LocalAlarmService {
 
   // A fixed id keeps a second failed dispatch from stacking alarms.
   static const _notificationId = 0x50A0;
+
+  /// Fallback waveform only; the normal path vibrates natively.
+  static const _vibrationPattern = [0, 600, 300, 600];
 
   /// Bumped by [stop]. A [sound] call that was already in flight when the
   /// countdown ended must not post a notification after the stop, or the
@@ -41,19 +44,19 @@ class LocalAlarmService {
     final serial = ++_soundSerial;
     // Native audio ignores notification permission and the activity lifetime,
     // which are exactly the two things that can silence a notification sound.
-    await _player.start(duration: duration);
+    // It also starts a native vibration that lasts the whole countdown.
+    final audible = await _player.start(duration: duration);
     if (epoch != _stopEpoch) {
       // stop() ran while the bridge was starting; do not leave it ringing.
       await _player.stop();
       return;
     }
-    // Vibration runs alongside the tune and the notification and must not
-    // depend on either succeeding: a silenced phone or a denied notification
-    // permission are exactly the cases where it matters most.
-    unawaited(_vibrate(epoch, serial, duration));
+    // Only a failed tune needs the Dart fallback: a second waveform here would
+    // replace the native one, and an unbounded loop can outlive the process.
+    if (!audible) unawaited(_vibrate(epoch, serial, duration));
     // Android 13+ can silently drop a notification when the permission is
     // denied: show() still completes, so the catch below would never run.
-    // Probe first and skip the notification; vibration already started.
+    // Probe first and skip the notification; the tune already runs.
     try {
       final android = sunoNotifications
           .resolvePlatformSpecificImplementation<
@@ -77,11 +80,10 @@ class LocalAlarmService {
             importance: Importance.max,
             priority: Priority.max,
             category: AndroidNotificationCategory.alarm,
-            // The tune comes from NativeAlarmPlayer; a second sound from the
-            // channel would overlap it.
+            // Tune and vibration come from NativeAlarmPlayer; the channel must
+            // add neither, or its vibration would replace the waveform.
             playSound: false,
-            enableVibration: true,
-            vibrationPattern: alarmVibration,
+            enableVibration: false,
             fullScreenIntent: true,
           ),
         ),
@@ -110,7 +112,7 @@ class LocalAlarmService {
     try {
       if (!await Vibration.hasVibrator()) return;
       if (epoch != _stopEpoch) return;
-      await Vibration.vibrate(pattern: alarmVibration, repeat: 0);
+      await Vibration.vibrate(pattern: _vibrationPattern, repeat: 0);
       if (epoch != _stopEpoch) {
         // stop() already ran its own Vibration.cancel while the plugin call
         // was starting up, so cancel this late start too.
